@@ -1,29 +1,28 @@
 {
-  // Cloudflare Pages configuration for ApexTraining.
+  // Cloudflare Pages configuration for Brigade Athletic Club (forked from ApexTraining).
   // Deploy:  npm run build && npx wrangler pages deploy
   // (first time: npx wrangler login)
-  "name": "apextraining",
+  "name": "brigade-app",
   "compatibility_date": "2026-07-01",
   "compatibility_flags": ["nodejs_compat"],
   "pages_build_output_dir": "./dist",
 
-  // D1 database binding (env.DB). Create it once with:
-  //   npx wrangler d1 create apextraining
-  // then paste the returned database_id below.
+  // D1 database binding (env.DB). Database "brigade-app" already exists in
+  // the Cloudflare account; this is its id.
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "apextraining",
-      "database_id": "a49d1b5b-a87c-4bf8-9a41-f45579720918"
+      "database_name": "brigade-app",
+      "database_id": "2d3baffe-74e7-4ee5-b3ac-ab05a7e7ca74"
     }
   ],
 
   // R2 bucket for file uploads (env.FILES). Create it once with:
-  //   npx wrangler r2 bucket create apextraining-files
+  //   npx wrangler r2 bucket create brigade-app-files
   "r2_buckets": [
     {
       "binding": "FILES",
-      "bucket_name": "apextraining-files"
+      "bucket_name": "brigade-app-files"
     }
   ],
 

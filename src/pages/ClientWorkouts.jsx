@@ -64,7 +64,7 @@ function FitnessProgramCard({ program }) {
               </p>
             </div>
           </div>
-          <Badge className="bg-purple-100 text-purple-700 shrink-0 w-fit">{allExercises.length} exercises</Badge>
+          <Badge className="bg-purple-100 text-purple-700 dark:bg-purple-500/15 dark:text-purple-300 shrink-0 w-fit">{allExercises.length} exercises</Badge>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -72,27 +72,27 @@ function FitnessProgramCard({ program }) {
         {program.client_info && (program.client_info.weight_lbs || program.client_info.bmi) && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {program.client_info.weight_lbs && (
-              <div className="rounded-lg p-3 text-center" style={{ background: 'rgba(255,255,255,0.05)' }}>
+              <div className="rounded-lg p-3 text-center bg-secondary">
                 <div className="font-bold text-foreground">{program.client_info.weight_lbs} lbs</div>
                 <div className="text-xs text-muted-foreground">Weight</div>
               </div>
             )}
             {program.client_info.bmi && (
-              <div className="rounded-lg p-3 text-center" style={{ background: 'rgba(255,255,255,0.05)' }}>
+              <div className="rounded-lg p-3 text-center bg-secondary">
                 <div className="font-bold text-foreground">{program.client_info.bmi}</div>
                 <div className="text-xs text-muted-foreground">BMI</div>
               </div>
             )}
             {program.client_info.body_fat && (
-              <div className="rounded-lg p-3 text-center" style={{ background: 'rgba(255,255,255,0.05)' }}>
+              <div className="rounded-lg p-3 text-center bg-secondary">
                 <div className="font-bold text-foreground">{program.client_info.body_fat}%</div>
                 <div className="text-xs text-muted-foreground">Body Fat</div>
               </div>
             )}
             {program.client_info.suggestions && (
-              <div className="col-span-2 sm:col-span-1 rounded-lg p-3" style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.2)' }}>
-                <div className="text-xs text-green-400 font-medium">Notes</div>
-                <div className="text-xs text-green-300 mt-1">{program.client_info.suggestions}</div>
+              <div className="col-span-2 sm:col-span-1 rounded-lg p-3" style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.25)' }}>
+                <div className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">Notes</div>
+                <div className="text-xs text-emerald-700 dark:text-emerald-300 mt-1">{program.client_info.suggestions}</div>
               </div>
             )}
           </div>
@@ -103,10 +103,9 @@ function FitnessProgramCard({ program }) {
           const exercises = (program[section] || []).filter(e => e.name);
           if (!exercises.length) return null;
           return (
-            <div key={section} className="rounded-lg overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.08)' }}>
+            <div key={section} className="rounded-lg overflow-hidden border border-border">
               <button
-                className="w-full flex items-center justify-between px-4 py-3 transition-colors text-left"
-                style={{ background: 'rgba(255,255,255,0.04)' }}
+                className="w-full flex items-center justify-between px-4 py-3 transition-colors text-left bg-secondary hover:bg-accent"
                 onClick={() => setOpenDay(openDay === section ? null : section)}
               >
                 <span className="font-semibold text-foreground">{sectionLabels[section]}</span>
@@ -116,7 +115,7 @@ function FitnessProgramCard({ program }) {
                 </div>
               </button>
               {openDay === section && (
-                <div className="divide-y divide-white/5">
+                <div className="divide-y divide-border">
                   {exercises.map((ex, i) => (
                     <div key={i} className="px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                       <span className="font-medium text-foreground text-sm">{ex.name}</span>

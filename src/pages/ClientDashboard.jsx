@@ -20,6 +20,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { calculateHabitStreak } from "@/lib/utils";
 
 const todayStr = () => new Date().toISOString().split("T")[0];
 
@@ -156,7 +157,7 @@ export default function ClientDashboard() {
     .filter((s) => s.status === "scheduled" && s.date >= today)
     .sort((a, b) => (a.date + (a.time || "")).localeCompare(b.date + (b.time || "")))[0];
 
-  const streak = clientProfile?.current_streak || 0;
+  const streak = calculateHabitStreak(habitLogs);
 
   const allPhotos = progressLogs
     .filter((log) => log.photo_urls && log.photo_urls.length > 0)

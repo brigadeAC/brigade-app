@@ -108,7 +108,7 @@ export default function FocusTimer({ onSessionComplete }) {
             style={preset.label === p.label ? {
               background: 'rgba(212,175,55,0.15)', color: '#d4a017', border: '1px solid rgba(212,175,55,0.3)'
             } : {
-              background: 'rgba(255,255,255,0.04)', color: '#6b7280', border: '1px solid rgba(255,255,255,0.07)'
+              background: 'hsl(var(--secondary))', color: 'hsl(var(--muted-foreground))', border: '1px solid hsl(var(--border))'
             }}
           >
             {p.label}
@@ -120,7 +120,7 @@ export default function FocusTimer({ onSessionComplete }) {
       <div className="flex flex-col items-center mb-6">
         <div className="relative" style={{ width: 160, height: 160 }}>
           <svg width="160" height="160" className="absolute inset-0 -rotate-90">
-            <circle cx="80" cy="80" r={r} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="8" />
+            <circle cx="80" cy="80" r={r} fill="none" stroke="hsl(var(--border))" strokeWidth="8" />
             <circle
               cx="80" cy="80" r={r} fill="none"
               stroke={done ? '#22c55e' : running ? '#d4a017' : 'rgba(212,175,55,0.3)'}

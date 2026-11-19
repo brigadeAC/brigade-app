@@ -148,12 +148,12 @@ export default function ProgressCharts({ logs }) {
   }));
 
   const prs = {
-    bench: Math.max(...performanceData.map(d => d.bench || 0)),
-    squat: Math.max(...performanceData.map(d => d.squat || 0)),
-    deadlift: Math.max(...performanceData.map(d => d.deadlift || 0)),
-    pullups: Math.max(...performanceData.map(d => d.pullups || 0)),
-    pushups: Math.max(...performanceData.map(d => d.pushups || 0)),
-    plank: Math.max(...performanceData.map(d => d.plank || 0)),
+    bench: Math.max(0, ...performanceData.map(d => d.bench || 0)),
+    squat: Math.max(0, ...performanceData.map(d => d.squat || 0)),
+    deadlift: Math.max(0, ...performanceData.map(d => d.deadlift || 0)),
+    pullups: Math.max(0, ...performanceData.map(d => d.pullups || 0)),
+    pushups: Math.max(0, ...performanceData.map(d => d.pushups || 0)),
+    plank: Math.max(0, ...performanceData.map(d => d.plank || 0)),
   };
 
   // Build Nivo line series

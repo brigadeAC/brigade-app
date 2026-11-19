@@ -46,7 +46,7 @@ function WeekStrip({ selectedDate, onSelect }) {
               onClick={() => onSelect(day)}
               className={`flex flex-col items-center px-2 py-1.5 rounded-xl transition-all text-xs font-medium ${
                 isSelected
-                  ? "bg-white text-black"
+                  ? "bg-primary text-primary-foreground"
                   : "text-muted-foreground hover:bg-accent"
               }`}
             >
@@ -74,13 +74,13 @@ function MedalProgress({ progress, trueCount, total }) {
   const medal = getMedal(progress);
   const circumference = 2 * Math.PI * 54;
   const strokeDashoffset = circumference * (1 - progress);
-  const trackColor = medal ? medal.color : "rgba(255,255,255,0.15)";
+  const trackColor = medal ? medal.color : "hsl(var(--border))";
 
   return (
     <div className="flex flex-col items-center gap-2">
       <div className="relative w-36 h-36">
         <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120">
-          <circle cx="60" cy="60" r="54" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="8" />
+          <circle cx="60" cy="60" r="54" fill="none" stroke="hsl(var(--border))" strokeWidth="8" />
           <motion.circle
             cx="60" cy="60" r="54"
             fill="none"
@@ -102,7 +102,7 @@ function MedalProgress({ progress, trueCount, total }) {
             </>
           ) : (
             <>
-              <Trophy className="w-8 h-8 text-gray-600" />
+              <Trophy className="w-8 h-8 text-muted-foreground" />
               <span className="text-xs text-muted-foreground mt-1">Pending</span>
             </>
           )}
@@ -135,8 +135,8 @@ function HabitCard({ habit, dateKey, isCompleted, logNotes, onToggle, onDelete, 
       className="relative flex flex-col items-center justify-center rounded-2xl cursor-pointer select-none"
       style={{
         aspectRatio: "107.5/145",
-        background: isCompleted ? "rgba(255,255,255,0.04)" : "rgba(30,30,32,0.9)",
-        border: isCompleted ? "1.5px solid rgba(255,255,255,0.15)" : "1.5px solid rgba(255,255,255,0.06)",
+        background: isCompleted ? "hsl(var(--secondary) / 0.5)" : "hsl(var(--card))",
+        border: isCompleted ? "1.5px solid hsl(var(--border))" : "1.5px solid hsl(var(--border) / 0.6)",
         boxShadow: isCompleted ? "0 0 0 0 transparent" : "none",
         transition: "all 0.25s ease"
       }}
@@ -165,7 +165,7 @@ function HabitCard({ habit, dateKey, isCompleted, logNotes, onToggle, onDelete, 
         <p
           className="text-center text-xs font-semibold leading-tight transition-all"
           style={{
-            color: isCompleted ? "rgba(255,255,255,0.4)" : "white",
+            color: isCompleted ? "hsl(var(--muted-foreground))" : "hsl(var(--foreground))",
             textDecoration: isCompleted ? "line-through" : "none",
             maxWidth: "90px",
             wordBreak: "break-word"
@@ -197,7 +197,7 @@ function HabitCard({ habit, dateKey, isCompleted, logNotes, onToggle, onDelete, 
             exit={{ opacity: 0, scale: 0.5 }}
             className="absolute top-2 left-2 w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center"
           >
-            <Check className="w-3 h-3 text-black" />
+            <Check className="w-3 h-3 text-emerald-950" />
           </motion.div>
         )}
       </AnimatePresence>
@@ -212,9 +212,9 @@ function AddHabitCard({ onClick }) {
       whileTap={{ scale: 0.94 }}
       onClick={onClick}
       className="flex flex-col items-center justify-center rounded-2xl cursor-pointer border-dashed border-2 border-border hover:border-white/25 transition-all"
-      style={{ aspectRatio: "107.5/145", background: "rgba(20,20,22,0.5)" }}
+      style={{ aspectRatio: "107.5/145", background: "hsl(var(--secondary) / 0.3)" }}
     >
-      <Plus className="w-8 h-8 text-gray-600" />
+      <Plus className="w-8 h-8 text-muted-foreground" />
     </motion.div>
   );
 }
@@ -356,7 +356,7 @@ export default function TrophyHabitTracker({ clientId, trainerId, readOnly = fal
       {/* Week strip */}
       <div
         className="rounded-2xl p-4"
-        style={{ background: "rgba(15,15,18,0.8)", border: "1px solid rgba(255,255,255,0.07)" }}
+        style={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }}
       >
         <WeekStrip selectedDate={selectedDate} onSelect={setSelectedDate} />
       </div>
@@ -365,7 +365,7 @@ export default function TrophyHabitTracker({ clientId, trainerId, readOnly = fal
       {total > 0 && (
         <div
           className="rounded-2xl p-5 flex flex-col items-center"
-          style={{ background: "rgba(15,15,18,0.8)", border: "1px solid rgba(255,255,255,0.07)" }}
+          style={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }}
         >
           <MedalProgress progress={progress} trueCount={trueCount} total={total} />
         </div>
@@ -374,7 +374,7 @@ export default function TrophyHabitTracker({ clientId, trainerId, readOnly = fal
       {/* Habit grid */}
       <div
         className="rounded-2xl p-4"
-        style={{ background: "rgba(10,10,12,0.9)", border: "1px solid rgba(255,255,255,0.07)" }}
+        style={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }}
       >
         {total === 0 ? (
           <div className="text-center py-10 text-muted-foreground">
@@ -448,7 +448,7 @@ export default function TrophyHabitTracker({ clientId, trainerId, readOnly = fal
 
       {/* Completion Modal */}
       <Dialog open={!!completionHabit} onOpenChange={(open) => !open && setCompletionHabit(null)}>
-        <DialogContent className="max-w-sm" style={{ background: "#111113", border: "1px solid rgba(255,255,255,0.1)" }}>
+        <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle className="text-foreground">Complete {completionHabit?.name}</DialogTitle>
           </DialogHeader>
@@ -504,7 +504,7 @@ export default function TrophyHabitTracker({ clientId, trainerId, readOnly = fal
 
       {/* Add habit dialog */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent className="max-w-sm" style={{ background: "#111113", border: "1px solid rgba(255,255,255,0.1)" }}>
+        <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle className="text-foreground">New Habit</DialogTitle>
           </DialogHeader>
@@ -515,7 +515,7 @@ export default function TrophyHabitTracker({ clientId, trainerId, readOnly = fal
                 value={newName}
                 onChange={e => setNewName(e.target.value)}
                 placeholder="e.g. Drink water"
-                className="bg-secondary border-border text-foreground placeholder:text-gray-600"
+                className="bg-secondary border-border text-foreground placeholder:text-muted-foreground"
                 required
                 autoFocus
               />

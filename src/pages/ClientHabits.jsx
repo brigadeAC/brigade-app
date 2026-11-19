@@ -57,7 +57,7 @@ export default function ClientHabits() {
       />
       
       <TrophyHabitTracker
-        clientId={user.id}
+        clientId={clientProfile.id}
         trainerId={clientProfile.trainer_id}
         readOnly={clientProfile.trainer_id !== null}
       />

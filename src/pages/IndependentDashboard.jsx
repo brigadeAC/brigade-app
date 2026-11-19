@@ -5,6 +5,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { CheckCircle2, ChevronRight, LayoutDashboard, Dumbbell, Utensils, MessageCircle, Settings, LogOut, ChevronDown, Upload, Camera, Loader2, PlaySquare, Target, Activity, Users2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { calculateHabitStreak } from "@/lib/utils";
 
 export default function IndependentDashboard() {
   const navigate = useNavigate();
@@ -39,6 +40,8 @@ export default function IndependentDashboard() {
   const { data: workoutPlans = [] } = useQuery({ queryKey: ["clientWorkouts", clientProfile?.id], queryFn: () => base44.entities.WorkoutPlan.filter({ client_id: clientProfile?.id }), enabled: !!clientProfile });
   const { data: mealPlans = [] } = useQuery({ queryKey: ["clientMeals", clientProfile?.id], queryFn: () => base44.entities.MealPlan.filter({ client_id: clientProfile?.id }), enabled: !!clientProfile });
   const { data: progressLogs = [] } = useQuery({ queryKey: ["progressLogs", clientProfile?.id], queryFn: () => base44.entities.ProgressLog.filter({ client_id: clientProfile?.id }, "-date"), enabled: !!clientProfile });
+  const { data: habitLogs = [] } = useQuery({ queryKey: ["habitLogs", clientProfile?.id], queryFn: () => base44.entities.HabitLog.filter({ client_id: clientProfile?.id }), enabled: !!clientProfile });
+  const currentStreak = calculateHabitStreak(habitLogs);
 
   const allPhotos = progressLogs
     .filter(log => log.photo_urls && log.photo_urls.length > 0)
@@ -248,7 +251,7 @@ export default function IndependentDashboard() {
                   <React.Fragment key={row}>
                     {Array.from({length: 7}).map((_, col) => {
                       const pastDays = (3 - row) * 7 + (6 - col);
-                      const isCompleted = pastDays < (clientProfile?.current_streak || 0);
+                      const isCompleted = pastDays < currentStreak;
                       const isCurrent = pastDays === 0;
                       
                       return (

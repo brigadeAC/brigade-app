@@ -64,26 +64,48 @@ export default function ClientProgress() {
   });
 
   const queryClient = useQueryClient();
+  const [clientProfile, setClientProfile] = useState(null);
 
   useEffect(() => {
-    base44.auth.me().then(setUser);
+    const loadUser = async () => {
+      const userData = await base44.auth.me();
+      setUser(userData);
+      let profile = null;
+      try {
+        const byEmail = await base44.entities.Client.filter({ email: userData.email });
+        if (byEmail.length > 0) profile = byEmail[0];
+      } catch (e) {}
+      if (!profile) {
+        try {
+          const byUserId = await base44.entities.Client.filter({ user_id: userData.id });
+          if (byUserId.length > 0) profile = byUserId[0];
+        } catch (e) {}
+      }
+      if (profile && !profile.user_id) {
+        try { await base44.entities.Client.update(profile.id, { user_id: userData.id }); } catch (e) {}
+        profile = { ...profile, user_id: userData.id };
+      }
+      setClientProfile(profile || null);
+    };
+    loadUser();
   }, []);
 
   const { data: progressLogs = [] } = useQuery({
-    queryKey: ["myProgressLogs"],
+    queryKey: ["myProgressLogs", clientProfile?.id],
     queryFn: async () => {
-      if (!user?.id) return [];
-      const logs = await base44.entities.ProgressLog.filter({ client_id: user.id }, "-date");
+      if (!clientProfile?.id) return [];
+      const logs = await base44.entities.ProgressLog.filter({ client_id: clientProfile.id }, "-date");
       return logs;
     },
-    enabled: !!user?.id,
+    enabled: !!clientProfile?.id,
   });
 
   const createLogMutation = useMutation({
     mutationFn: (data) =>
       base44.entities.ProgressLog.create({
         ...data,
-        client_id: user?.id,
+        client_id: clientProfile?.id,
+        trainer_id: clientProfile?.trainer_id,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["myProgressLogs"] });

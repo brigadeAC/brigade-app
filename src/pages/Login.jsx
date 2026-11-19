@@ -90,8 +90,7 @@ export default function Login() {
                   <label className="block text-sm text-muted-foreground mb-1">Beta key</label>
                   <input
                     type="text"
-                    required
-                    placeholder="e.g. ACOACH-XXXXXXXX"
+                    placeholder="e.g. ACOACH-XXXXXXXX (leave blank for an admin account)"
                     value={form.beta_key}
                     onChange={(e) => setForm({ ...form, beta_key: e.target.value.toUpperCase() })}
                     className="w-full rounded-lg bg-background border border-border px-3 py-2 text-foreground outline-none focus:border-primary uppercase tracking-wider"

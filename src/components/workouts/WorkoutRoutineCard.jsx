@@ -22,7 +22,7 @@ export default function WorkoutRoutineCard({ day, exercises, onComplete, clientI
   const allDone = completedSetCount === totalSets && totalSets > 0;
 
   return (
-    <div className="glass-card rounded-xl overflow-hidden" style={{ background: 'rgba(20,20,20,0.6)', border: '1px solid rgba(255,255,255,0.05)' }}>
+    <div className="glass-card rounded-xl overflow-hidden bg-card border border-border">
       <button
         onClick={() => setExpanded(e => !e)}
         className="w-full flex items-center gap-3 p-4 text-left hover:bg-accent transition-colors"
@@ -44,7 +44,7 @@ export default function WorkoutRoutineCard({ day, exercises, onComplete, clientI
       </button>
 
       {expanded && (
-        <div className="border-t border-border divide-y divide-white/5">
+        <div className="border-t border-border divide-y divide-border">
           {exercises.map((exercise, eIdx) => (
             <div key={eIdx} className="p-4 bg-secondary">
               <div className="flex items-start gap-3 mb-3">
@@ -92,9 +92,9 @@ export default function WorkoutRoutineCard({ day, exercises, onComplete, clientI
                       onClick={() => toggleSet(eIdx, sIdx)}
                       className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-all font-medium"
                       style={done ? {
-                        background: 'rgba(0,255,157,0.15)', color: '#00ff9d', border: '1px solid rgba(0,255,157,0.3)', boxShadow: '0 0 10px rgba(0,255,157,0.1)'
+                        background: 'rgba(0,255,157,0.15)', color: '#00c278', border: '1px solid rgba(0,255,157,0.35)', boxShadow: '0 0 10px rgba(0,255,157,0.1)'
                       } : {
-                        background: 'rgba(255,255,255,0.02)', color: '#9ca3af', border: '1px solid rgba(255,255,255,0.1)'
+                        background: 'hsl(var(--secondary))', color: 'hsl(var(--muted-foreground))', border: '1px solid hsl(var(--border))'
                       }}
                     >
                       {done ? <CheckCircle2 className="w-3 h-3" /> : <Circle className="w-3 h-3" />}
@@ -109,7 +109,7 @@ export default function WorkoutRoutineCard({ day, exercises, onComplete, clientI
           {allDone && (
             <div className="p-4 bg-card">
               <Button
-                className="w-full font-bold text-black border-none transition-all hover:"
+                className="w-full font-bold text-emerald-950 border-none transition-all"
                 style={{ background: 'linear-gradient(135deg, #00ff9d, #059669)' }}
                 onClick={() => onComplete?.({ day, exercises })}
               >
