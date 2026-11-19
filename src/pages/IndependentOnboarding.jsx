@@ -15,7 +15,7 @@ export default function IndependentOnboarding() {
   
   const [formData, setFormData] = useState({
     age: '',
-    gender: 'male',
+    gender: '',
     weight_kg: '',
     height_cm: '',
     goals: '',
@@ -71,7 +71,7 @@ export default function IndependentOnboarding() {
         
       });
 
-      const prompt = `Create a 4-week workout plan and a 1-day meal plan for a ${formData.age} year old ${formData.gender}, weighing ${formData.weight_kg}kg, height ${formData.height_cm}cm.
+      const prompt = `Create a 4-week workout plan and a 1-day meal plan for a ${formData.age} year old ${formData.gender || 'person'}, weighing ${formData.weight_kg}kg, height ${formData.height_cm}cm.
 Activity level: ${formData.activity_level}. Equipment: ${formData.equipment}. Goal: ${formData.goals}.
 Output JSON exactly matching these properties:
 {
@@ -176,6 +176,7 @@ Output JSON exactly matching these properties:
             <div className="space-y-2">
               <label className="text-sm font-semibold text-muted-foreground">Gender</label>
               <select className="w-full bg-card border border-border rounded-xl p-3 text-foreground" value={formData.gender} onChange={e => setFormData({...formData, gender: e.target.value})}>
+                <option value="">Prefer not to say</option>
                 <option value="male">Male</option>
                 <option value="female">Female</option>
                 <option value="other">Other</option>

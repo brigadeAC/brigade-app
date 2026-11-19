@@ -27,7 +27,7 @@ export default function ClientForm({ open, onOpenChange, client, onSubmit }) {
     email: "",
     phone: "",
     date_of_birth: "",
-    gender: "male",
+    gender: "",
     status: "active",
     goals: "",
     medical_notes: "",

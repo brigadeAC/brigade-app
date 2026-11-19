@@ -60,7 +60,7 @@ export default function TrainerClientOnboarding({ open, onOpenChange, client, on
     email: "",
     phone: "",
     age: "",
-    gender: "male",
+    gender: "",
     status: "active",
     // Physical metrics
     height_cm: "",
@@ -100,7 +100,7 @@ export default function TrainerClientOnboarding({ open, onOpenChange, client, on
         email: client.email || "",
         phone: client.phone || "",
         age: client.age || "",
-        gender: client.gender || "male",
+        gender: client.gender || "",
         status: client.status || "active",
         height_cm: convertHeightValue(client.height_cm) || "",
         weight_kg: convertWeightValue(client.weight_kg) || "",
@@ -136,7 +136,7 @@ export default function TrainerClientOnboarding({ open, onOpenChange, client, on
         email: "",
         phone: "",
         age: "",
-        gender: "male",
+        gender: "",
         status: "active",
         height_cm: "",
         weight_kg: "",
@@ -324,7 +324,7 @@ export default function TrainerClientOnboarding({ open, onOpenChange, client, on
                   <div className="space-y-2">
                     <Label className="text-muted-foreground">Gender</Label>
                     <Select value={formData.gender} onValueChange={(v) => handleChange("gender", v)}>
-                      <SelectTrigger className="bg-card border-border text-foreground focus:ring-[#00ff9d]"><SelectValue /></SelectTrigger>
+                      <SelectTrigger className="bg-card border-border text-foreground focus:ring-[#00ff9d]"><SelectValue placeholder="Not specified" /></SelectTrigger>
                       <SelectContent className="bg-card border-border text-foreground">
                         <SelectItem className="focus:bg-secondary" value="male">Male</SelectItem>
                         <SelectItem className="focus:bg-secondary" value="female">Female</SelectItem>
