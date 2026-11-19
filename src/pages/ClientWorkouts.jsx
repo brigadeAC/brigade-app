@@ -36,7 +36,7 @@ import ExerciseProgressChart from "@/components/workouts/ExerciseProgressChart";
 import WorkoutRoutineCard from "@/components/workouts/WorkoutRoutineCard";
 import VolumeChart from "@/components/analytics/VolumeChart";
 import WorkoutForm from "@/components/workouts/WorkoutForm";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import FormCheckAnalyzer from "@/components/workouts/FormCheckAnalyzer";
 import WorkoutMusicPlayer from "@/components/workouts/WorkoutMusicPlayer";
 import LiveWorkoutMode from "@/components/workouts/LiveWorkoutMode";
@@ -558,7 +558,7 @@ export default function ClientWorkouts() {
                         </div>
                         <div>
                           <CardTitle className="text-base text-foreground">
-                            {format(new Date(log.date), 'EEEE, MMMM d, yyyy')}
+                            {format(parseISO(log.date), 'EEEE, MMMM d, yyyy')}
                           </CardTitle>
                           <p className="text-sm text-muted-foreground">
                             {log.duration_minutes} minutes • {log.exercises?.length || 0} exercises

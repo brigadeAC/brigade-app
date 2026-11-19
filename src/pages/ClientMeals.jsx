@@ -36,7 +36,7 @@ import {
 "lucide-react";
 import MealPlanForm from "@/components/meals/MealPlanForm";
 
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 
 function CalorieLogEditor({ log, onSave }) {
   const [entries, setEntries] = useState(log.entries || []);
@@ -535,9 +535,9 @@ export default function ClientMeals() {
                         </div>
                         <div>
                           <CardTitle className="text-base text-foreground">
-                            {log.meal_name || format(new Date(log.date), 'EEEE, MMMM d, yyyy')}
+                            {log.meal_name || format(parseISO(log.date), 'EEEE, MMMM d, yyyy')}
                           </CardTitle>
-                          <p className="text-sm text-muted-foreground capitalize">{log.meal_type} • {format(new Date(log.date), 'MMM d, yyyy')}</p>
+                          <p className="text-sm text-muted-foreground capitalize">{log.meal_type} • {format(parseISO(log.date), 'MMM d, yyyy')}</p>
                         </div>
                       </div>
                     </div>

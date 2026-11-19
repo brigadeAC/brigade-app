@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Plus, Trash2, Edit2, MoreVertical, TrendingDown, DollarSign, Filter, Download } from "lucide-react";
 import { toast } from "sonner";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 
 const CATEGORIES = [
   { id: "equipment", label: "Equipment", color: "#ef4444", bg: "rgba(239,68,68,0.1)" },
@@ -268,7 +268,7 @@ export default function TrainerExpenses() {
                     </div>
                     <div className="min-w-0">
                       <p className="font-semibold text-foreground truncate">{expense.description}</p>
-                      <p className="text-xs text-muted-foreground">{cat?.label} • {expense.date ? format(new Date(expense.date), "MMM d") : format(new Date(expense.created_date), "MMM d")}</p>
+                      <p className="text-xs text-muted-foreground">{cat?.label} • {expense.date ? format(parseISO(expense.date), "MMM d") : format(new Date(expense.created_date), "MMM d")}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3 ml-4">

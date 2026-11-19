@@ -100,7 +100,7 @@ Return a JSON object with the following structure:
         setGeneratedPlan({
           name: plan.name,
           description: plan.description,
-          client_id: client.user_id || client.id,
+          client_id: client.id, // Client record id, what the client dashboard reads
           duration_days: 7,
           calories_target: parseInt(calorieTarget),
           protein_target_g: parseInt(proteinTarget),
@@ -149,7 +149,7 @@ Return a JSON object with the following structure:
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 mt-2">
-            <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300">
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs text-amber-800 dark:text-amber-300">
               <span className="flex-shrink-0 mt-0.5">⚠️</span>
               <span><strong>NASM/ISSA Nutrition Scope:</strong> As a CPT, provide general healthy eating guidance only. Clinical or therapeutic dietary plans require an RD/RDN credential. AI plans are a starting point — always review before assigning.</span>
             </div>

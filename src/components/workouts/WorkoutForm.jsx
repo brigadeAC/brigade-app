@@ -448,7 +448,7 @@ export default function WorkoutForm({ open, onOpenChange, workout, clients, onSu
                           <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${isOpen ? "rotate-180" : ""}`} />
                           <span className="font-semibold text-foreground">Day {dayNum}</span>
                           {dayExercises.length > 0 && (
-                            <span className="text-xs bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded-full border border-purple-500/30">{dayExercises.length} exercise{dayExercises.length !== 1 ? "s" : ""}</span>
+                            <span className="text-xs bg-purple-500/20 text-purple-700 dark:text-purple-300 px-2 py-0.5 rounded-full border border-purple-500/30">{dayExercises.length} exercise{dayExercises.length !== 1 ? "s" : ""}</span>
                           )}
                         </div>
                         <div className="flex items-center gap-2">

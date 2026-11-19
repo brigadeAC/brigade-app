@@ -524,7 +524,7 @@ function ExpensesTab({ user, expenses, queryClient, isOpen, setIsOpen, editingEx
                     {irsCategories.find(c => c.value === exp.category)?.label || exp.category}
                   </span>
                   {exp.items?.length > 0 && (
-                    <span className="text-[10px] uppercase tracking-wider bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full">Itemized</span>
+                    <span className="text-[10px] uppercase tracking-wider bg-blue-500/20 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full">Itemized</span>
                   )}
                 </h4>
                 <p className="text-sm text-muted-foreground mt-1">{exp.date} {exp.vendor && `• ${exp.vendor}`} {exp.notes && `• ${exp.notes}`}</p>

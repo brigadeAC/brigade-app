@@ -68,6 +68,17 @@ export default function Messages() {
     enabled: !!user && !clientProfile,
   });
 
+  // A client's own trainer, so a brand-new conversation shows the trainer's
+  // name before any message exists (the trainers list above is coach-only).
+  const { data: myTrainer } = useQuery({
+    queryKey: ["my-trainer", clientProfile?.trainer_id],
+    queryFn: async () => {
+      const res = await base44.functions.invoke('getUserById', { userId: clientProfile.trainer_id });
+      return res.data?.user || null;
+    },
+    enabled: !!clientProfile?.trainer_id,
+  });
+
   const { data: allPlatformClients = [] } = useQuery({
     queryKey: ["all-platform-clients", user?.id],
     queryFn: async () => {
@@ -202,7 +213,7 @@ export default function Messages() {
     if (!selectedConversation) return null;
     const existing = conversations.find(c => c.id === selectedConversation);
     if (existing) return existing;
-    const allPeople = [...clients, ...otherClients, ...trainers, ...allPlatformClients];
+    const allPeople = [...clients, ...otherClients, ...trainers, ...(myTrainer ? [myTrainer] : []), ...allPlatformClients];
     const person = allPeople.find(p => [user.id, p.user_id || p.id].sort().join("-") === selectedConversation);
     if (person) return { id: selectedConversation, otherUserId: person.user_id || person.id, otherUserName: person.full_name, lastMessage: "", lastMessageTime: new Date().toISOString(), unreadCount: 0 };
     return null;

@@ -10,18 +10,39 @@ import ReactMarkdown from "react-markdown";
 
 export default function ClientRecovery() {
   const [user, setUser] = useState(null);
+  const [clientProfile, setClientProfile] = useState(null);
 
+  // Readiness logs and AI protocols are keyed by the Client record id (what the
+  // coach side reads), falling back to the login id only if no profile exists.
   useEffect(() => {
-    base44.auth.me().then(setUser);
+    const load = async () => {
+      const me = await base44.auth.me();
+      let profile = null;
+      try {
+        const byEmail = await base44.entities.Client.filter({ email: me.email });
+        if (byEmail.length > 0) profile = byEmail[0];
+      } catch (e) {}
+      if (!profile) {
+        try {
+          const byUserId = await base44.entities.Client.filter({ user_id: me.id });
+          if (byUserId.length > 0) profile = byUserId[0];
+        } catch (e) {}
+      }
+      setClientProfile(profile);
+      setUser(me);
+    };
+    load();
   }, []);
+
+  const clientId = clientProfile?.id || user?.id;
 
   const today = format(new Date(), 'yyyy-MM-dd'); // local date, not UTC
 
   const { data: prescriptionNote, isLoading } = useQuery({
-    queryKey: ["recoveryPrescription", user?.id, today],
+    queryKey: ["recoveryPrescription", clientId, today],
     queryFn: async () => {
       const notes = await base44.entities.ClientNote.filter({ 
-        client_id: user?.id, 
+        client_id: clientId,
         trainer_id: "AI_SYSTEM"
       }, "-created_date", 10);
       
@@ -33,7 +54,7 @@ export default function ClientRecovery() {
         null
       );
     },
-    enabled: !!user?.id
+    enabled: !!clientId
   });
 
   return (
@@ -50,7 +71,7 @@ export default function ClientRecovery() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         <div className="space-y-8">
-          {user && <SleepStressLogger userId={user.id} />}
+          {clientId && <SleepStressLogger userId={clientId} />}
 
           {/* Today's AI recovery protocol (generated after logging readiness) */}
           <Card className="glass-card border-blue-500/20">
@@ -83,8 +104,8 @@ export default function ClientRecovery() {
 
         <div>
           <AIRecoveryPlan
-            clientId={user?.id}
-            clientProfile={user}
+            clientId={clientId}
+            clientProfile={clientProfile || user}
             workoutLogs={[]}
           />
         </div>

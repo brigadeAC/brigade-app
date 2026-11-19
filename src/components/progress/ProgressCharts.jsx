@@ -3,6 +3,7 @@ import { ResponsiveLine } from "@nivo/line";
 import { ResponsiveBar } from "@nivo/bar";
 import { TrendingUp, TrendingDown, Minus, Weight, Ruler, Zap, Activity, Trophy } from "lucide-react";
 import { useUnitSystem } from "@/components/hooks/useUnitSystem";
+import { parseISO } from "date-fns";
 
 const COLORS = {
   gold: "#d4a017",
@@ -115,13 +116,13 @@ export default function ProgressCharts({ logs }) {
   const sortedLogs = [...logs].sort((a, b) => new Date(a.date) - new Date(b.date));
 
   const weightData = sortedLogs.filter(l => l.weight_kg || l.body_fat_percentage).map(l => ({
-    date: new Date(l.date).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+    date: parseISO(l.date).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
     weight: l.weight_kg ? Number(convertWeightDisplay(l.weight_kg)) : null,
     bodyFat: l.body_fat_percentage || null,
   }));
 
   const measurementsData = sortedLogs.filter(l => l.measurements && Object.values(l.measurements).some(v => v)).map(l => ({
-    date: new Date(l.date).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+    date: parseISO(l.date).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
     chest: l.measurements?.chest ? Number(convertHeightDisplay(l.measurements.chest)) : null,
     waist: l.measurements?.waist ? Number(convertHeightDisplay(l.measurements.waist)) : null,
     hips: l.measurements?.hips ? Number(convertHeightDisplay(l.measurements.hips)) : null,
@@ -130,7 +131,7 @@ export default function ProgressCharts({ logs }) {
   }));
 
   const performanceData = sortedLogs.filter(l => l.performance_metrics && Object.values(l.performance_metrics).some(v => v)).map(l => ({
-    date: new Date(l.date).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+    date: parseISO(l.date).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
     bench: l.performance_metrics?.bench_press_kg ? Number(convertWeightDisplay(l.performance_metrics.bench_press_kg)) : null,
     squat: l.performance_metrics?.squat_kg ? Number(convertWeightDisplay(l.performance_metrics.squat_kg)) : null,
     deadlift: l.performance_metrics?.deadlift_kg ? Number(convertWeightDisplay(l.performance_metrics.deadlift_kg)) : null,
@@ -140,7 +141,7 @@ export default function ProgressCharts({ logs }) {
   }));
 
   const biometricsData = sortedLogs.filter(l => l.biometrics && Object.values(l.biometrics).some(v => v)).map(l => ({
-    date: new Date(l.date).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+    date: parseISO(l.date).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
     hrv: l.biometrics?.hrv_ms || null,
     sleep: l.biometrics?.sleep_quality_score || null,
     cns: l.biometrics?.cns_readiness || null,

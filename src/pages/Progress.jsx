@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { 
   Plus, 
   TrendingUp,
@@ -149,7 +149,7 @@ export default function Progress() {
     : [];
 
   const chartData = clientLogs.map(log => ({
-    date: format(new Date(log.date), "MMM d"),
+    date: format(parseISO(log.date), "MMM d"),
     weight: log.weight_kg,
     bodyFat: log.body_fat_percentage
   }));
@@ -223,7 +223,7 @@ export default function Progress() {
                       <div className="p-4 border-b border-border flex items-center gap-2">
                         <Camera className="h-5 w-5 text-emerald-400" />
                         <h3 className="font-semibold text-foreground">
-                          {format(new Date(log.date), 'MMMM yyyy')}
+                          {format(parseISO(log.date), 'MMMM yyyy')}
                         </h3>
                       </div>
                       <div className="p-6">
@@ -322,7 +322,7 @@ export default function Progress() {
                   <div key={log.id} className="p-4 hover:bg-accent transition-colors">
                     <div className="flex items-center justify-between">
                       <p className="font-medium text-foreground">
-                        {format(new Date(log.date), "MMMM d, yyyy")}
+                        {format(parseISO(log.date), "MMMM d, yyyy")}
                       </p>
                       <div className="flex items-center gap-4 text-sm">
                         {log.weight_kg && (

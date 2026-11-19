@@ -48,8 +48,8 @@ const EXERCISES = [
 ];
 
 const difficultyColor = {
-  Beginner: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
-  Intermediate: "bg-yellow-500/20 text-yellow-300 border-yellow-500/30",
+  Beginner: "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-500/30",
+  Intermediate: "bg-yellow-500/20 text-yellow-700 dark:text-yellow-300 border-yellow-500/30",
   Advanced: "bg-red-500/20 text-red-300 border-red-500/30",
 };
 
@@ -144,14 +144,14 @@ function CoachingCatalog({ exercises }) {
             <div className="flex items-start justify-between gap-2">
               <p className="font-semibold text-foreground text-sm leading-tight">{ex.name}</p>
               {ex.unilateral && (
-                <Badge className="text-[10px] px-1.5 py-0 border bg-blue-500/20 text-blue-300 border-blue-500/30 whitespace-nowrap">
+                <Badge className="text-[10px] px-1.5 py-0 border bg-blue-500/20 text-blue-700 dark:text-blue-300 border-blue-500/30 whitespace-nowrap">
                   Unilateral
                 </Badge>
               )}
             </div>
 
             <div className="flex flex-wrap gap-1.5">
-              <Badge className="text-[10px] px-1.5 py-0 border bg-emerald-500/20 text-emerald-300 border-emerald-500/30">
+              <Badge className="text-[10px] px-1.5 py-0 border bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-500/30">
                 {PATTERN_LABEL[ex.pattern] || ex.pattern}
               </Badge>
               {ex.equipment && (
@@ -184,7 +184,7 @@ function CoachingCatalog({ exercises }) {
                   <div className="flex items-start gap-1.5 text-xs">
                     <ArrowDownRight className="w-3.5 h-3.5 text-amber-400 flex-shrink-0 mt-0.5" />
                     <span className="text-muted-foreground">
-                      <span className="text-amber-300 font-medium">Regress:</span> {ex.regression}
+                      <span className="text-amber-700 dark:text-amber-300 font-medium">Regress:</span> {ex.regression}
                     </span>
                   </div>
                 )}
@@ -192,7 +192,7 @@ function CoachingCatalog({ exercises }) {
                   <div className="flex items-start gap-1.5 text-xs">
                     <ArrowUpRight className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0 mt-0.5" />
                     <span className="text-muted-foreground">
-                      <span className="text-emerald-300 font-medium">Progress:</span> {ex.progression}
+                      <span className="text-emerald-700 dark:text-emerald-300 font-medium">Progress:</span> {ex.progression}
                     </span>
                   </div>
                 )}

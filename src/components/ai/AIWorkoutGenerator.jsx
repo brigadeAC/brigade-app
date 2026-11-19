@@ -32,6 +32,12 @@ Fitness Level: ${client.fitness_level || 'intermediate'}
 Goals: ${goal}
 Duration: ${durationWeeks} weeks
 
+Design ONE training week that will repeat for all ${durationWeeks} weeks.
+Train 3 days that week, on days 1, 3 and 5 (day numbers are calendar days of the week).
+Each training day must have 5 or 6 exercises: a main compound lift first, then accessories, then core.
+Use a different focus on each day (for example lower body, upper body, full body).
+Write the description without assuming the client's gender.
+
 Return a JSON object with the following structure:
 {
   "name": "Plan Name",
@@ -40,16 +46,11 @@ Return a JSON object with the following structure:
   "days_per_week": 3,
   "difficulty": "intermediate",
   "exercises": [
-    {
-      "day": 1,
-      "name": "Exercise Name",
-      "sets": 3,
-      "reps": "10-12",
-      "rest_seconds": 60,
-      "notes": "Tips"
-    }
+    { "day": 1, "name": "Back Squat", "sets": 4, "reps": "6-8", "rest_seconds": 120, "notes": "Tips" },
+    { "day": 1, "name": "Romanian Deadlift", "sets": 3, "reps": "8-10", "rest_seconds": 90, "notes": "Tips" }
   ]
-}`,
+}
+List every exercise for days 1, 3 and 5 (15 to 18 entries in total).`,
         response_json_schema: {
           type: "object",
           properties: {
@@ -78,14 +79,30 @@ Return a JSON object with the following structure:
       });
 
       if (plan) {
-        // Pre-fill the workout form with AI data — don't save yet
+        // The model writes one template week (days 1-7); repeat it for every
+        // week of the block, matching the form's 7-day-per-week numbering
+        // (the form shows at most 31 days).
+        const weeks = parseInt(durationWeeks, 10) || 4;
+        const template = (Array.isArray(plan.exercises) ? plan.exercises : [])
+          .filter((e) => e && e.name)
+          .map((e) => ({ ...e, day: Math.min(7, Math.max(1, Math.round(e.day || 1))) }));
+        const exercises = [];
+        for (let w = 0; w < weeks; w++) {
+          for (const e of template) {
+            const day = e.day + w * 7;
+            if (day <= 31) exercises.push({ ...e, day });
+          }
+        }
+        // Pre-fill the workout form with AI data — don't save yet.
+        // client_id must be the Client record id: that is what the client's
+        // dashboard and workouts pages look plans up by.
         setGeneratedPlan({
           name: plan.name,
           description: plan.description,
-          client_id: client.user_id || client.id,
-          duration_weeks: plan.duration_weeks,
-          days_per_week: plan.days_per_week,
-          exercises: plan.exercises,
+          client_id: client.id,
+          duration_weeks: weeks,
+          days_per_week: plan.days_per_week || 3,
+          exercises,
           difficulty: plan.difficulty || "intermediate",
           status: "active",
           trainer_id: client.trainer_id
@@ -129,7 +146,7 @@ Return a JSON object with the following structure:
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 mt-2">
-            <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300">
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs text-amber-800 dark:text-amber-300">
               <span className="flex-shrink-0 mt-0.5">⚠️</span>
               <span><strong>NASM/ISSA Scope of Practice:</strong> AI-generated plans are a starting point only. Always review, modify, and approve before assigning. Do not prescribe exercise for medical conditions — refer to licensed professionals when indicated.</span>
             </div>

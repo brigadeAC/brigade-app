@@ -172,7 +172,7 @@ export default function Dashboard() {
             </div>
             <h2 className="text-5xl font-bold mb-1 text-foreground drop-">{totalSessionsCount.toLocaleString()}</h2>
             <p className="text-xs text-muted-foreground mb-2">all time</p>
-            <div className="flex items-center gap-1.5 text-[10px] text-green-300 bg-green-500/10 w-max px-2 py-0.5 rounded border border-green-500/20 mb-4">
+            <div className="flex items-center gap-1.5 text-[10px] text-green-700 dark:text-green-300 bg-green-500/10 w-max px-2 py-0.5 rounded border border-green-500/20 mb-4">
               <Sparkles className="w-3 h-3" />
               {upcomingSessionsCount} upcoming
             </div>
@@ -467,7 +467,7 @@ export default function Dashboard() {
               </div>
             </div>
             {leads.filter(l => l.status !== "won" && l.status !== "lost").length > 0 && (
-              <div className="mt-4 flex items-center gap-2 text-xs text-blue-300 bg-blue-500/10 border border-blue-500/20 px-3 py-1.5 rounded-lg justify-center w-max mx-auto">
+              <div className="mt-4 flex items-center gap-2 text-xs text-blue-700 dark:text-blue-300 bg-blue-500/10 border border-blue-500/20 px-3 py-1.5 rounded-lg justify-center w-max mx-auto">
                 <Bot className="w-3.5 h-3.5" />
                 AI is auto-following up with {leads.filter(l => l.status !== "won" && l.status !== "lost").length} leads
               </div>

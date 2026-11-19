@@ -3,7 +3,7 @@ import { base44 } from "@/api/base44Client";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BookOpen, TrendingUp, Frown, Smile, Loader2 } from "lucide-react";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 
 export default function TrainerJournalInsights() {
   const [user, setUser] = useState(null);
@@ -75,7 +75,7 @@ export default function TrainerJournalInsights() {
                         {client?.full_name || "Unknown Client"}
                         {entry.sentiment && getSentimentIcon(entry.sentiment)}
                       </CardTitle>
-                      <p className="text-sm text-muted-foreground">{format(new Date(entry.date), 'MMMM d, yyyy')}</p>
+                      <p className="text-sm text-muted-foreground">{format(parseISO(entry.date), 'MMMM d, yyyy')}</p>
                     </div>
                   </div>
                 </CardHeader>

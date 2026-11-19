@@ -197,6 +197,11 @@ async function ownershipClause(env, user) {
     { sql: 'created_by = ?', bind: user.email },
     { sql: "json_extract(data,'$.trainer_id') = ?", bind: user.id },
     { sql: "json_extract(data,'$.user_id') = ?", bind: user.id },
+    // Rows about this user as a client, keyed by their login id. The coach's
+    // Workouts, Schedule and Meals pages assign by login id once the client
+    // has signed up; without this term those plans were invisible to clients.
+    { sql: "json_extract(data,'$.client_id') = ?", bind: user.id },
+    { sql: "json_extract(data,'$.client_user_id') = ?", bind: user.id },
     { sql: "json_extract(data,'$.email') = ?", bind: user.email },
     { sql: "json_extract(data,'$.sender_id') = ?", bind: user.id },
     { sql: "json_extract(data,'$.receiver_id') = ?", bind: user.id },
@@ -473,8 +478,25 @@ async function runFunction(name, payload, ctx) {
       return { logo_url: null };
 
     case 'getUserById': {
+      // Public profile only: callers (client portal) need the trainer's name,
+      // branding and portal feature switches. The full userRow includes email,
+      // billing and beta-key data, so never return it here, and require login.
+      if (!user) return { user: null };
       const row = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(payload?.userId || payload?.id).first();
-      return { user: userRow(row) };
+      const u = userRow(row);
+      if (!u) return { user: null };
+      return {
+        user: {
+          id: u.id,
+          full_name: u.full_name,
+          role: u.role,
+          user_type: u.user_type,
+          business_name: u.business_name,
+          business_logo_url: u.business_logo_url,
+          avatar_url: u.avatar_url,
+          client_portal_features: u.client_portal_features,
+        },
+      };
     }
 
     case 'submitContact': {
@@ -748,7 +770,7 @@ async function runFunction(name, payload, ctx) {
 
       const out = await invokeLLM(
         {
-          prompt: `A fitness client wrote this journal entry. Summarize it for their trainer in 1-2 sentences (third person, professional, flag anything the trainer should follow up on), and classify overall sentiment. Entry: """${content}"""`,
+          prompt: `A fitness client wrote this journal entry. Summarize it for their trainer in 1-2 sentences (third person using "the client" or they/them, never guess gender from a name; professional; flag anything the trainer should follow up on), and classify overall sentiment. Entry: """${content}"""`,
           response_json_schema: {
             type: 'object',
             properties: {
@@ -1200,13 +1222,28 @@ async function invokeLLM(payload, env) {
   }
 
   if (env.AI) {
-    const out = await env.AI.run(env.WORKERS_AI_MODEL || '@cf/meta/llama-3.1-8b-instruct', {
-      messages: [
-        { role: 'system', content: sys },
-        { role: 'user', content: prompt },
-      ],
-      max_tokens: 2048,
-    });
+    const model = env.WORKERS_AI_MODEL || '@cf/meta/llama-3.1-8b-instruct';
+    const messages = [
+      { role: 'system', content: sys },
+      { role: 'user', content: prompt },
+    ];
+    // With a schema, use Workers AI JSON mode so the model is constrained to
+    // valid JSON. Free-form prompting alone regularly produced malformed JSON
+    // (e.g. missing commas), which parsed into a useless { text } blob.
+    if (schema) {
+      try {
+        const out = await env.AI.run(model, {
+          messages,
+          max_tokens: 2048,
+          response_format: { type: 'json_schema', json_schema: schema },
+        });
+        const parsed = parseOut(out?.response ?? '');
+        if (parsed && typeof parsed === 'object' && !('text' in parsed && Object.keys(parsed).length === 1)) {
+          return parsed;
+        }
+      } catch { /* model without JSON mode support: fall through */ }
+    }
+    const out = await env.AI.run(model, { messages, max_tokens: 2048 });
     return parseOut(out?.response ?? '');
   }
 

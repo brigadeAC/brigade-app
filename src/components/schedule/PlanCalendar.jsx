@@ -146,7 +146,7 @@ export default function PlanCalendar({ workoutPlans = [], mealPlans = [], sessio
                       isSelected ? "bg-purple-500/20 border-purple-500/50" : "border-border bg-secondary",
                     )}
                   >
-                    <span className={cn("text-sm font-semibold z-10 mb-1", isSelected ? "text-purple-300" : "text-muted-foreground", isCurrentMonth && !isSelected && "text-foreground")}>
+                    <span className={cn("text-sm font-semibold z-10 mb-1", isSelected ? "text-purple-700 dark:text-purple-300" : "text-muted-foreground", isCurrentMonth && !isSelected && "text-foreground")}>
                       {format(date, "d")}
                     </span>
                     {hasPlans && (
@@ -178,7 +178,7 @@ export default function PlanCalendar({ workoutPlans = [], mealPlans = [], sessio
               <div className="space-y-3">
                 {selectedWorkouts.map(plan => (
                   <div key={plan.id} className="p-3 rounded-lg border border-green-500/20 bg-green-500/5">
-                    <h4 className="font-bold text-sm text-green-300">{plan.name}</h4>
+                    <h4 className="font-bold text-sm text-green-700 dark:text-green-300">{plan.name}</h4>
                     <p className="text-xs text-muted-foreground mt-1">{plan.difficulty} • {plan.duration_weeks}w</p>
                     <div className="mt-3 space-y-2 max-h-48 overflow-y-auto pr-1">
                       {plan.exercises?.filter(e => {
@@ -212,7 +212,7 @@ export default function PlanCalendar({ workoutPlans = [], mealPlans = [], sessio
               <div className="space-y-3">
                 {selectedMeals.map(plan => (
                   <div key={plan.id} className="p-3 rounded-lg border border-yellow-500/20 bg-yellow-500/5">
-                    <h4 className="font-bold text-sm text-yellow-300">{plan.name}</h4>
+                    <h4 className="font-bold text-sm text-yellow-700 dark:text-yellow-300">{plan.name}</h4>
                     <p className="text-xs text-muted-foreground mt-1">{plan.calories_target} cal target</p>
                     <div className="mt-3 space-y-2 max-h-48 overflow-y-auto pr-1">
                       {plan.meals?.filter(m => {
@@ -249,7 +249,7 @@ export default function PlanCalendar({ workoutPlans = [], mealPlans = [], sessio
                     {selectedSessions.map(session => (
                       <div key={session.id} className="p-3 rounded-lg border border-purple-500/20 bg-purple-500/5 flex justify-between items-center">
                         <div>
-                          <p className="font-semibold text-sm text-purple-300 capitalize">{session.type?.replace('_', ' ')}</p>
+                          <p className="font-semibold text-sm text-purple-700 dark:text-purple-300 capitalize">{session.type?.replace('_', ' ')}</p>
                           <p className="text-xs text-muted-foreground mt-0.5">{session.notes || "No notes"}</p>
                         </div>
                         <div className="text-right">

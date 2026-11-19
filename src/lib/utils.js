@@ -17,7 +17,7 @@ export function calculateHabitStreak(habitLogs = []) {
   );
   if (completedDates.size === 0) return 0;
 
-  const toKey = (d) => d.toISOString().split("T")[0];
+  const toKey = (d) => d.toLocaleDateString("sv-SE"); // local yyyy-MM-dd
   const cursor = new Date();
   cursor.setHours(0, 0, 0, 0);
 

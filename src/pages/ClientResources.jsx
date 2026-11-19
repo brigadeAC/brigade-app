@@ -17,11 +17,11 @@ import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 
 const categoryColors = {
-  workout: "bg-blue-900/40 text-blue-300 border-blue-700",
+  workout: "bg-blue-900/40 text-blue-700 dark:text-blue-300 border-blue-700",
   nutrition: "bg-orange-900/40 text-orange-300 border-orange-700",
   medical: "bg-red-900/40 text-red-300 border-red-700",
   general: "bg-gray-700/40 text-muted-foreground border-gray-600",
-  motivation: "bg-purple-900/40 text-purple-300 border-purple-700"
+  motivation: "bg-purple-900/40 text-purple-700 dark:text-purple-300 border-purple-700"
 };
 
 export default function ClientResources() {

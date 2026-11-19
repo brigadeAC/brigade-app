@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import {
   Plus,
   TrendingUp,
@@ -309,7 +309,7 @@ export default function ClientProgress() {
                 <div className="flex items-start justify-between">
                   <div>
                     <p className="font-medium text-foreground">
-                      {format(new Date(log.date), "MMMM d, yyyy")}
+                      {format(parseISO(log.date), "MMMM d, yyyy")}
                     </p>
                     <div className="flex flex-wrap gap-3 mt-2 text-sm text-muted-foreground">
                       {log.weight_kg && (

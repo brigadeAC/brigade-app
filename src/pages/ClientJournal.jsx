@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { BookOpen, Sparkles, Send, Loader2 } from "lucide-react";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -127,7 +127,7 @@ export default function ClientJournal() {
           <AnimatePresence>
             {entries?.map(entry => (
               <motion.div key={entry.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="p-6 glass-card hover:border-indigo-300 transition-colors">
-                <div className="text-sm text-indigo-400 font-semibold mb-2">{format(new Date(entry.date), 'MMMM d, yyyy')}</div>
+                <div className="text-sm text-indigo-400 font-semibold mb-2">{format(parseISO(entry.date), 'MMMM d, yyyy')}</div>
                 {entry.ai_prompt_used && (
                   <div className="text-sm text-muted-foreground mb-3 italic">Q: {entry.ai_prompt_used}</div>
                 )}

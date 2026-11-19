@@ -83,7 +83,7 @@ export default function InstallGuide() {
                 <p>2. Scroll down and select <strong>Add to Home Screen</strong>.</p>
                 <p>3. Tap <strong>Add</strong> in the top right.</p>
                 <div className="p-2 bg-blue-900/40 rounded border border-blue-500/20 mt-2">
-                  <p className="text-xs text-blue-300 font-medium">Important: Push features only work after adding to home screen, not in the browser tab.</p>
+                  <p className="text-xs text-blue-700 dark:text-blue-300 font-medium">Important: Push features only work after adding to home screen, not in the browser tab.</p>
                 </div>
               </div>
             ) : (

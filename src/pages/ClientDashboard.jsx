@@ -22,7 +22,9 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { calculateHabitStreak } from "@/lib/utils";
 
-const todayStr = () => new Date().toISOString().split("T")[0];
+// Local calendar date (matches the Habits page). UTC would roll over to
+// "tomorrow" in the evening for US time zones.
+const todayStr = () => new Date().toLocaleDateString("sv-SE");
 
 function greeting() {
   const h = new Date().getHours();
@@ -95,15 +97,26 @@ export default function ClientDashboard() {
   }, [clientProfile, navigate]);
 
   const clientId = clientProfile?.id;
+  // Plans and sessions created by the coach are keyed by either the Client
+  // record id or the client's login id depending on where they were created
+  // (the Schedule and Meals pages use the login id), so look up both.
+  const clientIds = [clientId, user?.id].filter(Boolean);
+  const byEitherId = async (entity, sort) => {
+    const results = await Promise.allSettled(
+      [...new Set(clientIds)].map((id) => base44.entities[entity].filter({ client_id: id }, sort))
+    );
+    const rows = results.flatMap((r) => (r.status === "fulfilled" ? r.value : []));
+    return rows.filter((row, i) => rows.findIndex((x) => x.id === row.id) === i);
+  };
 
   const { data: workoutPlans = [] } = useQuery({
-    queryKey: ["clientWorkouts", clientId],
-    queryFn: () => base44.entities.WorkoutPlan.filter({ client_id: clientId }),
+    queryKey: ["clientWorkouts", clientId, user?.id],
+    queryFn: () => byEitherId("WorkoutPlan"),
     enabled: !!clientId,
   });
   const { data: mealPlans = [] } = useQuery({
-    queryKey: ["clientMeals", clientId],
-    queryFn: () => base44.entities.MealPlan.filter({ client_id: clientId }),
+    queryKey: ["clientMeals", clientId, user?.id],
+    queryFn: () => byEitherId("MealPlan"),
     enabled: !!clientId,
   });
   const { data: progressLogs = [] } = useQuery({
@@ -122,13 +135,13 @@ export default function ClientDashboard() {
     enabled: !!clientId,
   });
   const { data: sessions = [] } = useQuery({
-    queryKey: ["clientSessions", clientId],
-    queryFn: () => base44.entities.Session.filter({ client_id: clientId }),
+    queryKey: ["clientSessions", clientId, user?.id],
+    queryFn: () => byEitherId("Session"),
     enabled: !!clientId,
   });
   const { data: workoutLogs = [] } = useQuery({
-    queryKey: ["clientWorkoutLogs", clientId],
-    queryFn: () => base44.entities.WorkoutLog.filter({ client_id: clientId }),
+    queryKey: ["clientWorkoutLogs", clientId, user?.id],
+    queryFn: () => byEitherId("WorkoutLog"),
     enabled: !!clientId,
   });
 

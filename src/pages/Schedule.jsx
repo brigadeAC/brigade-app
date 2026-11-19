@@ -96,7 +96,7 @@ export default function Schedule() {
       .sort((a, b) => a.start_time.localeCompare(b.start_time));
   };
 
-  const getClientById = (clientId) => clients.find(c => (c.user_id || c.id) === clientId);
+  const getClientById = (clientId) => clients.find(c => c.user_id === clientId || c.id === clientId);
 
   const handleCreateSession = async (data) => {
     const selectedClient = clients.find(c => (c.user_id || c.id) === data.client_id);
