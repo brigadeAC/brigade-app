@@ -82,6 +82,7 @@ import PublicHome from './pages/PublicHome';
 import Recipes from './pages/Recipes';
 import ReportBug from './pages/ReportBug';
 import Resources from './pages/Resources';
+import HabitLibrary from './pages/HabitLibrary';
 import Schedule from './pages/Schedule';
 import Settings from './pages/Settings';
 import Terms from './pages/Terms';
@@ -99,6 +100,7 @@ export const PAGES = {
     "AdminBugs": AdminBugs,
     "AdminContactMessages": AdminContactMessages,
     "BusinessHub": BusinessHub,
+    "HabitLibrary": HabitLibrary,
     "CRM": CRM,
     "ClientCommunity": ClientCommunity,
     "ClientDashboard": ClientDashboard,

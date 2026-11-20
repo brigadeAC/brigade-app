@@ -24,6 +24,7 @@ import {
   Zap,
   MessageCircle,
   Library,
+  ListChecks,
   FileText,
   DollarSign,
   Users2,
@@ -75,6 +76,7 @@ const navGroups = [
     title: "Programs",
     items: [
       { name: "Resources", icon: Library, page: "Resources" },
+      { name: "Habit Library", icon: ListChecks, page: "HabitLibrary" },
       { name: "Bulk Import", icon: Upload, page: "BulkImport" }
     ]
   },
@@ -130,6 +132,7 @@ const adminNavGroups = [
     title: 'Content',
     items: [
       { name: 'Resources', icon: Library, page: 'Resources' },
+      { name: 'Habit Library', icon: ListChecks, page: 'HabitLibrary' },
       { name: 'Contracts', icon: FileText, page: 'Contracts' },
       { name: 'Community', icon: Users2, page: 'TrainerCommunity' },
     ]

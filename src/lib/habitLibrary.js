@@ -128,3 +128,31 @@ export function formatTarget(habit) {
   }
   return freq;
 }
+
+// The library coaches pick from: prebuilt habits plus the gym's HabitTemplate
+// rows. A template with `overrides: "builtin:<id>"` replaces that prebuilt
+// habit (an edit), or removes it when `hidden` is true.
+export function mergeLibrary(gymTemplates = [], { includeHidden = false } = {}) {
+  const overrides = new Map();
+  const own = [];
+  for (const t of gymTemplates) {
+    if (t.overrides) overrides.set(t.overrides, t);
+    else own.push({ ...t, builtin: false });
+  }
+  const builtins = [];
+  for (const b of BUILTIN_HABITS) {
+    const o = overrides.get(b.id);
+    if (!o) { builtins.push(b); continue; }
+    if (o.hidden && !includeHidden) continue;
+    builtins.push({
+      ...b,
+      ...Object.fromEntries(Object.entries(o).filter(([k, v]) => v !== undefined && v !== null && k !== "id")),
+      id: b.id,
+      builtin: true,
+      edited: !o.hidden && !!o.name,
+      hidden: !!o.hidden,
+      override_id: o.id,
+    });
+  }
+  return [...own, ...builtins];
+}

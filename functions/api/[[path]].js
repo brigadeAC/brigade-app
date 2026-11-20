@@ -209,6 +209,8 @@ async function memberResourceTerm(env, user) {
 
 // Staff (trainers and admins) work for the gym: they all see the same clients,
 // plans, templates and business records. Only these stay private per person.
+// Gym libraries everyone can read but only staff can change.
+const STAFF_LIBRARY_TYPES = new Set(['HabitTemplate']);
 const STAFF_PRIVATE_TYPES = new Set(['Message', 'Notification', 'CoachBriefing', 'AgentConversation']);
 const isStaff = (user) => !!user && (user.role === 'admin' || user.user_type === 'trainer');
 const isMemberUser = (user) => !!user && user.role !== 'admin' && (user.user_type === 'client' || user.user_type === 'independent');
@@ -253,6 +255,7 @@ async function ownershipClause(env, user) {
 async function memberWriteViolation(env, user, type, fields, existing = null) {
   if (!user || user.role === 'admin') return null;
   if (user.user_type !== 'client' && user.user_type !== 'independent') return null;
+  if (STAFF_LIBRARY_TYPES.has(type)) return 'Only coaches can change the gym library.';
 
   const { results } = await env.DB.prepare(
     `SELECT id, data FROM entities WHERE entity_type='Client' AND (json_extract(data,'$.email') = ? OR json_extract(data,'$.user_id') = ?)`
@@ -436,7 +439,7 @@ async function audit(env, { actor, action, target, targetId, detail, request }) 
 const COACH_PRIVATE_TYPES = new Set(['ClientNote', 'ClientNotebookPage']);
 
 async function entityScope(env, type, user) {
-  if (SHARED_TYPES.has(type)) return null;
+  if (SHARED_TYPES.has(type) || STAFF_LIBRARY_TYPES.has(type)) return null;
   if (isStaff(user) && !STAFF_PRIVATE_TYPES.has(type)) return null;
   const scope = await ownershipClause(env, user);
   if (!scope) return null; // admin
@@ -2246,6 +2249,7 @@ export async function onRequest(context) {
           const row = await getScopedEntity(env, type, id, user);
           if (!row) return err('Not found.', 404);
           if (sharedWriteDenied(type, row, user)) return err('Only the author can delete this.', 403);
+          if (STAFF_LIBRARY_TYPES.has(type) && !isStaff(user)) return err('Only coaches can change the gym library.', 403);
           // Clients and their data are kept until an admin deletes the client.
           if (type === 'Client') {
             if (user.role !== 'admin') return err('Only an admin can delete a client.', 403);
