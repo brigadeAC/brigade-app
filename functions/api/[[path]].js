@@ -1714,7 +1714,10 @@ export async function onRequest(context) {
         const user_type = body.user_type || 'independent';
         const isAllowlistedAdmin = resolveRole(env, email, 'user') === 'admin';
         let claimedKeyRow = null;
-        if (isAllowlistedAdmin) {
+        // Admins skip the trainer beta-key gate, but a client account still
+        // needs a Client record (the coach's invite): without one every
+        // client page has no profile to load and the app looks broken.
+        if (isAllowlistedAdmin && user_type !== 'client') {
           // no gate
         } else if (user_type === 'trainer') {
           const key = String(body.beta_key || '').trim().toUpperCase();
