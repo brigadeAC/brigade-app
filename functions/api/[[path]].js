@@ -409,12 +409,23 @@ async function audit(env, { actor, action, target, targetId, detail, request }) 
 // Used by BOTH the list endpoint and single-record GET/PUT/DELETE so that
 // fetching a record by its id can never bypass the list's access rules.
 // Returns null when no restriction applies (admins, shared content types).
+const COACH_PRIVATE_TYPES = new Set(['ClientNote', 'ClientNotebookPage']);
+
 async function entityScope(env, type, user) {
   if (SHARED_TYPES.has(type)) return null;
   const scope = await ownershipClause(env, user);
   if (!scope) return null; // admin
   let sql = scope.sql;
   const binds = [...scope.binds];
+  // Coach notes and notebooks are about the member but written for the coach
+  // (including "medical" notes). Members only see notes they wrote and the AI
+  // recovery prescriptions stored as notes from AI_SYSTEM.
+  if (COACH_PRIVATE_TYPES.has(type) && (user.user_type === 'client' || user.user_type === 'independent')) {
+    return {
+      sql: `(created_by = ? OR (json_extract(data,'$.trainer_id') = 'AI_SYSTEM' AND ${scope.sql}))`,
+      binds: [user.email, ...scope.binds],
+    };
+  }
   if (type === 'Resource') {
     const extra = await trainerResourceTerms(env, user);
     if (extra.length) {
@@ -767,7 +778,7 @@ async function runFunction(name, payload, ctx) {
     case 'aiPersonalizedPlans': {
       const plan = await invokeLLM(
         {
-          prompt: `Create a personalized recovery plan for this client. Profile: ${JSON.stringify(payload?.clientProfile || {})}. Recent workout activity count: ${(payload?.workoutLogs || []).length}. Give practical, specific guidance for each area.`,
+          prompt: `Create a personalized recovery plan for this client. Profile: ${JSON.stringify(payload?.clientProfile || {})}. Recent workout activity count: ${(payload?.workoutLogs || []).length}. Give practical, specific guidance for each area in two to four sentences, and a mobility routine of four to six movements with how long and how often to do each.`,
           response_json_schema: {
             type: 'object',
             properties: {
@@ -776,9 +787,22 @@ async function runFunction(name, payload, ctx) {
               stress_management: { type: 'string' },
               active_recovery_days: { type: 'string' },
               deload_schedule: { type: 'string' },
-              mobility_routine: { type: 'array', items: { type: 'string' } },
+              mobility_routine: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    exercise: { type: 'string' },
+                    description: { type: 'string' },
+                    duration_minutes: { type: 'number' },
+                    frequency: { type: 'string' },
+                  },
+                  required: ['exercise', 'description', 'duration_minutes', 'frequency'],
+                },
+              },
               expected_outcomes: { type: 'string' },
             },
+            required: ['sleep_optimization', 'nutrition_timing', 'stress_management', 'active_recovery_days', 'deload_schedule', 'mobility_routine', 'expected_outcomes'],
           },
         },
         env

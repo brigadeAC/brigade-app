@@ -100,7 +100,6 @@ export default function MealPlanForm({ open, onOpenChange, plan, clients, onSubm
         carbs_target_g: 200,
         fat_target_g: 65,
         status: "active",
-        circadian_timing: true,
         daily_meals: {}
       });
     }
@@ -356,23 +355,6 @@ export default function MealPlanForm({ open, onOpenChange, plan, clients, onSubm
               />
             </div>
 
-            {!simpleMode && (
-            <div className="space-y-2 sm:col-span-2 pt-2 pb-2">
-               <div className="flex items-center justify-between p-4 bg-primary/10 border border-primary/20 rounded-xl">
-                 <div>
-                   <Label className="text-primary font-bold block mb-1">Circadian Nutritional Timing</Label>
-                   <p className="text-xs text-muted-foreground">AI predicts precise eating windows mapped to workout schedules and metabolic circadian rhythms. Integrates directly into client's daily schedule.</p>
-                 </div>
-                 <button
-                   type="button"
-                   onClick={() => handleChange("circadian_timing", !formData.circadian_timing)}
-                   className={`w-12 h-6 rounded-full transition-colors relative ${formData.circadian_timing ? 'bg-primary' : 'bg-gray-400'}`}
-                 >
-                   <div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-transform ${formData.circadian_timing ? 'translate-x-7' : 'translate-x-1'}`} />
-                 </button>
-               </div>
-             </div>
-            )}
 
           </div>
 

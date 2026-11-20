@@ -23,7 +23,11 @@ export default function ClientJournal() {
 
   const { data: entries, isLoading } = useQuery({
     queryKey: ["journalEntries", user?.id],
-    queryFn: () => base44.entities.JournalEntry.filter({ client_id: user?.id }, "-date", 30),
+    queryFn: async () => {
+      const rows = await base44.entities.JournalEntry.filter({ client_id: user?.id }, "-date", 30);
+      // Newest first, including several entries on the same day.
+      return rows.sort((a, b) => (b.date || "").localeCompare(a.date || "") || (b.created_date || "").localeCompare(a.created_date || ""));
+    },
     enabled: !!user?.id
   });
 

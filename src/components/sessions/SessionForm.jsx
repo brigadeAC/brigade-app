@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,16 +19,27 @@ import {
 import { Calendar, Clock, Loader2, Video } from "lucide-react";
 import { showSuccess } from "@/components/ui/success-toast";
 
+const EMPTY_SESSION = {
+  client_id: "",
+  date: "",
+  start_time: "09:00",
+  end_time: "10:00",
+  type: "personal_training",
+  status: "scheduled",
+  notes: ""
+};
+
 export default function SessionForm({ open, onOpenChange, session, clients, onSubmit }) {
-  const [formData, setFormData] = useState(session || {
-    client_id: "",
-    date: "",
-    start_time: "09:00",
-    end_time: "10:00",
-    type: "personal_training",
-    status: "scheduled",
-    notes: ""
-  });
+  // `session` is either an existing session (has an id) or a prefill such as
+  // { date } from a day's Add button. Reset whenever the dialog opens so the
+  // prefill and the previous edit don't leak between opens.
+  const isEdit = !!session?.id;
+  const [formData, setFormData] = useState({ ...EMPTY_SESSION, ...(session || {}) });
+  useEffect(() => {
+    if (open) setFormData({ ...EMPTY_SESSION, ...(session || {}) });
+    // Keyed on identity fields: callers pass a fresh prefill object each render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, session?.id, session?.date]);
   const [isLoading, setIsLoading] = useState(false);
 
   const timeSlots = [];
@@ -52,7 +63,7 @@ export default function SessionForm({ open, onOpenChange, session, clients, onSu
     }
     
     await onSubmit(submitData);
-    showSuccess(session ? "Session Updated." : "Session Scheduled.", session ? "Changes saved successfully" : "Session has been booked");
+    showSuccess(isEdit ? "Session updated." : "Session scheduled.", isEdit ? "Changes saved." : "It's on their schedule now.");
     setIsLoading(false);
     onOpenChange(false);
   };
@@ -69,7 +80,7 @@ export default function SessionForm({ open, onOpenChange, session, clients, onSu
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary flex items-center justify-center">
               <Calendar className="w-5 h-5 text-foreground" />
             </div>
-            {session ? "Edit Session" : "Schedule Session"}
+            {isEdit ? "Edit Session" : "Schedule Session"}
           </DialogTitle>
         </DialogHeader>
 
@@ -187,7 +198,7 @@ export default function SessionForm({ open, onOpenChange, session, clients, onSu
               disabled={isLoading}
             >
               {isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              {session ? "Update Session" : "Schedule"}
+              {isEdit ? "Update Session" : "Schedule"}
             </Button>
           </div>
         </form>

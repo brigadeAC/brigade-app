@@ -12,7 +12,7 @@ export default function AIRecoveryPlan({ clientId, clientProfile, workoutLogs })
 
   const handleGenerateRecovery = async () => {
     if (!clientProfile) {
-      toast.error("No client profile");
+      toast.error("No client profile on this account yet. Ask your coach to add you.");
       return;
     }
 
@@ -27,6 +27,8 @@ export default function AIRecoveryPlan({ clientId, clientProfile, workoutLogs })
       if (response.data?.success) {
         setRecovery(response.data.data);
         toast.success("Recovery plan generated.");
+      } else {
+        toast.error("Couldn't generate a plan right now. Try again in a minute.");
       }
     } catch (error) {
       console.error(error);
@@ -138,16 +140,21 @@ export default function AIRecoveryPlan({ clientId, clientProfile, workoutLogs })
             <CardTitle className="text-primary">Daily Mobility Routine</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {recovery.mobility_routine.map((exercise, idx) => (
+            {recovery.mobility_routine.map((item, idx) => {
+              const exercise = typeof item === "string" ? { exercise: item } : item;
+              return (
               <div key={idx} className="bg-secondary p-3 rounded-lg">
                 <p className="font-medium text-foreground">{exercise.exercise}</p>
-                <p className="text-sm text-muted-foreground mt-1">{exercise.description}</p>
+                {exercise.description && <p className="text-sm text-muted-foreground mt-1">{exercise.description}</p>}
+                {(exercise.duration_minutes || exercise.frequency) && (
                 <div className="flex justify-between mt-2 text-xs text-muted-foreground">
-                  <span>{exercise.duration_minutes} min</span>
+                  <span>{exercise.duration_minutes ? `${exercise.duration_minutes} min` : ""}</span>
                   <span>{exercise.frequency}</span>
                 </div>
+                )}
               </div>
-            ))}
+              );
+            })}
           </CardContent>
         </Card>
       )}

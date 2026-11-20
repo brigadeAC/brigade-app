@@ -615,12 +615,14 @@ export default function Layout({ children, currentPageName }) {
 
       {/* Main content */}
       <main className="lg:pl-72 min-h-screen lg:pb-0 w-full overflow-x-hidden" style={{ paddingBottom: 'calc(80px + env(safe-area-inset-bottom))', paddingTop: 'calc(80px + env(safe-area-inset-top))' }}>
-        {/* Floating AI Orb */}
+        {/* Floating AI Orb — hidden where it would cover a send button */}
+        {!['Messages', 'TrainerAssistant'].includes(currentPageName) && (
         <Link to={createPageUrl("TrainerAssistant")} className="fixed bottom-24 lg:bottom-8 right-6 z-50 flex items-center justify-center pointer-events-none group hidden md:flex">
-          <div className="w-14 h-14 bg-gradient-to-br from-[#4B91DD] to-[#4B91DD] rounded-full border-2 border-border flex items-center justify-center animate-bounce pointer-events-auto cursor-pointer hover:scale-110 transition-transform">
+          <div className="w-14 h-14 bg-gradient-to-br from-[#4B91DD] to-[#4B91DD] rounded-full border-2 border-border flex items-center justify-center pointer-events-auto cursor-pointer hover:scale-110 transition-transform">
             <Bot className="w-6 h-6 text-primary-foreground" />
           </div>
         </Link>
+        )}
         <PullToRefresh onRefresh={handleRefresh} pullingContent="" refreshingContent={<div className="flex justify-center p-4"><div className="w-6 h-6 border-2 border-[#4B91DD] border-t-transparent rounded-full animate-spin" /></div>}>
           <div className="p-4 lg:p-6 max-w-[1400px] mx-auto min-h-[calc(100vh-80px)]" style={{ paddingLeft: 'max(1rem, env(safe-area-inset-left))', paddingRight: 'max(1rem, env(safe-area-inset-right))' }}>
             <AnimatePresence mode="wait">

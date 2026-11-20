@@ -147,10 +147,19 @@ export default function Messages() {
   }, [allMessages, user]);
 
   const markAsReadMutation = useMutation({
-    mutationFn: (ids) => Promise.all(ids.map(id => base44.entities.Message.update(id, { read: true }))),
+    mutationFn: async (ids) => {
+      await Promise.all(ids.map(id => base44.entities.Message.update(id, { read: true })));
+      // Reading the thread also clears its "New message" bell notifications.
+      try {
+        const notes = await base44.entities.Notification.filter({ user_id: user.id, type: 'message' });
+        await Promise.all(notes.filter(n => !n.read).map(n => base44.entities.Notification.update(n.id, { read: true })));
+      } catch { /* the bell can still be cleared by hand */ }
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["messages", selectedConversation] });
       queryClient.invalidateQueries({ queryKey: ["conversations"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["unreadMessages"] });
     },
   });
 

@@ -62,6 +62,23 @@ function ProgressRing({ value, max, size = 120, stroke = 10, color = "#4B91DD", 
   );
 }
 
+const SESSION_TYPE_LABELS = {
+  personal_training: "Personal training",
+  group_class: "Group class",
+  assessment: "Assessment",
+  consultation: "Consultation",
+  video_call: "Video call",
+};
+
+// "09:00" -> "9:00 AM" in the member's locale; missing -> "Time TBD".
+function formatSessionTime(t) {
+  if (!t) return "Time TBD";
+  const [h, m] = String(t).split(":").map(Number);
+  if (Number.isNaN(h)) return t;
+  const d = new Date(); d.setHours(h, m || 0, 0, 0);
+  return d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+}
+
 export default function ClientDashboard() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -147,8 +164,12 @@ export default function ClientDashboard() {
 
   // ---- derived ----
   const today = todayStr();
+  // Newest active plan that actually has exercises; an empty plan is useless
+  // as "today's workout".
+  const byNewest = [...workoutPlans].sort((a, b) => (b.created_date || "").localeCompare(a.created_date || ""));
   const activePlan =
-    workoutPlans.find((p) => p.status === "active") || workoutPlans[0] || null;
+    byNewest.find((p) => p.status === "active" && p.exercises?.length) ||
+    byNewest.find((p) => p.status === "active") || byNewest[0] || null;
   const activeMealPlan =
     mealPlans.find((p) => p.status === "active") || mealPlans[0] || null;
 
@@ -168,7 +189,7 @@ export default function ClientDashboard() {
 
   const nextSession = sessions
     .filter((s) => s.status === "scheduled" && s.date >= today)
-    .sort((a, b) => (a.date + (a.time || "")).localeCompare(b.date + (b.time || "")))[0];
+    .sort((a, b) => (a.date + (a.start_time || a.time || "")).localeCompare(b.date + (b.start_time || b.time || "")))[0];
 
   const streak = calculateHabitStreak(habitLogs);
 
@@ -382,7 +403,7 @@ export default function ClientDashboard() {
                 })}
               </p>
               <p className="text-sm text-muted-foreground">
-                {nextSession.time || "Time TBD"} · {nextSession.type || nextSession.title || "Training session"}
+                {formatSessionTime(nextSession.start_time || nextSession.time)} · {SESSION_TYPE_LABELS[nextSession.type] || nextSession.title || "Training session"}
               </p>
             </div>
           ) : (
