@@ -64,7 +64,7 @@ export default function PublicHome() {
               Sign in <ArrowRight className="w-4 h-4" />
             </button>
             <button
-              onClick={goToLogin}
+              onClick={() => navigate(createPageUrl("Login") + "?mode=signup")}
               className="h-12 px-8 rounded-[6px] border border-border text-foreground text-sm font-bold uppercase tracking-[0.08em] hover:bg-secondary transition"
             >
               Create your account

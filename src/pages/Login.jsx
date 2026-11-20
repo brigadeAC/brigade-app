@@ -8,8 +8,11 @@ import { Dumbbell } from 'lucide-react';
 export default function Login() {
   const { login, register } = useAuth();
   const navigate = useNavigate();
-  const [mode, setMode] = useState('login'); // 'login' | 'register'
-  const [form, setForm] = useState({ email: '', password: '', full_name: '', user_type: 'independent', beta_key: '' });
+  // ?mode=signup opens the sign-up form; ?type=trainer|client|independent preselects the account type.
+  const params = new URLSearchParams(window.location.search);
+  const initialType = ['trainer', 'client', 'independent'].includes(params.get('type')) ? params.get('type') : 'independent';
+  const [mode, setMode] = useState(params.get('mode') === 'signup' ? 'register' : 'login'); // 'login' | 'register'
+  const [form, setForm] = useState({ email: '', password: '', full_name: '', user_type: initialType, beta_key: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
