@@ -50,7 +50,7 @@ export default function LiveWorkoutMode({ workoutSession, setWorkoutSession, onC
       {/* Top Header */}
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-xl font-bold text-foreground">Live Workout</h2>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap justify-end gap-2 max-w-[60%]">
           {workoutSession.exercises.map((_, idx) => (
             <div
               key={idx}

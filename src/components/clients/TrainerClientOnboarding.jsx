@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -178,8 +178,18 @@ export default function TrainerClientOnboarding({ open, onOpenChange, client, on
     }));
   };
 
+  const submittingRef = useRef(false);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    // Enter in a field, or a double-tap on "Next Step" as it turns into the
+    // submit button, used to save the client twice. Only the last step saves.
+    if (currentStep < steps.length - 1) {
+      setCurrentStep(currentStep + 1);
+      return;
+    }
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setIsLoading(true);
     try {
       const user = await base44.auth.me();
@@ -251,6 +261,7 @@ export default function TrainerClientOnboarding({ open, onOpenChange, client, on
     } catch (error) {
       toast.error(error.message || "Failed to save client");
     } finally {
+      submittingRef.current = false;
       setIsLoading(false);
     }
   };

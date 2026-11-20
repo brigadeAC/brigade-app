@@ -48,7 +48,6 @@ import ParQForm from "@/components/forms/ParQForm";
 import ClientIntakeForm from "@/components/forms/ClientIntakeForm";
 import MedicalReleaseForm from "@/components/forms/MedicalReleaseForm";
 import MedicalReleaseFormPrintable from "@/components/forms/MedicalReleaseFormPrintable";
-import ReadinessAnalyzer from "@/components/analytics/ReadinessAnalyzer";
 import TrainerClientOnboarding from "@/components/clients/TrainerClientOnboarding";
 import ClientDocuments from "@/components/clients/ClientDocuments";
 import AIWorkoutGenerator from "@/components/ai/AIWorkoutGenerator";
@@ -506,7 +505,6 @@ export default function ClientProfile() {
         </div>
       </div>
 
-      <ReadinessAnalyzer client={client} progressLogs={progressLogs} />
 
       {/* Tabs */}
       <Tabs defaultValue="workouts" className="space-y-6">

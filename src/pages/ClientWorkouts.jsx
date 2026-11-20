@@ -232,16 +232,31 @@ export default function ClientWorkouts() {
       queryClient.invalidateQueries({ queryKey: ["workoutLogs"] });
       setWorkoutSession(null);
       setSelectedWorkout(null);
+      toast.success("Workout logged. Your coach can see it now.");
     },
+    onError: (e) => toast.error(e?.message || "Couldn't save the workout. Check your connection and try again."),
   });
 
-  const handleStartWorkout = (workout) => {
+  // A plan holds every training day (day 1, 3, 5, 8, ...). A session is one
+  // day: the day card passes its day, and "Start Workout" picks the next day
+  // after the ones already logged for this plan.
+  const nextDayFor = (workout) => {
+    const days = [...new Set((workout.exercises || []).map(ex => ex.day || 1))].sort((a, b) => a - b);
+    if (days.length === 0) return null;
+    const done = new Set(workoutLogs.filter(l => l.workout_plan_id === workout.id && l.day != null).map(l => l.day));
+    return days.find(d => !done.has(d)) ?? days[0];
+  };
+
+  const handleStartWorkout = (workout, day) => {
+    const sessionDay = day ?? nextDayFor(workout);
+    const dayExercises = (workout.exercises || []).filter(ex => sessionDay == null || (ex.day || 1) === sessionDay);
     setSelectedWorkout(workout);
     setWorkoutSession({
       workout_plan_id: workout.id,
+      day: sessionDay,
       client_id: clientProfile.id,
       date: new Date().toLocaleDateString('sv-SE'),
-      exercises: workout.exercises?.map(ex => ({
+      exercises: dayExercises.map(ex => ({
         name: ex.name,
         target_sets: ex.sets || 3,
         target_reps: ex.reps || "10",
@@ -252,7 +267,7 @@ export default function ClientWorkouts() {
         rir_completed: Array(ex.sets || 3).fill(""),
         completed: false,
         notes: ''
-      })) || [],
+      })),
       duration_minutes: 0,
       difficulty_rating: 5,
       energy_level: 5,
@@ -464,7 +479,7 @@ export default function ClientWorkouts() {
                               key={day}
                               day={day}
                               exercises={exercisesByDay[day]}
-                              onComplete={(data) => handleStartWorkout(workout)}
+                              onComplete={() => handleStartWorkout(workout, day)}
                               clientId={clientProfile?.id}
                               trainerId={workout.trainer_id}
                             />

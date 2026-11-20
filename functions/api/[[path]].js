@@ -2084,6 +2084,14 @@ export async function onRequest(context) {
             const { id: _i, created_date: _c, updated_date: _u, created_by: _b, ...fields } = item || {};
             const violation = await memberWriteViolation(env, user, type, fields);
             if (violation) return err(violation, 403);
+            // One Client record per email per coach. A duplicate splits the
+            // member's plans and logs across two records.
+            if (type === 'Client' && fields.email && fields.trainer_id) {
+              const dup = await env.DB.prepare(
+                `SELECT id FROM entities WHERE entity_type='Client' AND lower(json_extract(data,'$.email')) = lower(?) AND json_extract(data,'$.trainer_id') = ? LIMIT 1`
+              ).bind(fields.email, fields.trainer_id).first();
+              if (dup) return err(`${fields.email} is already one of your clients.`, 409, { code: 'duplicate_client', id: dup.id });
+            }
             prepared.push(fields);
           }
           for (const fields of prepared) {

@@ -24,18 +24,19 @@ export default function PhotoMealLogger({ onMealAnalyzed }) {
 
       setIsAnalyzing(true);
       const aiRes = await base44.integrations.Core.InvokeLLM({
-        prompt: "Analyze this meal photo. Estimate the calories, protein in grams, carbohydrates in grams, and fat in grams. Also provide a brief description of the food.",
+        prompt: "Analyze this meal photo. Estimate the calories, protein in grams, carbohydrates in grams, and fat in grams. Give the meal a short name of two to five words (for example \"Tofu grain bowl\"), and a one- or two-sentence description of what you see and any assumptions behind the estimate.",
         file_urls: [smallDataUrl],
         response_json_schema: {
           type: "object",
           properties: {
+            meal_name: { type: "string" },
             food_description: { type: "string" },
             calories: { type: "number" },
             protein_g: { type: "number" },
             carbs_g: { type: "number" },
             fat_g: { type: "number" }
           },
-          required: ["food_description", "calories", "protein_g", "carbs_g", "fat_g"]
+          required: ["meal_name", "food_description", "calories", "protein_g", "carbs_g", "fat_g"]
         }
       });
 

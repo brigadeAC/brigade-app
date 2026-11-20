@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import ShoppingListView from "../components/meals/ShoppingListView";
 import CalorieTracker from "@/components/nutrition/CalorieTracker";
 import PhotoMealLogger from "@/components/meals/PhotoMealLogger";
+import ManualMealLogger from "@/components/meals/ManualMealLogger";
 import ItemCompletionTracker from "@/components/ItemCompletionTracker";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -154,6 +155,18 @@ export default function ClientMeals() {
     enabled: !!clientProfile
   });
 
+  // Sum of everything logged today (local date), for the Today's Nutrition ring.
+  const todayStr = new Date().toLocaleDateString('sv-SE');
+  const todayTotals = mealLogs
+    .filter((m) => m.date === todayStr)
+    .reduce((t, m) => ({
+      calories: t.calories + (Number(m.calories) || 0),
+      protein_g: t.protein_g + (Number(m.protein_g) || 0),
+      carbs_g: t.carbs_g + (Number(m.carbs_g) || 0),
+      fat_g: t.fat_g + (Number(m.fat_g) || 0),
+    }), { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0 });
+  Object.keys(todayTotals).forEach((k) => { todayTotals[k] = Math.round(todayTotals[k]); });
+
   const { data: recipes = [] } = useQuery({
     queryKey: ["recipes"],
     queryFn: () => base44.entities.Recipe.list()
@@ -222,12 +235,12 @@ export default function ClientMeals() {
             trainer_id: clientProfile.trainer_id,
             date: new Date().toLocaleDateString('sv-SE'),
             meal_type: meal_type,
-            meal_name: data.food_description || 'AI Logged Meal',
+            meal_name: data.meal_name || (data.food_description || '').split(/[,.]/)[0].slice(0, 60) || 'Scanned meal',
             calories: data.calories || 0,
             protein_g: data.protein_g || 0,
             carbs_g: data.carbs_g || 0,
             fat_g: data.fat_g || 0,
-            notes: `AI Analysis: ${data.food_description || 'No description'}`,
+            notes: data.food_description ? `AI estimate: ${data.food_description}` : '',
             photo_urls: data.fileUrl ? [data.fileUrl] : []
           });
           queryClient.invalidateQueries({ queryKey: ["mealLogs"] });
@@ -238,17 +251,19 @@ export default function ClientMeals() {
         }
       }} />
 
+      <div className="-mt-3 mb-6 flex justify-end">
+        <ManualMealLogger clientProfile={clientProfile} onSaved={() => queryClient.invalidateQueries({ queryKey: ["mealLogs"] })} />
+      </div>
+
       {/* Calorie tracker for active plan */}
-      {activeMeals.length > 0 &&
       <CalorieTracker
         target={{
-          calories: activeMeals[0].calories_target,
-          protein_g: activeMeals[0].protein_target_g,
-          carbs_g: activeMeals[0].carbs_target_g,
-          fat_g: activeMeals[0].fat_target_g
-        }} />
-
-      }
+          calories: activeMeals[0]?.calories_target || undefined,
+          protein_g: activeMeals[0]?.protein_target_g || undefined,
+          carbs_g: activeMeals[0]?.carbs_target_g || undefined,
+          fat_g: activeMeals[0]?.fat_target_g || undefined
+        }}
+        actual={todayTotals} />
 
       <Tabs defaultValue="active" className="space-y-6">
         <TabsList className="flex flex-wrap h-auto">

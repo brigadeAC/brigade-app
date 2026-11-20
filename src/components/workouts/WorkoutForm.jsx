@@ -399,23 +399,6 @@ export default function WorkoutForm({ open, onOpenChange, workout, clients, onSu
               />
             </div>
 
-            {!simpleMode && (
-            <div className="space-y-2 sm:col-span-2 pt-2 pb-2">
-              <div className="flex items-center justify-between p-4 bg-primary/10 border border-primary/20 rounded-xl">
-                <div>
-                  <Label className="text-primary font-bold block mb-1">Predictive Dynamic Adaptation</Label>
-                  <p className="text-xs text-muted-foreground">Automatically scales volume, adjusts exercise selection, and suggests specific mobility drills based on AI injury risk flags from morning readiness, HRV, and sleep metrics.</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => handleChange("dynamic_adaptation", !formData.dynamic_adaptation)}
-                  className={`w-12 h-6 rounded-full transition-colors relative ${formData.dynamic_adaptation ? 'bg-primary' : 'bg-gray-400'}`}
-                >
-                  <div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-transform ${formData.dynamic_adaptation ? 'translate-x-7' : 'translate-x-1'}`} />
-                </button>
-              </div>
-            </div>
-            )}
 
             </div>
 
