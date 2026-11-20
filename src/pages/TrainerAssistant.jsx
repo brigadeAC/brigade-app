@@ -222,7 +222,7 @@ async function buildClientSnapshot(client, user) {
   const w = recent(workouts);
   lines.push(`Workouts logged: ${w.length}. ${w.slice(0, 5).map((l) => `${l.date}: ${(l.exercises || []).length} exercises, volume ${l.total_volume_load || 0}`).join("; ")}`);
   const hl = recent(habitLogs).filter((l) => l.completed);
-  lines.push(`Habits assigned: ${habits.map((h) => h.name || h.title).filter(Boolean).join(", ") || "none"}. Habit check-offs: ${hl.length}.`);
+  lines.push(`Habits assigned: ${habits.filter((h) => h.is_active !== false).map((h) => [h.name || h.title, h.tracking === "number" ? `(target ${h.target_value} ${h.unit || ""})` : ""].join(" ").trim()).filter(Boolean).join(", ") || "none"}. Habit check-offs: ${hl.length}.`);
   const p = progress.slice(0, 3);
   if (p.length) lines.push(`Recent progress: ${p.map((x) => `${x.date}: ${x.weight_kg ? x.weight_kg + " kg" : ""}${x.body_fat_percentage ? ", " + x.body_fat_percentage + "% BF" : ""}`).join("; ")}.`);
   const j = recent(journal).map((e) => e.trainer_summary).filter(Boolean).slice(0, 4);

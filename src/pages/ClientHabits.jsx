@@ -59,7 +59,8 @@ export default function ClientHabits() {
       <TrophyHabitTracker
         clientId={clientProfile.id}
         trainerId={clientProfile.trainer_id}
-        readOnly={clientProfile.trainer_id !== null}
+        canLog
+        canManage={!clientProfile.trainer_id}
       />
     </div>
   );

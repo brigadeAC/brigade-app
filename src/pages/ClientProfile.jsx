@@ -1099,7 +1099,7 @@ export default function ClientProfile() {
 
         {/* Habits Tab */}
         <TabsContent value="habits" className="space-y-4">
-          <TrophyHabitTracker clientId={clientId} trainerId={user?.id} readOnly={false} />
+          <TrophyHabitTracker clientId={clientId} trainerId={client?.trainer_id || user?.id} canManage canLog isStaff />
         </TabsContent>
 
         {/* Onboarding Tab */}

@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { calculateHabitStreak, parseLocalDate } from "@/lib/utils";
+import { isLogDone } from "@/lib/habitLibrary";
 
 // Local calendar date (matches the Habits page). UTC would roll over to
 // "tomorrow" in the evening for US time zones.
@@ -141,11 +142,12 @@ export default function ClientDashboard() {
     queryFn: () => base44.entities.ProgressLog.filter({ client_id: clientId }, "-date"),
     enabled: !!clientId,
   });
-  const { data: habits = [] } = useQuery({
+  const { data: allHabits = [] } = useQuery({
     queryKey: ["habits", clientId],
     queryFn: () => base44.entities.Habit.filter({ client_id: clientId }),
     enabled: !!clientId,
   });
+  const habits = allHabits.filter((h) => h.is_active !== false);
   const { data: habitLogs = [] } = useQuery({
     queryKey: ["habitLogs", clientId],
     queryFn: () => base44.entities.HabitLog.filter({ client_id: clientId }),
@@ -173,9 +175,8 @@ export default function ClientDashboard() {
   const activeMealPlan =
     mealPlans.find((p) => p.status === "active") || mealPlans[0] || null;
 
-  const habitsDoneToday = habits.filter((h) =>
-    habitLogs.some((l) => l.habit_id === h.id && l.date === today && l.completed)
-  ).length;
+  const habitDoneToday = (h) => isLogDone(h, habitLogs.find((l) => l.habit_id === h.id && l.date === today));
+  const habitsDoneToday = habits.filter(habitDoneToday).length;
 
   const workoutsThisWeek = workoutLogs.filter((l) => {
     const d = new Date(l.date || l.created_date);
@@ -361,11 +362,13 @@ export default function ClientDashboard() {
           </div>
           <div className="space-y-2">
             {habits.slice(0, 5).map((habit) => {
-              const done = habitLogs.some((l) => l.habit_id === habit.id && l.date === today && l.completed);
+              const done = habitDoneToday(habit);
+              const isNumber = (habit.tracking || "check") === "number";
               return (
                 <button
                   key={habit.id}
-                  onClick={() => toggleHabit(habit)}
+                  // Amount habits (water, steps...) need a number, so open the Habits page.
+                  onClick={() => (isNumber ? navigate(createPageUrl("ClientHabits")) : toggleHabit(habit))}
                   className={`w-full flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition ${
                     done
                       ? "border-primary/40 bg-primary/10"
@@ -377,9 +380,15 @@ export default function ClientDashboard() {
                   ) : (
                     <Circle className="w-5 h-5 text-muted-foreground shrink-0" />
                   )}
-                  <span className={`text-sm font-medium ${done ? "text-foreground line-through opacity-70" : "text-foreground"}`}>
+                  <span className="text-lg shrink-0">{habit.icon || "⭐"}</span>
+                  <span className={`text-sm font-medium flex-1 ${done ? "text-foreground line-through opacity-70" : "text-foreground"}`}>
                     {habit.name || habit.title}
                   </span>
+                  {isNumber && (
+                    <span className="text-xs text-muted-foreground shrink-0">
+                      {Number(habitLogs.find((l) => l.habit_id === habit.id && l.date === today)?.value || 0).toLocaleString()} / {Number(habit.target_value).toLocaleString()} {habit.unit}
+                    </span>
+                  )}
                 </button>
               );
             })}
