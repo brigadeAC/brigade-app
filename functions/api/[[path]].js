@@ -220,6 +220,49 @@ async function ownershipClause(env, user) {
   };
 }
 
+// Members (clients and independents) can write their own logs, journals and
+// profile, but must not be able to point records at people they don't belong
+// to. Without this a client could set trainer_id on their Client record to any
+// trainer and start reading that trainer's resources, or drop rows into
+// another client's history. Returns an error message, or null if allowed.
+// Mutates `fields` for Client creates to pin the record to the caller.
+async function memberWriteViolation(env, user, type, fields, existing = null) {
+  if (!user || user.role === 'admin') return null;
+  if (user.user_type !== 'client' && user.user_type !== 'independent') return null;
+
+  const { results } = await env.DB.prepare(
+    `SELECT id, data FROM entities WHERE entity_type='Client' AND (json_extract(data,'$.email') = ? OR json_extract(data,'$.user_id') = ?)`
+  ).bind(user.email, user.id).all();
+  const myClientIds = new Set(results.map((r) => r.id));
+  const myTrainerIds = new Set(results
+    .map((r) => { try { return JSON.parse(r.data).trainer_id; } catch { return null; } })
+    .filter(Boolean));
+
+  if (type === 'Client') {
+    if (!existing) {
+      fields.email = user.email;
+      fields.user_id = user.id;
+    } else if ('email' in fields && fields.email && fields.email.toLowerCase() !== String(user.email).toLowerCase()) {
+      return 'You can only use your own email on your profile.';
+    }
+  }
+
+  if ('trainer_id' in fields && fields.trainer_id) {
+    const current = existing?.trainer_id;
+    if (fields.trainer_id !== current && !myTrainerIds.has(fields.trainer_id)) {
+      return 'Only your coach can assign you to a trainer.';
+    }
+  }
+
+  if ('client_id' in fields && fields.client_id) {
+    const cid = fields.client_id;
+    if (cid !== user.id && !myClientIds.has(cid) && cid !== existing?.client_id) {
+      return 'You can only save records to your own profile.';
+    }
+  }
+  return null;
+}
+
 /* --------------------------- audit logging ------------------------------ */
 // HIPAA-aligned audit trail (45 CFR §164.312(b)): records who did what to
 // which record, when, and from where. Fire-and-forget so it never blocks
@@ -2036,10 +2079,16 @@ export async function onRequest(context) {
           }
 
           const created = [];
+          const prepared = [];
           for (const item of list) {
+            const { id: _i, created_date: _c, updated_date: _u, created_by: _b, ...fields } = item || {};
+            const violation = await memberWriteViolation(env, user, type, fields);
+            if (violation) return err(violation, 403);
+            prepared.push(fields);
+          }
+          for (const fields of prepared) {
             const eid = uid();
             const now = nowISO();
-            const { id: _i, created_date: _c, updated_date: _u, created_by: _b, ...fields } = item || {};
             await env.DB.prepare(
               'INSERT INTO entities (id, entity_type, data, created_by, created_date, updated_date) VALUES (?,?,?,?,?,?)'
             ).bind(eid, type, JSON.stringify(fields), user.email || user.id, now, now).run();
@@ -2065,6 +2114,8 @@ export async function onRequest(context) {
           const body = await request.json();
           const data = JSON.parse(row.data || '{}');
           const { id: _i, created_date: _c, updated_date: _u, created_by: _b, ...fields } = body || {};
+          const violation = await memberWriteViolation(env, user, type, fields, data);
+          if (violation) return err(violation, 403);
           const merged = { ...data, ...fields };
           const now = nowISO();
           await env.DB.prepare('UPDATE entities SET data=?, updated_date=? WHERE id=?')

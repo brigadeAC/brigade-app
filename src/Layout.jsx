@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { BrandIcon, BrandWordmark, BrandLockup, BrandWordmarkImage } from "@/components/BrandMark";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { createPageUrl } from "./utils";
 import { base44 } from "@/api/base44Client";
 import ClientLayout from "@/components/ClientLayout";
@@ -354,8 +354,15 @@ export default function Layout({ children, currentPageName }) {
   // Client pages - use client layout
   const clientPages = ['ClientDashboard', 'ClientWorkouts', 'ClientMeals', 'ClientProgress', 'ClientSchedule', 'ClientHabits', 'ClientOnboarding', 'Messages', 'ClientResources', 'ClientCommunity', 'ClientInfo', 'ReportBug', 'ClientJournal', 'OnboardingWalkthrough', 'ClientRecovery', 'ClientDocuments'];
 
-  // Always use client layout if user is a client
+  // Always use client layout if user is a client. Clients may only open
+  // member pages; anything else (trainer tools reached by typing a URL) sends
+  // them back to their dashboard. The API scopes data either way — this keeps
+  // trainer screens from rendering at all.
   if (isClient) {
+    const clientAllowed = [...clientPages, 'Settings', 'Dashboard', 'IndependentDashboard', 'IndependentOnboarding'];
+    if (!clientAllowed.includes(currentPageName)) {
+      return <Navigate to={createPageUrl('ClientDashboard')} replace />;
+    }
     return <ClientLayout children={children} currentPageName={currentPageName} />;
   }
 
