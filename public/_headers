@@ -12,7 +12,7 @@
   Permissions-Policy: geolocation=(), payment=(), usb=(), magnetometer=(), gyroscope=(), camera=(self), microphone=(self)
   # Keep PHI pages out of shared caches.
   Cache-Control: no-store, max-age=0
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://meet.jit.si; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' data: blob: https:; connect-src 'self' https://meet.jit.si wss://meet.jit.si; frame-src 'self' https://meet.jit.si; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://meet.jit.si; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' data: blob: https:; connect-src 'self' https://meet.jit.si wss://meet.jit.si; frame-src 'self' https://meet.jit.si https://www.youtube-nocookie.com https://www.youtube.com https://player.vimeo.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests
 
 # Immutable, content-hashed build assets can be cached hard.
 /assets/*

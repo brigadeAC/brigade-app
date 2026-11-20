@@ -79,6 +79,8 @@ const navGroups = [
     title: "Programs",
     items: [
       { name: "Resources", icon: Library, page: "Resources" },
+      { name: "Programs", icon: CalendarDays, page: "Programs" },
+      { name: "Lesson Library", icon: BookOpen, page: "LessonLibrary" },
       { name: "Habit Library", icon: ListChecks, page: "HabitLibrary" },
       { name: "Bulk Import", icon: Upload, page: "BulkImport" }
     ]
@@ -135,6 +137,8 @@ const adminNavGroups = [
     title: 'Content',
     items: [
       { name: 'Resources', icon: Library, page: 'Resources' },
+      { name: 'Programs', icon: CalendarDays, page: 'Programs' },
+      { name: 'Lesson Library', icon: BookOpen, page: 'LessonLibrary' },
       { name: 'Habit Library', icon: ListChecks, page: 'HabitLibrary' },
       { name: 'Contracts', icon: FileText, page: 'Contracts' },
       { name: 'Community', icon: Users2, page: 'TrainerCommunity' },
@@ -387,7 +391,7 @@ export default function Layout({ children, currentPageName }) {
   }
 
   // Client pages - use client layout
-  const clientPages = ['ClientDashboard', 'ClientWorkouts', 'ClientMeals', 'ClientProgress', 'ClientSchedule', 'ClientHabits', 'ClientOnboarding', 'Messages', 'ClientResources', 'ClientCommunity', 'ClientInfo', 'ReportBug', 'ClientJournal', 'OnboardingWalkthrough', 'ClientRecovery', 'ClientDocuments'];
+  const clientPages = ['ClientDashboard', 'ClientWorkouts', 'ClientMeals', 'ClientProgress', 'ClientSchedule', 'ClientHabits', 'ClientOnboarding', 'Messages', 'ClientResources', 'ClientCommunity', 'ClientInfo', 'ReportBug', 'ClientJournal', 'OnboardingWalkthrough', 'ClientRecovery', 'ClientDocuments', 'ClientProgram'];
 
   // Always use client layout if user is a client. Clients may only open
   // member pages; anything else (trainer tools reached by typing a URL) sends

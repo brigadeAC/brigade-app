@@ -83,6 +83,10 @@ import Recipes from './pages/Recipes';
 import ReportBug from './pages/ReportBug';
 import Resources from './pages/Resources';
 import HabitLibrary from './pages/HabitLibrary';
+import LessonLibrary from './pages/LessonLibrary';
+import Programs from './pages/Programs';
+import ProgramBuilder from './pages/ProgramBuilder';
+import ClientProgram from './pages/ClientProgram';
 import Schedule from './pages/Schedule';
 import Settings from './pages/Settings';
 import Terms from './pages/Terms';
@@ -101,6 +105,10 @@ export const PAGES = {
     "AdminContactMessages": AdminContactMessages,
     "BusinessHub": BusinessHub,
     "HabitLibrary": HabitLibrary,
+    "LessonLibrary": LessonLibrary,
+    "Programs": Programs,
+    "ProgramBuilder": ProgramBuilder,
+    "ClientProgram": ClientProgram,
     "CRM": CRM,
     "ClientCommunity": ClientCommunity,
     "ClientDashboard": ClientDashboard,
