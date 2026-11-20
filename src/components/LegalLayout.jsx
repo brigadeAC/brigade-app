@@ -1,5 +1,5 @@
 import React from "react";
-import { BrandIcon, BrandWordmark } from "@/components/BrandMark";
+import { BrandIcon, BrandWordmark, BrandLockup, BrandWordmarkImage } from "@/components/BrandMark";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, Dumbbell } from "lucide-react";
 import { createPageUrl } from "@/utils";
@@ -18,8 +18,7 @@ export default function LegalLayout({ title, updated, intro, body }) {
       <header className="border-b border-border bg-card/60 backdrop-blur sticky top-0 z-10">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
           <Link to={createPageUrl("Home")} className="flex items-center gap-2">
-            <BrandIcon className="w-7 h-7" />
-            <BrandWordmark>Brigade</BrandWordmark>
+            <BrandWordmarkImage className="h-6" />
           </Link>
           <button
             onClick={() => navigate(-1)}

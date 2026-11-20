@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BrandIcon, BrandWordmark } from "@/components/BrandMark";
+import { BrandIcon, BrandWordmark, BrandLockup, BrandWordmarkImage } from "@/components/BrandMark";
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import { createPageUrl } from '@/utils';
@@ -49,10 +49,8 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
       <div className="w-full max-w-md">
         <div className="flex flex-col items-center mb-8">
-          <BrandIcon className="w-14 h-14" />
-          <BrandWordmark className="mt-4 text-2xl">Brigade</BrandWordmark>
-          <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground mt-1">Athletic Club</p>
-          <p className="text-muted-foreground text-sm mt-1">
+          <BrandWordmarkImage className="h-16" />
+          <p className="text-muted-foreground text-sm mt-5">
             {mode === 'login' ? 'Sign in to your account' : 'Create your account'}
           </p>
         </div>

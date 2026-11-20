@@ -1,7 +1,7 @@
 /* Brigade service worker — offline shell + Web Push. */
 
-const CACHE = 'brigade-v1';
-const SHELL = ['/', '/manifest.json', '/icon.svg'];
+const CACHE = 'brigade-v2';
+const SHELL = ['/', '/manifest.json', '/brand/icon-192.png'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)));
@@ -55,8 +55,8 @@ self.addEventListener('push', (event) => {
   const title = data.title || 'Brigade';
   const options = {
     body: data.body || '',
-    icon: '/icon.svg',
-    badge: '/icon.svg',
+    icon: '/brand/icon-192.png',
+    badge: '/brand/favicon-48.png',
     data: { url: data.url || '/' },
     tag: data.tag,
   };

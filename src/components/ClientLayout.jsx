@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { BrandIcon, BrandWordmark } from "@/components/BrandMark";
+import { BrandIcon, BrandWordmark, BrandLockup, BrandWordmarkImage } from "@/components/BrandMark";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { base44 } from "@/api/base44Client";
@@ -312,16 +312,14 @@ export default function ClientLayout({ children, currentPageName }) {
             </Button>
           )}
           <div className="flex items-center gap-2">
-            {trainerProfile?.data?.business_logo_url || trainerProfile?.business_logo_url ? (
-              <img src={trainerProfile?.data?.business_logo_url || trainerProfile?.business_logo_url} alt="Logo" className="w-8 h-8 object-contain rounded" />
-            ) : appLogoUrl ? (
-              <img src={appLogoUrl} alt="Logo" className="w-8 h-8 object-contain rounded" />
+            {trainerProfile?.data?.business_logo_url || trainerProfile?.business_logo_url || appLogoUrl ? (
+              <>
+                <img src={trainerProfile?.data?.business_logo_url || trainerProfile?.business_logo_url || appLogoUrl} alt="Logo" className="w-8 h-8 object-contain rounded" />
+                <BrandWordmark className="text-base">{trainerProfile?.data?.business_name || trainerProfile?.business_name || "Brigade"}</BrandWordmark>
+              </>
             ) : (
-              <BrandIcon />
+              <BrandLockup name={trainerProfile?.data?.business_name || trainerProfile?.business_name} className="h-7" />
             )}
-            <BrandWordmark className="text-base">
-              {trainerProfile ? (trainerProfile.data?.business_name || trainerProfile.business_name || "Brigade") : "Brigade"}
-            </BrandWordmark>
           </div>
         </div>
         <div className="flex items-center gap-2">

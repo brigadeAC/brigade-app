@@ -2,7 +2,7 @@ import React from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { createPageUrl } from "../utils";
 import { Dumbbell, Utensils, CheckSquare, MessageCircle, ArrowRight } from "lucide-react";
-import { BrandIcon, BrandWordmark } from "@/components/BrandMark";
+import { BrandWordmarkImage } from "@/components/BrandMark";
 
 // Member entry page. Sales and positioning live on brigadeathleticclub.com;
 // this page's job is to get members into the app. Layout follows the Brand
@@ -34,8 +34,7 @@ export default function PublicHome() {
       <header className="sticky top-0 z-50 bg-background/90 backdrop-blur border-b border-border">
         <Column className="h-16 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <BrandIcon className="w-9 h-9" />
-            <BrandWordmark className="text-lg">Brigade</BrandWordmark>
+            <BrandWordmarkImage className="h-8" />
           </div>
           <button
             onClick={goToLogin}
@@ -133,8 +132,7 @@ export default function PublicHome() {
         <Column className="py-10 flex flex-col md:flex-row md:items-start md:justify-between gap-8 text-sm text-muted-foreground">
           <div>
             <div className="flex items-center gap-2">
-              <BrandIcon className="w-7 h-7" />
-              <BrandWordmark>Brigade</BrandWordmark>
+              <BrandWordmarkImage className="h-7" />
             </div>
             <p className="mt-3">646 Overbridge Lane, Chattanooga, TN 37405</p>
           </div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { BrandIcon, BrandWordmark } from "@/components/BrandMark";
+import { BrandIcon, BrandWordmark, BrandLockup, BrandWordmarkImage } from "@/components/BrandMark";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { createPageUrl } from "./utils";
 import { base44 } from "@/api/base44Client";
@@ -400,16 +400,14 @@ export default function Layout({ children, currentPageName }) {
             </Button>
           )}
           <div className="flex items-center gap-2">
-            {user?.data?.business_logo_url || user?.business_logo_url ?
-            <img src={user?.data?.business_logo_url || user?.business_logo_url} alt="Logo" className="w-8 h-8 object-contain rounded" /> :
-            appLogoUrl ?
-            <img src={appLogoUrl} alt="Logo" className="w-8 h-8 object-contain rounded" /> :
-
-            <BrandIcon />
-            }
-            <BrandWordmark className="text-base">
-              {user ? (user.data?.business_name || user.business_name || "Brigade") : "Brigade"}
-            </BrandWordmark>
+            {user?.data?.business_logo_url || user?.business_logo_url || appLogoUrl ? (
+              <>
+                <img src={user?.data?.business_logo_url || user?.business_logo_url || appLogoUrl} alt="Logo" className="w-8 h-8 object-contain rounded" />
+                <BrandWordmark className="text-base">{user?.data?.business_name || user?.business_name || "Brigade"}</BrandWordmark>
+              </>
+            ) : (
+              <BrandLockup name={user?.data?.business_name || user?.business_name} className="h-7" />
+            )}
           </div>
         </div>
         <div className="flex items-center gap-2">
