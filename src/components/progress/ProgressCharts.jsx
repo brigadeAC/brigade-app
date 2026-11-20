@@ -36,6 +36,43 @@ const Tooltip = ({ children }) => (
   </div>
 );
 
+function TrendBadge({ value, inverse = false }) {
+  if (!value || value === 0) return <span className="flex items-center gap-1 text-xs text-muted-foreground"><Minus className="w-3 h-3" /> No change</span>;
+  const isGood = inverse ? value < 0 : value > 0;
+  const Icon = value > 0 ? TrendingUp : TrendingDown;
+  return (
+    <span className={`flex items-center gap-1 text-xs font-semibold ${isGood ? "text-primary" : "text-muted-foreground"}`}>
+      <Icon className="w-3 h-3" />{Math.abs(value)}%
+    </span>
+  );
+}
+
+function StatMini({ label, value, unit, trend, inverse, icon: Icon }) {
+  return (
+    <div className="glass-card rounded-xl p-4 flex items-center gap-3">
+      <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 bg-primary/10">
+        <Icon className="w-5 h-5 text-primary" />
+      </div>
+      <div>
+        <p className="text-xs text-muted-foreground">{label}</p>
+        <div className="flex items-baseline gap-1">
+          <span className="text-xl font-bold text-foreground">{value ?? "—"}</span>
+          {unit && value != null && <span className="text-xs text-muted-foreground">{unit}</span>}
+        </div>
+        <TrendBadge value={trend} inverse={inverse} />
+      </div>
+    </div>
+  );
+}
+
+const calcTrend = (data, key) => {
+  const valid = data.filter(d => d[key] != null);
+  if (valid.length < 2) return 0;
+  const first = valid[0][key], last = valid[valid.length - 1][key];
+  if (!first) return 0;
+  return parseFloat(((last - first) / first * 100).toFixed(1));
+};
+
 function LineChart({ series, height = 280 }) {
   return (
     <div style={{ height }}>

@@ -25,7 +25,6 @@ export default function AdminFullDashboard({
   ];
 
   const adminActions = [
-    { label: "Admin Journey", path: "AdminJourney", desc: "View platform growth" },
     { label: "Manage Users", path: "Clients", desc: "View and manage all users" },
     { label: "Trainers", path: "TrainerCommunity", desc: "Manage trainer community" },
     { label: "Messages", path: "Messages", desc: "View system messages" },
