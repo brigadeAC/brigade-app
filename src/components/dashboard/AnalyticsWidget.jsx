@@ -1,4 +1,5 @@
 import React from "react";
+import { parseLocalDate } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 
@@ -16,7 +17,7 @@ export function ClientActivityChart({ sessions, clients }) {
     weekEnd.setDate(weekStart.getDate() + 6);
     
     const weekSessions = sessions.filter(s => {
-      const sessionDate = new Date(s.date);
+      const sessionDate = parseLocalDate(s.date);
       return sessionDate >= weekStart && sessionDate <= weekEnd;
     });
     
@@ -101,7 +102,7 @@ export function CompletionRateChart({ sessions }) {
     weekEnd.setDate(weekStart.getDate() + 6);
     
     const weekSessions = sessions.filter(s => {
-      const sessionDate = new Date(s.date);
+      const sessionDate = parseLocalDate(s.date);
       return sessionDate >= weekStart && sessionDate <= weekEnd;
     });
     

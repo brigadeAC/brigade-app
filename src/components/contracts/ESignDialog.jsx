@@ -31,7 +31,7 @@ export default function ESignDialog({ contract, open, onOpenChange, onSigned }) 
       const now = new Date();
       await base44.entities.Contract.update(contract.id, {
         status: "signed",
-        signed_date: now.toISOString().split("T")[0],
+        signed_date: now.toLocaleDateString("sv-SE"), // local date, not UTC
         signature_data: JSON.stringify({
           name: typedName.trim(),
           email: user?.email || contract.client_email || "",

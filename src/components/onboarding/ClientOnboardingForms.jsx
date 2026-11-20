@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,26 +14,16 @@ import ESignDialog from "@/components/contracts/ESignDialog";
 
 export default function ClientOnboardingForms({ clientId, clientUserId, clientName, trainerName, businessName, isOptional = false }) {
   const [activeForm, setActiveForm] = useState(null);
-  const [contracts, setContracts] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [signingContract, setSigningContract] = useState(null);
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    loadContracts();
-  }, [clientId, clientUserId]);
-
-  const loadContracts = async () => {
-    try {
-      const clientContracts = await base44.entities.Contract.filter({
-        client_id: clientId
-      });
-      setContracts(clientContracts);
-    } catch (error) {
-      console.error("Failed to load contracts:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Same query key as the Documents page, so signing in either place updates both.
+  const { data: contracts = [], isLoading: loading } = useQuery({
+    queryKey: ["myContracts", clientId],
+    queryFn: () => base44.entities.Contract.filter({ client_id: clientId }, "-created_date"),
+    enabled: !!clientId,
+  });
+  const loadContracts = () => queryClient.invalidateQueries({ queryKey: ["myContracts"] });
 
   // Trainer-assigned contracts that are "sent" and need client e-signature or upload
   const pendingContracts = contracts.filter(c => c.status === "sent" && c.client_id === clientId);

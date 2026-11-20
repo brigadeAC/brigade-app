@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { parseLocalDate } from "@/lib/utils";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -1010,7 +1011,7 @@ export default function ClientProfile() {
                       <div className="space-y-1">
                         <CardTitle className="text-base flex items-center gap-2 text-foreground">
                           <CalendarIcon className="w-4 h-4 text-[#4B91DD]" />
-                          {new Date(log.date).toLocaleDateString('en-US', {
+                          {parseLocalDate(log.date).toLocaleDateString('en-US', {
                         year: 'numeric',
                         month: 'long',
                         day: 'numeric'

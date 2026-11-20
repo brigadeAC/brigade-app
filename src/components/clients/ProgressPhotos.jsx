@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { parseLocalDate } from "@/lib/utils";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -145,7 +146,7 @@ export default function ProgressPhotos({ clientId }) {
                     </Button>
                   </div>
                   <p className="text-xs text-slate-500 mt-1 text-center">
-                    {new Date(photo.date).toLocaleDateString()}
+                    {parseLocalDate(photo.date).toLocaleDateString()}
                   </p>
                 </div>
               ))}
@@ -164,7 +165,7 @@ export default function ProgressPhotos({ clientId }) {
         <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle>
-              Progress Photo - {selectedPhoto && new Date(selectedPhoto.date).toLocaleDateString()}
+              Progress Photo - {selectedPhoto && parseLocalDate(selectedPhoto.date).toLocaleDateString()}
             </DialogTitle>
           </DialogHeader>
           {selectedPhoto && (

@@ -32,3 +32,13 @@ export function calculateHabitStreak(habitLogs = []) {
   }
   return streak;
 }
+
+// A bare "YYYY-MM-DD" passed to new Date() is read as UTC midnight, which is
+// the previous evening in US time zones, so dates displayed a day early.
+// This reads date-only strings as local midnight and leaves timestamps alone.
+export function parseLocalDate(value) {
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return new Date(`${value}T00:00:00`);
+  }
+  return new Date(value);
+}

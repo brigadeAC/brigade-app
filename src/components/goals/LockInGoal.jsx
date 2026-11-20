@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { parseLocalDate } from "@/lib/utils";
 import { base44 } from "@/api/base44Client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -216,7 +217,7 @@ export default function LockInGoal({ goals = [], clientId, trainerId, readOnly =
             <div className="mb-4">
               <div className="flex justify-between text-xs text-muted-foreground mb-1">
                 <span>{achievedCount} of {totalMilestones} milestones</span>
-                {lockedGoal.target_date && <span>Target: {format(new Date(lockedGoal.target_date), 'MMM d, yyyy')}</span>}
+                {lockedGoal.target_date && <span>Target: {format(parseLocalDate(lockedGoal.target_date), 'MMM d, yyyy')}</span>}
               </div>
               <div className="h-2 rounded-full" style={{ background: 'hsl(var(--secondary))' }}>
                 <div
@@ -248,7 +249,7 @@ export default function LockInGoal({ goals = [], clientId, trainerId, readOnly =
                   }
                   <span className={`text-sm flex-1 ${m.achieved ? 'line-through text-muted-foreground' : 'text-muted-foreground'}`}>{m.title}</span>
                   {m.achieved && m.achieved_date && (
-                    <span className="text-xs text-primary">{format(new Date(m.achieved_date), 'MMM d')}</span>
+                    <span className="text-xs text-primary">{format(parseLocalDate(m.achieved_date), 'MMM d')}</span>
                   )}
                 </button>
               ))}

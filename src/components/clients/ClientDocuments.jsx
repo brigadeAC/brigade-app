@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FileText, Download, ExternalLink, Send, CheckCircle, Clock, Edit, Upload, PenLine } from "lucide-react";
 import { toast } from "sonner";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import ESignDialog from "@/components/contracts/ESignDialog";
 
 const statusConfig = {
@@ -105,7 +105,7 @@ export default function ClientDocuments({ clientId, trainerId }) {
                     )}
                     {contract.signed_date && (
                       <span className="text-xs" style={{ color: '#4B91DD' }}>
-                        ✓ Signed {format(new Date(contract.signed_date), "MMM d, yyyy")}
+                        ✓ Signed {format(parseISO(contract.signed_date), "MMM d, yyyy")}
                       </span>
                     )}
                   </div>

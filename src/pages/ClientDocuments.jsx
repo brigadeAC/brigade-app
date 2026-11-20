@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FileText, Download, PenLine, CheckCircle2, Clock, Loader2 } from "lucide-react";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import ClientOnboardingForms from "@/components/onboarding/ClientOnboardingForms";
 import ESignDialog from "@/components/contracts/ESignDialog";
 
@@ -99,7 +99,7 @@ export default function ClientDocuments() {
                         <p className="font-medium text-foreground truncate">{c.title}</p>
                         <p className="text-xs text-muted-foreground">
                           {(c.type || "agreement").replace(/_/g, " ")}
-                          {c.signed_date ? ` · signed ${format(new Date(c.signed_date), "MMM d, yyyy")}` : ""}
+                          {c.signed_date ? ` · signed ${format(parseISO(c.signed_date), "MMM d, yyyy")}` : ""}
                         </p>
                       </div>
                     </div>

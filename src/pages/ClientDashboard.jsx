@@ -20,7 +20,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { calculateHabitStreak } from "@/lib/utils";
+import { calculateHabitStreak, parseLocalDate } from "@/lib/utils";
 
 // Local calendar date (matches the Habits page). UTC would roll over to
 // "tomorrow" in the evening for US time zones.
@@ -480,7 +480,7 @@ export default function ClientDashboard() {
                 <img src={photo.url} className="w-full h-full object-cover" alt={`Progress ${i}`} />
                 <div className="absolute bottom-0 inset-x-0 bg-black/60 py-0.5">
                   <p className="text-[9px] text-center text-gray-300">
-                    {new Date(photo.date).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                    {parseLocalDate(photo.date).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
                   </p>
                 </div>
               </div>

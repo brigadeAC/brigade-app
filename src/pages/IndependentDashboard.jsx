@@ -5,7 +5,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { CheckCircle2, ChevronRight, LayoutDashboard, Dumbbell, Utensils, MessageCircle, Settings, LogOut, ChevronDown, Upload, Camera, Loader2, PlaySquare, Target, Activity, Users2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { calculateHabitStreak } from "@/lib/utils";
+import { calculateHabitStreak, parseLocalDate } from "@/lib/utils";
 
 export default function IndependentDashboard() {
   const navigate = useNavigate();
@@ -198,7 +198,7 @@ export default function IndependentDashboard() {
                     <img src={photo.url} className="w-full h-full object-cover group-hover:scale-110 transition-transform" alt={`Progress ${i}`} />
                     <div className="absolute bottom-0 left-0 right-0 bg-black/60 p-1 backdrop-blur-sm">
                       <p className="text-[9px] text-center text-muted-foreground font-medium">
-                        {new Date(photo.date).toLocaleDateString(undefined, {month:'short', day:'numeric'})}
+                        {parseLocalDate(photo.date).toLocaleDateString(undefined, {month:'short', day:'numeric'})}
                       </p>
                     </div>
                   </div>
