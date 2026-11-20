@@ -76,18 +76,18 @@ function TicketsTab({ user, queryClient }) {
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h2 className="text-xl font-semibold text-foreground">Punch Cards & Day Passes</h2>
-        <Button onClick={() => { setEditingTicket(null); setIsOpen(true); }} className="gap-2 bg-indigo-600 hover:bg-indigo-700">
+        <Button onClick={() => { setEditingTicket(null); setIsOpen(true); }} className="gap-2 bg-primary hover:bg-primary">
           <Plus className="w-4 h-4" /> New Pass
         </Button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {tickets.map(ticket => (
-          <Card key={ticket.id} className="glass-card border-indigo-500/20">
+          <Card key={ticket.id} className="glass-card border-primary/20">
             <CardHeader className="pb-2">
               <CardTitle className="text-lg text-foreground flex justify-between items-start">
                 {ticket.name}
-                <div className="flex gap-1">
+                <div className="flex gap-1 flex-wrap">
                   <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => { setEditingTicket(ticket); setIsOpen(true); }}>
                     <Pencil className="w-3 h-3 text-muted-foreground" />
                   </Button>
@@ -96,7 +96,7 @@ function TicketsTab({ user, queryClient }) {
                   </Button>
                 </div>
               </CardTitle>
-              <div className="text-2xl font-bold text-indigo-400">${ticket.price}</div>
+              <div className="text-2xl font-bold text-primary">${ticket.price}</div>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground mb-4">{ticket.description}</p>
@@ -115,7 +115,7 @@ function TicketsTab({ user, queryClient }) {
         ))}
         {tickets.length === 0 && !isLoading && (
           <div className="col-span-full text-center p-8 text-muted-foreground border border-dashed border-border rounded-xl">
-            No passes created yet. Add one to let clients buy single visits or punch cards!
+            No passes created yet. Add one to let clients buy single visits or punch cards.
           </div>
         )}
       </div>
@@ -148,7 +148,7 @@ function TicketsTab({ user, queryClient }) {
                 <Input type="number" value={formData.expire_days} onChange={e => setFormData({ ...formData, expire_days: e.target.value })} className="input-frosted" placeholder="30" />
               </div>
             </div>
-            <Button onClick={saveTicket} className="w-full mt-2 bg-indigo-600 hover:bg-indigo-700" disabled={!formData.name || !formData.price || !formData.expire_days}>Save Pass</Button>
+            <Button onClick={saveTicket} className="w-full mt-2 bg-primary hover:bg-primary" disabled={!formData.name || !formData.price || !formData.expire_days}>Save Pass</Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -202,8 +202,8 @@ export default function BusinessHub() {
               <p className="text-muted-foreground text-sm font-medium">Pending Tasks</p>
               <h3 className="text-2xl font-bold text-foreground mt-1">{tasks.filter(t => t.status !== 'done').length}</h3>
             </div>
-            <div className="h-12 w-12 rounded-full bg-blue-500/20 flex items-center justify-center">
-              <Target className="text-blue-400 h-6 w-6" />
+            <div className="h-12 w-12 rounded-full bg-primary/20 flex items-center justify-center">
+              <Target className="text-primary h-6 w-6" />
             </div>
           </CardContent>
         </Card>
@@ -224,8 +224,8 @@ export default function BusinessHub() {
               <p className="text-muted-foreground text-sm font-medium">Marketing Spend</p>
               <h3 className="text-2xl font-bold text-foreground mt-1">${marketingExpenses.toFixed(2)}</h3>
             </div>
-            <div className="h-12 w-12 rounded-full bg-purple-500/20 flex items-center justify-center">
-              <Briefcase className="text-purple-400 h-6 w-6" />
+            <div className="h-12 w-12 rounded-full bg-primary/20 flex items-center justify-center">
+              <Briefcase className="text-primary h-6 w-6" />
             </div>
           </CardContent>
         </Card>
@@ -238,7 +238,7 @@ export default function BusinessHub() {
         >
           Day Passes & Punch Cards
           {activeTab === 'tickets' && (
-            <motion.div layoutId="tab-indicator" className="absolute bottom-[-9px] left-0 right-0 h-0.5 bg-[#d4a017]" />
+            <motion.div layoutId="tab-indicator" className="absolute bottom-[-9px] left-0 right-0 h-0.5 bg-[#4B91DD]" />
           )}
         </button>
         <button
@@ -247,7 +247,7 @@ export default function BusinessHub() {
         >
           Tasks
           {activeTab === 'tasks' && (
-            <motion.div layoutId="tab-indicator" className="absolute bottom-[-9px] left-0 right-0 h-0.5 bg-[#d4a017]" />
+            <motion.div layoutId="tab-indicator" className="absolute bottom-[-9px] left-0 right-0 h-0.5 bg-[#4B91DD]" />
           )}
         </button>
         <button
@@ -256,7 +256,7 @@ export default function BusinessHub() {
         >
           Expenses
           {activeTab === 'expenses' && (
-            <motion.div layoutId="tab-indicator" className="absolute bottom-[-9px] left-0 right-0 h-0.5 bg-[#d4a017]" />
+            <motion.div layoutId="tab-indicator" className="absolute bottom-[-9px] left-0 right-0 h-0.5 bg-[#4B91DD]" />
           )}
         </button>
       </div>
@@ -351,20 +351,20 @@ function TasksTab({ user, tasks, queryClient, isOpen, setIsOpen, editingTask, se
         {sortedTasks.map(task => (
           <div key={task.id} className={`flex items-center justify-between p-4 rounded-xl border border-border bg-secondary transition-all hover:bg-accent ${task.status === 'done' ? 'opacity-50' : ''}`}>
             <div className="flex items-center gap-3">
-              <button onClick={() => toggleTaskStatus(task)} className="text-muted-foreground hover:text-green-500">
-                {task.status === 'done' ? <CheckCircle2 className="w-6 h-6 text-green-500" /> : <Circle className="w-6 h-6" />}
+              <button onClick={() => toggleTaskStatus(task)} className="text-muted-foreground hover:text-primary">
+                {task.status === 'done' ? <CheckCircle2 className="w-6 h-6 text-primary" /> : <Circle className="w-6 h-6" />}
               </button>
               <div>
                 <h4 className={`font-medium ${task.status === 'done' ? 'line-through text-muted-foreground' : 'text-foreground'}`}>{task.title}</h4>
                 {(task.description || task.due_date) && (
                   <p className="text-sm text-muted-foreground mt-1">
-                    {task.due_date && <span className="mr-2 text-yellow-500/80 text-xs bg-yellow-500/10 px-2 py-0.5 rounded">Due: {task.due_date}</span>}
+                    {task.due_date && <span className="mr-2 text-primary/80 text-xs bg-primary/10 px-2 py-0.5 rounded">Due: {task.due_date}</span>}
                     {task.description}
                   </p>
                 )}
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <Button variant="ghost" size="icon" onClick={() => { setEditingTask(task); setIsOpen(true); }}>
                 <Pencil className="w-4 h-4 text-muted-foreground" />
               </Button>
@@ -376,7 +376,7 @@ function TasksTab({ user, tasks, queryClient, isOpen, setIsOpen, editingTask, se
         ))}
         {sortedTasks.length === 0 && (
           <div className="text-center p-8 text-muted-foreground border border-dashed border-border rounded-xl">
-            No tasks yet. Create one to get started!
+            No tasks yet. Create one to get started.
           </div>
         )}
       </div>
@@ -524,14 +524,14 @@ function ExpensesTab({ user, expenses, queryClient, isOpen, setIsOpen, editingEx
                     {irsCategories.find(c => c.value === exp.category)?.label || exp.category}
                   </span>
                   {exp.items?.length > 0 && (
-                    <span className="text-[10px] uppercase tracking-wider bg-blue-500/20 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full">Itemized</span>
+                    <span className="text-[10px] uppercase tracking-wider bg-primary/20 text-primary dark:text-primary px-2 py-0.5 rounded-full">Itemized</span>
                   )}
                 </h4>
                 <p className="text-sm text-muted-foreground mt-1">{exp.date} {exp.vendor && `• ${exp.vendor}`} {exp.notes && `• ${exp.notes}`}</p>
               </div>
               <div className="flex items-center gap-4">
                 <span className="font-bold text-red-400">-${exp.amount.toFixed(2)}</span>
-                <div className="flex items-center gap-1 border-l border-border pl-4">
+                <div className="flex items-center gap-1 border-l border-border pl-4 flex-wrap">
                   <Button variant="ghost" size="icon" onClick={() => { setEditingExpense(exp); setIsOpen(true); }}>
                     <Pencil className="w-4 h-4 text-muted-foreground" />
                   </Button>
@@ -558,7 +558,7 @@ function ExpensesTab({ user, expenses, queryClient, isOpen, setIsOpen, editingEx
         ))}
         {expenses.length === 0 && (
           <div className="text-center p-8 text-muted-foreground border border-dashed border-border rounded-xl">
-            No expenses recorded yet. Keep track of your business spending!
+            No expenses recorded yet. Keep track of your business spending.
           </div>
         )}
       </div>

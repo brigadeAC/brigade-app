@@ -47,11 +47,11 @@ import NASMExerciseLibrary from "@/components/resources/NASMExerciseLibrary";
 import { toast } from "sonner";
 
 const categoryColors = {
-  workout: "bg-purple-500/10 text-purple-400 border border-purple-500/20",
-  nutrition: "bg-green-500/10 text-green-400 border border-green-500/20",
+  workout: "bg-primary/10 text-primary border border-primary/20",
+  nutrition: "bg-primary/10 text-primary border border-primary/20",
   medical: "bg-red-500/10 text-red-400 border border-red-500/20",
   general: "bg-secondary text-muted-foreground border border-border",
-  motivation: "bg-yellow-500/10 text-yellow-400 border border-yellow-500/20"
+  motivation: "bg-primary/10 text-primary border border-primary/20"
 };
 
 export default function Resources() {
@@ -159,7 +159,7 @@ export default function Resources() {
       if (response.data?.error) throw new Error(response.data.error);
     },
     onSuccess: () => {
-      toast.success("Resource emailed to client successfully!");
+      toast.success("Resource emailed to client successfully.");
       setSendingResource(null);
       setSelectedClientId("");
     },
@@ -175,7 +175,7 @@ export default function Resources() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["resources"] });
-      toast.success("Standard PT Forms generated successfully!");
+      toast.success("Standard PT Forms generated successfully.");
     },
     onError: () => {
       toast.error("Failed to generate forms.");
@@ -295,7 +295,7 @@ export default function Resources() {
           </Button>
           <Button
             onClick={() => {resetForm();setShowForm(true);}}
-            className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700">
+            className="bg-gradient-to-r from-primary to-primary hover:from-primary hover:to-primary">
 
             <Plus className="w-4 h-4 mr-2" />
             Create Custom
@@ -304,9 +304,9 @@ export default function Resources() {
       </div>
 
       {/* Featured Resources */}
-      <div className="glass-card rounded-2xl p-6 border-green-500/20">
+      <div className="glass-card rounded-2xl p-6 border-primary/20">
         <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
-          <div className="w-1.5 h-4 bg-green-500 rounded-full"></div>
+          <div className="w-1.5 h-4 bg-primary rounded-full"></div>
           Professional Development Resources
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
@@ -322,9 +322,9 @@ export default function Resources() {
             href={resource.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="bg-secondary p-4 rounded-xl hover:bg-accent transition-all border border-border hover:border-green-500/30 group text-foreground">
+            className="bg-secondary p-4 rounded-xl hover:bg-accent transition-all border border-border hover:border-primary/30 group text-foreground">
 
-              <p className="font-medium text-sm text-foreground mb-2 group-hover:text-green-400 transition-colors">{resource.title}</p>
+              <p className="font-medium text-sm text-foreground mb-2 group-hover:text-primary transition-colors">{resource.title}</p>
               <Button size="sm" variant="outline" className="w-full text-xs gap-1 pointer-events-none">
                 <Download className="w-3 h-3" />
                 Download
@@ -345,7 +345,7 @@ export default function Resources() {
         <RecipeImporter
           onImportComplete={() => {
             queryClient.invalidateQueries({ queryKey: ["recipes"] });
-            toast.success("Recipe imported and list updated!");
+            toast.success("Recipe imported and list updated.");
           }} />
       </div>
 
@@ -379,7 +379,7 @@ export default function Resources() {
       {filteredRecipes.length > 0 &&
       <div className="space-y-4">
           <h2 className="text-xl font-semibold text-foreground flex items-center gap-2">
-            <div className="w-1.5 h-5 bg-green-500 rounded-full"></div>
+            <div className="w-1.5 h-5 bg-primary rounded-full"></div>
             Recipes
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -392,7 +392,7 @@ export default function Resources() {
                 <CardHeader>
                   <div className="flex justify-between items-start gap-2">
                     <div className="flex-1 min-w-0">
-                      <Badge className="bg-green-500/10 text-green-400 border border-green-500/20 mb-2 capitalize">
+                      <Badge className="bg-primary/10 text-primary border border-primary/20 mb-2 capitalize">
                         {recipe.category || "nutrition"}
                       </Badge>
                       <CardTitle className="text-base text-foreground truncate">{recipe.name}</CardTitle>
@@ -405,9 +405,9 @@ export default function Resources() {
                 <CardContent className="space-y-3">
                   <div className="flex gap-2 text-xs text-muted-foreground font-medium">
                     {recipe.prep_time_minutes &&
-                <span className="flex items-center gap-1"><Clock className="w-3 h-3 text-purple-400" /> {(recipe.prep_time_minutes || 0) + (recipe.cook_time_minutes || 0)}m</span>
+                <span className="flex items-center gap-1"><Clock className="w-3 h-3 text-primary" /> {(recipe.prep_time_minutes || 0) + (recipe.cook_time_minutes || 0)}m</span>
                 }
-                    {recipe.servings && <span className="flex items-center gap-1"><Users className="w-3 h-3 text-yellow-500" /> {recipe.servings} servings</span>}
+                    {recipe.servings && <span className="flex items-center gap-1"><Users className="w-3 h-3 text-primary" /> {recipe.servings} servings</span>}
                   </div>
                   {recipe.calories_per_serving &&
               <div className="flex gap-2 flex-wrap">
@@ -444,7 +444,7 @@ export default function Resources() {
       {filteredResources.length > 0 &&
       <div className="space-y-4">
           <h2 className="text-xl font-semibold text-foreground flex items-center gap-2">
-            <div className="w-1.5 h-5 bg-green-500 rounded-full"></div>
+            <div className="w-1.5 h-5 bg-primary rounded-full"></div>
             Resources
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -495,14 +495,14 @@ export default function Resources() {
                           <source src={resource.video_file_url} />
                         </video> :
 
-                <div className="text-sm text-muted-foreground flex items-center gap-2"><Flame className="w-4 h-4 text-purple-400" /> Video Link</div>
+                <div className="text-sm text-muted-foreground flex items-center gap-2"><Flame className="w-4 h-4 text-primary" /> Video Link</div>
                 }
                     </div>
               }
                   <p className="text-sm text-muted-foreground line-clamp-3 mb-3">{resource.content}</p>
                   <div className="flex items-center justify-between text-xs text-muted-foreground font-medium">
                     <div className="flex items-center gap-2">
-                      <Users className="w-3 h-3 text-yellow-500" />
+                      <Users className="w-3 h-3 text-primary" />
                       {resource.shared_with?.length > 0 ?
                   `${resource.shared_with.length} client${resource.shared_with.length > 1 ? 's' : ''}` :
                   "All clients"}
@@ -512,7 +512,7 @@ export default function Resources() {
                   href={resource.source_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-green-500 hover:text-green-400 flex items-center gap-1 transition-colors">
+                  className="text-primary hover:text-primary flex items-center gap-1 transition-colors">
 
                         {(resource.source_name || '').split(' - ')[0]}
                         <ExternalLink className="w-3 h-3" />
@@ -570,7 +570,7 @@ export default function Resources() {
                 href={viewingResource.source_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-sm text-green-400 hover:text-green-300 flex items-center gap-1 transition-colors">
+                className="text-sm text-primary hover:text-primary flex items-center gap-1 transition-colors">
 
                   Source: {viewingResource.source_name}
                   <ExternalLink className="w-4 h-4" />
@@ -614,7 +614,7 @@ export default function Resources() {
                   rel="noopener noreferrer"
                   className="flex items-center gap-3 p-4 bg-secondary rounded-xl hover:bg-accent border border-border transition-colors group">
 
-                      <div className="text-sm flex-1 truncate text-green-400 group-hover:text-green-300">{url.split('/').pop()}</div>
+                      <div className="text-sm flex-1 truncate text-primary group-hover:text-primary">{url.split('/').pop()}</div>
                       <ExternalLink className="w-4 h-4 text-muted-foreground group-hover:text-foreground" />
                     </a>
                 )}
@@ -623,7 +623,7 @@ export default function Resources() {
             }
 
             <div className="pt-6 border-t border-border text-sm text-muted-foreground flex items-center gap-2">
-              <Users className="w-4 h-4 text-purple-400" />
+              <Users className="w-4 h-4 text-primary" />
               <span>
                 Shared with {viewingResource?.shared_with?.length > 0 ?
                 <strong className="text-foreground">{viewingResource.shared_with.length} client{viewingResource.shared_with.length > 1 ? 's' : ''}</strong> :
@@ -654,7 +654,7 @@ export default function Resources() {
 
           <div className="space-y-6 mt-6 text-foreground">
             <div className="flex flex-wrap gap-3">
-              <Badge className="bg-green-500/10 text-green-400 border border-green-500/20 capitalize text-base py-1 px-3">
+              <Badge className="bg-primary/10 text-primary border border-primary/20 capitalize text-base py-1 px-3">
                 {viewingRecipe?.category || "nutrition"}
               </Badge>
               {viewingRecipe?.tags?.length > 0 && viewingRecipe.tags.map((tag, i) =>
@@ -687,12 +687,12 @@ export default function Resources() {
               }
               {viewingRecipe?.servings &&
               <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-yellow-500/10 border border-yellow-500/20 flex items-center justify-center">
-                    <Users className="w-4 h-4 text-yellow-500" />
+                  <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center">
+                    <Users className="w-4 h-4 text-primary" />
                   </div>
                   <div>
                     <div className="font-medium text-muted-foreground text-xs">Servings</div>
-                    <div className="font-bold text-yellow-400">{viewingRecipe.servings}</div>
+                    <div className="font-bold text-primary">{viewingRecipe.servings}</div>
                   </div>
                 </div>
               }
@@ -712,21 +712,21 @@ export default function Resources() {
             {(viewingRecipe?.protein_per_serving || viewingRecipe?.carbs_per_serving || viewingRecipe?.fat_per_serving) &&
             <div className="grid grid-cols-3 gap-4">
                 {viewingRecipe.protein_per_serving &&
-              <div className="text-center p-4 bg-green-500/10 border border-green-500/20 rounded-xl">
-                    <div className="text-xs text-green-400/80 mb-1 uppercase tracking-wider font-bold">Protein</div>
-                    <div className="text-2xl font-black text-green-400">{viewingRecipe.protein_per_serving}g</div>
+              <div className="text-center p-4 bg-primary/10 border border-primary/20 rounded-xl">
+                    <div className="text-xs text-primary/80 mb-1 uppercase tracking-wider font-bold">Protein</div>
+                    <div className="text-2xl font-black text-primary">{viewingRecipe.protein_per_serving}g</div>
                   </div>
               }
                 {viewingRecipe.carbs_per_serving &&
-              <div className="text-center p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-xl">
-                    <div className="text-xs text-yellow-400/80 mb-1 uppercase tracking-wider font-bold">Carbs</div>
-                    <div className="text-2xl font-black text-yellow-400">{viewingRecipe.carbs_per_serving}g</div>
+              <div className="text-center p-4 bg-primary/10 border border-primary/20 rounded-xl">
+                    <div className="text-xs text-primary/80 mb-1 uppercase tracking-wider font-bold">Carbs</div>
+                    <div className="text-2xl font-black text-primary">{viewingRecipe.carbs_per_serving}g</div>
                   </div>
               }
                 {viewingRecipe.fat_per_serving &&
-              <div className="text-center p-4 bg-purple-500/10 border border-purple-500/20 rounded-xl">
-                    <div className="text-xs text-purple-400/80 mb-1 uppercase tracking-wider font-bold">Fat</div>
-                    <div className="text-2xl font-black text-purple-400">{viewingRecipe.fat_per_serving}g</div>
+              <div className="text-center p-4 bg-primary/10 border border-primary/20 rounded-xl">
+                    <div className="text-xs text-primary/80 mb-1 uppercase tracking-wider font-bold">Fat</div>
+                    <div className="text-2xl font-black text-primary">{viewingRecipe.fat_per_serving}g</div>
                   </div>
               }
               </div>
@@ -735,13 +735,13 @@ export default function Resources() {
             {viewingRecipe?.ingredients?.length > 0 &&
             <div className="bg-secondary p-6 rounded-xl border border-border">
                 <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
-                  <div className="w-1.5 h-4 bg-green-500 rounded-full"></div>
+                  <div className="w-1.5 h-4 bg-primary rounded-full"></div>
                   Ingredients
                 </h3>
                 <ul className="space-y-3">
                   {viewingRecipe.ingredients.map((ing, i) =>
                 <li key={i} className="flex items-start gap-3 text-muted-foreground">
-                      <div className="w-1.5 h-1.5 rounded-full bg-green-500 mt-2"></div>
+                      <div className="w-1.5 h-1.5 rounded-full bg-primary mt-2"></div>
                       <span><strong className="text-foreground">{ing.amount} {ing.unit}</strong> {ing.name}</span>
                     </li>
                 )}
@@ -752,7 +752,7 @@ export default function Resources() {
             {viewingRecipe?.instructions &&
             <div className="bg-secondary p-6 rounded-xl border border-border">
                 <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
-                  <div className="w-1.5 h-4 bg-purple-500 rounded-full"></div>
+                  <div className="w-1.5 h-4 bg-primary rounded-full"></div>
                   Instructions
                 </h3>
                 <div className="text-muted-foreground whitespace-pre-line leading-relaxed">
@@ -804,7 +804,7 @@ export default function Resources() {
               <Button
                 onClick={() => sendResourceMutation.mutate({ resource: sendingResource, clientId: selectedClientId })}
                 disabled={!selectedClientId || sendResourceMutation.isPending}
-                className="bg-gradient-to-r from-emerald-500 to-teal-600">
+                className="bg-gradient-to-r from-primary to-primary">
 
                 {sendResourceMutation.isPending ?
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" /> :
@@ -831,7 +831,7 @@ export default function Resources() {
           <div className="space-y-6 mt-4">
             <div className="p-4 bg-secondary border border-border rounded-lg text-foreground">
               <p className="font-medium">{addingRecipeToClient?.name}</p>
-              <Badge className="bg-orange-500/20 text-orange-400 border border-orange-500/30 mt-2 capitalize">
+              <Badge className="bg-primary/20 text-primary border border-primary/30 mt-2 capitalize">
                 {addingRecipeToClient?.category || "nutrition"}
               </Badge>
             </div>
@@ -966,7 +966,7 @@ export default function Resources() {
                   }
                 }}
                 disabled={!selectedClientId || !selectedMealPlanId || sendResourceMutation.isPending}
-                className="bg-gradient-to-r from-emerald-500 to-teal-600">
+                className="bg-gradient-to-r from-primary to-primary">
 
                 <Send className="w-4 h-4 mr-2" />
                 Add to Plan
@@ -1092,7 +1092,7 @@ export default function Resources() {
                 {isUploading && <Loader2 className="w-5 h-5 animate-spin" />}
               </div>
               {formData.video_file_url &&
-              <div className="flex items-center gap-2 text-sm text-emerald-600">
+              <div className="flex items-center gap-2 text-sm text-primary">
                   <span>✓ Video uploaded</span>
                   <Button
                   type="button"
@@ -1166,7 +1166,7 @@ export default function Resources() {
                     type="checkbox"
                     checked={formData.shared_with.includes(client.id)}
                     onChange={() => toggleClient(client.id)}
-                    className="rounded border-white/30 bg-secondary text-emerald-500 focus:ring-emerald-500" />
+                    className="rounded border-white/30 bg-secondary text-primary focus:ring-primary" />
 
                     <span>{client.full_name}</span>
                   </label>
@@ -1180,7 +1180,7 @@ export default function Resources() {
               </Button>
               <Button
                 type="submit"
-                className="bg-gradient-to-r from-emerald-500 to-teal-600"
+                className="bg-gradient-to-r from-primary to-primary"
                 disabled={createMutation.isPending || updateMutation.isPending}>
 
                 {(createMutation.isPending || updateMutation.isPending) &&

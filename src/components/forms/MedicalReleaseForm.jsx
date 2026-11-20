@@ -139,8 +139,8 @@ export default function MedicalReleaseForm({ clientId, onComplete }) {
             <p className="text-sm text-slate-600 mt-2">To be completed by participant's physician</p>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <p className="text-sm text-blue-900">
+            <div className="p-4 bg-primary/10 border border-primary/20 rounded-lg">
+              <p className="text-sm text-primary">
                 <strong>Physician Review:</strong> Review the program details on the previous section before completing this section.
               </p>
             </div>
@@ -214,7 +214,7 @@ export default function MedicalReleaseForm({ clientId, onComplete }) {
           </Button>
         )}
         <div className="flex-1" />
-        <Button type="submit" className="bg-gradient-to-r from-emerald-500 to-teal-600">
+        <Button type="submit" className="bg-gradient-to-r from-primary to-primary">
           {section === "trainer" ? "Next: Physician Section" : "Submit Medical Release"}
         </Button>
       </div>

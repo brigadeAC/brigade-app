@@ -123,7 +123,7 @@ Return a JSON object with the following structure:
 
   const handleSavePlan = async (data) => {
     const created = await base44.entities.MealPlan.create({ ...data, trainer_id: client.trainer_id || data.trainer_id });
-    toast.success("AI Meal Plan Saved! 🍽️");
+    toast.success("AI Meal Plan Saved.");
     setShowEditForm(false);
     setGeneratedPlan(null);
     onPlanGenerated?.(created);
@@ -133,7 +133,7 @@ Return a JSON object with the following structure:
     <>
       <Button
         onClick={() => setOpen(true)}
-        className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700"
+        className="bg-gradient-to-r from-primary to-primary hover:from-primary hover:to-primary"
       >
         <Utensils className="w-4 h-4 mr-2" />
         AI Meal Plan
@@ -144,7 +144,7 @@ Return a JSON object with the following structure:
         <DialogContent className="max-w-sm bg-card border-border text-foreground">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-foreground">
-              <Utensils className="w-5 h-5 text-green-400" />
+              <Utensils className="w-5 h-5 text-primary" />
               AI Meal Plan Generator
             </DialogTitle>
           </DialogHeader>
@@ -175,7 +175,7 @@ Return a JSON object with the following structure:
                 <Input type="number" value={proteinTarget} onChange={(e) => setProteinTarget(e.target.value)} className="bg-card border-border text-foreground" />
               </div>
             </div>
-            <Button onClick={handleGenerateMealPlan} disabled={loading} className="w-full bg-green-600 hover:bg-green-700">
+            <Button onClick={handleGenerateMealPlan} disabled={loading} className="w-full bg-primary hover:bg-primary">
               {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Generating...</> : <><Utensils className="w-4 h-4 mr-2" />Generate & Edit Plan</>}
             </Button>
           </div>

@@ -5,70 +5,36 @@ import { TrendingUp, TrendingDown, Minus, Weight, Ruler, Zap, Activity, Trophy }
 import { useUnitSystem } from "@/components/hooks/useUnitSystem";
 import { parseISO } from "date-fns";
 
+// Brand-disciplined chart ramp: shades and tints of sky blue, charcoal and
+// stone only (Brand Bible: no second accent). Keys kept for existing series.
 const COLORS = {
-  gold: "#d4a017",
-  green: "#22c55e",
-  red: "#ef4444",
-  purple: "#8b5cf6",
-  blue: "#3b82f6",
-  cyan: "#06b6d4",
-  pink: "#ec4899",
+  gold: "#4B91DD",   // sky blue
+  green: "#726B65",  // soft charcoal, secondary
+  red: "#2F6FB5",    // deep sky
+  purple: "#9EC3EB", // light sky
+  blue: "#4B91DD",
+  cyan: "#B4ADA7",   // warm stone, dark
+  pink: "#5A534E",   // charcoal, mid
 };
 
 const nivoTheme = {
   background: "transparent",
-  textColor: "#6b7280",
+  textColor: "#726B65",
   fontSize: 11,
   axis: {
-    domain: { line: { stroke: "rgba(255,255,255,0.08)" } },
-    ticks: { line: { stroke: "rgba(255,255,255,0.08)" }, text: { fill: "#6b7280", fontSize: 11 } },
+    domain: { line: { stroke: "rgba(114,107,101,0.25)" } },
+    ticks: { line: { stroke: "rgba(114,107,101,0.25)" }, text: { fill: "#726B65", fontSize: 11 } },
   },
-  grid: { line: { stroke: "rgba(255,255,255,0.05)" } },
-  crosshair: { line: { stroke: "rgba(255,255,255,0.2)" } },
-  legends: { text: { fill: "#9ca3af", fontSize: 11 } },
+  grid: { line: { stroke: "rgba(114,107,101,0.12)" } },
+  crosshair: { line: { stroke: "rgba(114,107,101,0.4)" } },
+  legends: { text: { fill: "#726B65", fontSize: 11 } },
 };
 
 const Tooltip = ({ children }) => (
-  <div style={{ background: "rgba(10,10,14,0.95)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, padding: "8px 12px", color: "#e5e7eb", fontSize: 12 }}>
+  <div style={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 6, padding: "8px 12px", color: "hsl(var(--popover-foreground))", fontSize: 12 }}>
     {children}
   </div>
 );
-
-function TrendBadge({ value, inverse = false }) {
-  if (!value || value === 0) return <span className="flex items-center gap-1 text-xs text-muted-foreground"><Minus className="w-3 h-3" /> No change</span>;
-  const isGood = inverse ? value < 0 : value > 0;
-  const Icon = value > 0 ? TrendingUp : TrendingDown;
-  return (
-    <span className={`flex items-center gap-1 text-xs font-semibold ${isGood ? "text-green-400" : "text-red-400"}`}>
-      <Icon className="w-3 h-3" />{Math.abs(value)}%
-    </span>
-  );
-}
-
-function StatMini({ label, value, unit, trend, inverse, icon: Icon, color }) {
-  return (
-    <div className="glass-card rounded-xl p-4 flex items-center gap-3">
-      <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: `rgba(${color},0.15)` }}>
-        <Icon className="w-5 h-5" style={{ color: `rgb(${color})` }} />
-      </div>
-      <div>
-        <p className="text-xs text-muted-foreground">{label}</p>
-        <div className="flex items-baseline gap-1">
-          <span className="text-xl font-bold text-foreground">{value ?? "—"}</span>
-          {unit && <span className="text-xs text-muted-foreground">{unit}</span>}
-        </div>
-        <TrendBadge value={trend} inverse={inverse} />
-      </div>
-    </div>
-  );
-}
-
-const calcTrend = (data, key) => {
-  const valid = data.filter(d => d[key] != null);
-  if (valid.length < 2) return 0;
-  const first = valid[0][key], last = valid[valid.length - 1][key];
-  return parseFloat(((last - first) / first * 100).toFixed(1));
-};
 
 function LineChart({ series, height = 280 }) {
   return (
@@ -88,9 +54,9 @@ function LineChart({ series, height = 280 }) {
         pointSize={6}
         pointColor={{ from: "color" }}
         pointBorderWidth={2}
-        pointBorderColor="#080808"
+        pointBorderColor="#F9F7F6"
         useMesh={true}
-        legends={[{ anchor: "bottom-right", direction: "column", itemWidth: 100, itemHeight: 16, itemTextColor: "#9ca3af", symbolSize: 8, symbolShape: "circle", translateX: 20, translateY: -10 }]}
+        legends={[{ anchor: "bottom-right", direction: "column", itemWidth: 100, itemHeight: 16, itemTextColor: "#726B65", symbolSize: 8, symbolShape: "circle", translateX: 20, translateY: -10 }]}
         tooltip={({ point }) => (
           <Tooltip><strong style={{ color: point.serieColor }}>{point.serieId}</strong>: {point.data.y}</Tooltip>
         )}
@@ -108,7 +74,7 @@ export default function ProgressCharts({ logs }) {
       <div className="glass-card rounded-2xl p-12 text-center">
         <TrendingUp className="w-14 h-14 mx-auto mb-4 text-gray-600" />
         <p className="text-muted-foreground font-medium">No progress data yet.</p>
-        <p className="text-gray-600 text-sm mt-1">Log your first entry to start seeing trends!</p>
+        <p className="text-gray-600 text-sm mt-1">Log your first entry to start seeing trends.</p>
       </div>
     );
   }
@@ -222,8 +188,8 @@ export default function ProgressCharts({ logs }) {
             <button key={tab.id} onClick={() => setActiveTab(tab.id)}
               className="px-3 py-1.5 rounded-lg text-sm font-medium transition-all"
               style={activeTab === tab.id
-                ? { background: "rgba(34,197,94,0.15)", color: "#22c55e", border: "1px solid rgba(34,197,94,0.3)" }
-                : { background: "rgba(255,255,255,0.04)", color: "#6b7280", border: "1px solid rgba(255,255,255,0.06)" }}>
+                ? { background: "rgba(75,145,221,0.15)", color: "#4B91DD", border: "1px solid rgba(75,145,221,0.3)" }
+                : { background: "hsl(var(--secondary))", color: "#726B65", border: "1px solid hsl(var(--border))" }}>
               {tab.label}
             </button>
           ))}

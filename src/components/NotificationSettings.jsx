@@ -85,7 +85,7 @@ export default function NotificationSettings() {
       });
       
       setIsSubscribed(true);
-      toast.success('Successfully subscribed to push notifications!');
+      toast.success('Successfully subscribed to push notifications.');
     } catch (e) {
       console.error('Subscription error:', e);
       toast.error('Failed to subscribe. Are you in a supported browser context? iOS requires "Add to Home Screen".');
@@ -126,12 +126,12 @@ export default function NotificationSettings() {
       const res = await base44.functions.invoke('webPush', {
         action: 'send',
         title: 'Test Notification 🚀',
-        message: 'Your push notifications are working perfectly!',
+        message: 'Your push notifications are working perfectly.',
         url: '/'
       });
       
       if (res.data.success) {
-        toast.success(`Test notification sent successfully to ${res.data.sentTo} devices!`);
+        toast.success(`Test notification sent successfully to ${res.data.sentTo} devices.`);
       } else {
         toast.error(res.data.message || 'Failed to send test notification.');
       }
@@ -147,7 +147,7 @@ export default function NotificationSettings() {
     <Card className="glass-card rounded-2xl">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-foreground">
-          <Bell className="w-5 h-5 text-emerald-400" />
+          <Bell className="w-5 h-5 text-primary" />
           Web Push Notifications
         </CardTitle>
       </CardHeader>
@@ -158,7 +158,7 @@ export default function NotificationSettings() {
             <p className="text-xs text-muted-foreground mt-1">Allows the app to display push notifications.</p>
           </div>
           {permission === 'granted' ? (
-            <span className="flex items-center gap-1 text-emerald-400 font-medium px-3 py-1 bg-emerald-500/10 rounded-full border border-emerald-500/20">
+            <span className="flex items-center gap-1 text-primary font-medium px-3 py-1 bg-primary/10 rounded-full border border-primary/20">
               <CheckCircle2 className="w-4 h-4" /> Granted
             </span>
           ) : permission === 'denied' ? (
@@ -166,14 +166,14 @@ export default function NotificationSettings() {
               <AlertTriangle className="w-4 h-4" /> Denied
             </span>
           ) : (
-            <span className="flex items-center gap-1 text-yellow-400 font-medium px-3 py-1 bg-yellow-500/10 rounded-full border border-yellow-500/20 capitalize">
+            <span className="flex items-center gap-1 text-primary font-medium px-3 py-1 bg-primary/10 rounded-full border border-primary/20 capitalize">
               <HelpCircle className="w-4 h-4" /> {permission}
             </span>
           )}
         </div>
 
-        <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl space-y-2">
-          <h4 className="font-semibold text-emerald-400 flex items-center gap-2">
+        <div className="p-4 bg-primary/10 border border-primary/20 rounded-xl space-y-2">
+          <h4 className="font-semibold text-primary flex items-center gap-2">
             <Bell className="w-4 h-4" />
             Native Web Push Enabled
           </h4>
@@ -182,7 +182,7 @@ export default function NotificationSettings() {
             Works on Android, Desktop, and iOS 16.4+ (when added to Home Screen).
           </p>
           {!isStandalone && (
-            <p className="text-yellow-400 font-medium text-xs mt-2 bg-yellow-900/30 p-2 rounded flex items-start gap-2">
+            <p className="text-primary font-medium text-xs mt-2 bg-primary/30 p-2 rounded flex items-start gap-2">
               <AlertTriangle className="w-4 h-4 flex-shrink-0" />
               <span>Note: You are currently running in browser mode. Full push support on iOS requires adding the app to your Home Screen first.</span>
             </p>

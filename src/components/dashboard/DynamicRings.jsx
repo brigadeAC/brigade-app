@@ -50,9 +50,9 @@ export default function DynamicRings({ calories = 0, calTarget = 2500, workoutSt
         {/* Outer Ring - Calories (Red/Pink) */}
         {createRing(size / 2 - strokeWidth, calPercent, "#ef4444", "rgba(239, 68, 68, 0.2)")}
         {/* Middle Ring - Workout (Green) */}
-        {createRing(size / 2 - strokeWidth * 2.2, workPercent, "#22c55e", "rgba(34, 197, 94, 0.2)")}
+        {createRing(size / 2 - strokeWidth * 2.2, workPercent, "#4B91DD", "rgba(75,145,221, 0.2)")}
         {/* Inner Ring - Macros (Blue/Cyan) */}
-        {createRing(size / 2 - strokeWidth * 3.4, macroPercent, "#06b6d4", "rgba(6, 182, 212, 0.2)")}
+        {createRing(size / 2 - strokeWidth * 3.4, macroPercent, "#4B91DD", "rgba(75,145,221, 0.2)")}
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
         <span className="text-foreground font-black text-xl">{calPercent.toFixed(0)}%</span>
@@ -64,11 +64,11 @@ export default function DynamicRings({ calories = 0, calTarget = 2500, workoutSt
           <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Move</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <div className="w-3 h-3 rounded-full bg-green-500"></div>
+          <div className="w-3 h-3 rounded-full bg-primary"></div>
           <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Exercise</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <div className="w-3 h-3 rounded-full bg-cyan-500"></div>
+          <div className="w-3 h-3 rounded-full bg-primary"></div>
           <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Macros</span>
         </div>
       </div>

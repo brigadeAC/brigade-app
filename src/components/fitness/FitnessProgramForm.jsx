@@ -335,7 +335,7 @@ export default function FitnessProgramForm({ open, onOpenChange, program, client
 
           <div className="flex justify-end gap-3 pt-4 border-t border-border">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="border-border text-foreground hover:bg-accent">Cancel</Button>
-            <Button type="submit" disabled={isLoading} className="bg-gradient-to-r from-[#d4a017] to-[#f5c842] text-black font-bold border-none hover:opacity-90">
+            <Button type="submit" disabled={isLoading} className="bg-gradient-to-r from-[#4B91DD] to-[#4B91DD] text-black font-bold border-none hover:opacity-90">
               {isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               {program?.id ? "Update Program" : "Save Program"}
             </Button>
@@ -394,7 +394,7 @@ function WeeklyTracking({ formData, setFormData }) {
     return (
       <div className="text-center py-10 bg-secondary border border-border rounded-xl">
         <p className="text-muted-foreground text-sm mb-3">No weeks added yet. Add a week to start tracking.</p>
-        <Button type="button" onClick={addWeek} className="bg-gradient-to-r from-[#d4a017] to-[#f5c842] text-black font-bold border-none hover:opacity-90">
+        <Button type="button" onClick={addWeek} className="bg-gradient-to-r from-[#4B91DD] to-[#4B91DD] text-black font-bold border-none hover:opacity-90">
           <Plus className="w-4 h-4 mr-2" /> Add Week 1
         </Button>
       </div>

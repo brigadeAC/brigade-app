@@ -165,7 +165,7 @@ export default function BulkImport() {
         toast.warning(`Imported ${success} of ${data.length} ${importType}`);
       }
     } catch (err) {
-      toast.error("Import failed: " + err.message);
+      toast.error("Import failed:" + err.message);
     } finally {
       setImporting(false);
     }
@@ -216,7 +216,7 @@ export default function BulkImport() {
           <Card className="glass-card">
             <CardHeader>
               <CardTitle className="text-foreground flex items-center gap-2">
-                <Users className="w-5 h-5 text-[#2CD49F]" />
+                <Users className="w-5 h-5 text-[#4B91DD]" />
                 Import Clients
               </CardTitle>
               <CardDescription className="text-muted-foreground">
@@ -248,7 +248,7 @@ export default function BulkImport() {
           <Card className="glass-card">
             <CardHeader>
               <CardTitle className="text-foreground flex items-center gap-2">
-                <Dumbbell className="w-5 h-5 text-[#2CD49F]" />
+                <Dumbbell className="w-5 h-5 text-[#4B91DD]" />
                 Import Exercises
               </CardTitle>
               <CardDescription className="text-muted-foreground">
@@ -319,10 +319,10 @@ export default function BulkImport() {
           )}
 
           {importResults && (
-            <Alert className={importResults.failed === 0 ? "border-green-500" : "border-yellow-500"}>
+            <Alert className={importResults.failed === 0 ? "border-primary" : "border-primary"}>
               {importResults.failed === 0 ? 
-                <CheckCircle2 className="w-4 h-4 text-green-500" /> : 
-                <AlertCircle className="w-4 h-4 text-yellow-500" />
+                <CheckCircle2 className="w-4 h-4 text-primary" /> : 
+                <AlertCircle className="w-4 h-4 text-primary" />
               }
               <AlertDescription>
                 <div className="space-y-2">
@@ -348,7 +348,7 @@ export default function BulkImport() {
             onClick={handleImport}
             disabled={!file || importing}
             className="w-full sm:w-auto"
-            style={{ background: 'linear-gradient(135deg, #2CD49F, #10b981)' }}
+            style={{ background: 'linear-gradient(135deg, #4B91DD, #4B91DD)' }}
           >
             {importing ? (
               <>Processing...</>

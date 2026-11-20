@@ -70,7 +70,7 @@ export default function AdminBugs() {
                       <SelectContent className="bg-background border-border text-foreground">
                         <SelectItem value="open" className="text-red-500 hover:bg-accent focus:bg-secondary">Open</SelectItem>
                         <SelectItem value="in_progress" className="text-amber-500 hover:bg-accent focus:bg-secondary">In Progress</SelectItem>
-                        <SelectItem value="resolved" className="text-emerald-500 hover:bg-accent focus:bg-secondary">Resolved</SelectItem>
+                        <SelectItem value="resolved" className="text-primary hover:bg-accent focus:bg-secondary">Resolved</SelectItem>
                       </SelectContent>
                     </Select>
                   </TableCell>
@@ -79,7 +79,7 @@ export default function AdminBugs() {
               {bugs.length === 0 && !isLoading && (
                 <TableRow>
                   <TableCell colSpan={4} className="text-center py-8 text-muted-foreground hover:bg-transparent">
-                    No bug reports found. Good job!
+                    No bug reports found. Good job.
                   </TableCell>
                 </TableRow>
               )}

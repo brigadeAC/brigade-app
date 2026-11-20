@@ -98,18 +98,18 @@ export default function MedicalReleaseUpload({ clientId, clientUserId, contractI
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+            <div className="p-4 bg-primary/10 border border-primary/20 rounded-lg">
               <div className="flex items-start gap-3">
-                <File className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
+                <File className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-green-900">{uploadedFile.name}</p>
-                  <p className="text-sm text-green-700">Uploaded on {uploadedFile.date}</p>
+                  <p className="font-medium text-primary">{uploadedFile.name}</p>
+                  <p className="text-sm text-primary">Uploaded on {uploadedFile.date}</p>
                 </div>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => setUploadedFile(null)}
-                  className="text-green-600 hover:text-red-600 flex-shrink-0"
+                  className="text-primary hover:text-red-600 flex-shrink-0"
                 >
                   <Trash2 className="w-4 h-4" />
                 </Button>

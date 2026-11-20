@@ -97,7 +97,7 @@ export default function CalorieLogForm({ open, onOpenChange, log, clients, onSub
           </div>
 
           {/* Summary Panel */}
-          <div className={`p-4 rounded-xl border ${fatWarning ? "bg-red-500/10 border-red-500/30" : "bg-green-500/10 border-green-500/30"}`}>
+          <div className={`p-4 rounded-xl border ${fatWarning ? "bg-red-500/10 border-red-500/30" : "bg-primary/10 border-primary/30"}`}>
             <h3 className="font-semibold text-sm mb-3 text-foreground">Summary</h3>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
               <div className="bg-card border border-border rounded-lg p-3 shadow-sm">
@@ -113,7 +113,7 @@ export default function CalorieLogForm({ open, onOpenChange, log, clients, onSub
                 <div className="text-xs text-muted-foreground">Calories from Fat</div>
               </div>
               <div className={`rounded-lg p-3 shadow-sm border ${fatWarning ? "bg-red-500/20 border-red-500/30" : "bg-card border-border"}`}>
-                <div className={`text-2xl font-bold ${fatWarning ? "text-red-400" : "text-green-400"}`}>{fatPercentage.toFixed(1)}%</div>
+                <div className={`text-2xl font-bold ${fatWarning ? "text-red-400" : "text-primary"}`}>{fatPercentage.toFixed(1)}%</div>
                 <div className="text-xs text-muted-foreground">Fat % of Calories</div>
                 {fatWarning && (
                   <div className="flex items-center justify-center gap-1 text-xs text-red-400 mt-1">
@@ -162,7 +162,7 @@ export default function CalorieLogForm({ open, onOpenChange, log, clients, onSub
                       <td className="p-1 px-3 text-muted-foreground text-sm">{entry.calories_from_fat != null ? Math.round(entry.calories_from_fat) : "—"}</td>
                       <td className="p-1 px-3 text-sm">
                         {entry.fat_percentage != null && entry.calories > 0 ? (
-                          <span className={entry.fat_percentage > 0.3 ? "text-red-400 font-medium" : "text-green-400"}>
+                          <span className={entry.fat_percentage > 0.3 ? "text-red-400 font-medium" : "text-primary"}>
                             {(entry.fat_percentage * 100).toFixed(1)}%
                           </span>
                         ) : "—"}
@@ -181,7 +181,7 @@ export default function CalorieLogForm({ open, onOpenChange, log, clients, onSub
 
           <div className="flex justify-end gap-3 pt-4 border-t border-border">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="border-border text-foreground hover:bg-accent">Cancel</Button>
-            <Button type="submit" disabled={isLoading} className="bg-gradient-to-r from-[#d4a017] to-[#f5c842] text-black font-bold border-none hover:opacity-90">
+            <Button type="submit" disabled={isLoading} className="bg-gradient-to-r from-[#4B91DD] to-[#4B91DD] text-black font-bold border-none hover:opacity-90">
               {isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               {log?.id ? "Update Log" : "Save Log"}
             </Button>

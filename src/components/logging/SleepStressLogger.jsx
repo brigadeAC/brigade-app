@@ -42,7 +42,7 @@ export default function SleepStressLogger({ userId }) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["recoveryPrescription"]);
-      toast.success("Logs saved! AI is generating your recovery protocol...");
+      toast.success("Logs saved. AI is generating your recovery protocol...");
       setStressors("");
     }
   });
@@ -51,7 +51,7 @@ export default function SleepStressLogger({ userId }) {
     <Card className="glass-card">
       <CardHeader>
         <CardTitle className="text-lg text-foreground flex items-center gap-2">
-          <Activity className="w-5 h-5 text-blue-500" />
+          <Activity className="w-5 h-5 text-primary" />
           Daily Readiness Log
         </CardTitle>
       </CardHeader>
@@ -59,18 +59,18 @@ export default function SleepStressLogger({ userId }) {
         
         <div className="space-y-4">
           <div className="flex justify-between items-center text-sm">
-            <span className="text-foreground font-medium flex items-center gap-2"><Moon className="w-4 h-4 text-indigo-400"/> Hours Slept</span>
-            <span className="text-indigo-400 font-bold">{hoursSlept[0]} hrs</span>
+            <span className="text-foreground font-medium flex items-center gap-2"><Moon className="w-4 h-4 text-primary"/> Hours Slept</span>
+            <span className="text-primary font-bold">{hoursSlept[0]} hrs</span>
           </div>
-          <Slider value={hoursSlept} onValueChange={setHoursSlept} max={12} min={2} step={0.5} className="[&_[role=slider]]:bg-indigo-500 [&_[role=slider]]:border-indigo-400" />
+          <Slider value={hoursSlept} onValueChange={setHoursSlept} max={12} min={2} step={0.5} className="[&_[role=slider]]:bg-primary [&_[role=slider]]:border-primary/40" />
         </div>
 
         <div className="space-y-4">
           <div className="flex justify-between items-center text-sm">
             <span className="text-foreground font-medium">Sleep Quality (1-5)</span>
-            <span className="text-indigo-400 font-bold">{sleepQuality[0]}/5</span>
+            <span className="text-primary font-bold">{sleepQuality[0]}/5</span>
           </div>
-          <Slider value={sleepQuality} onValueChange={setSleepQuality} max={5} min={1} step={1} className="[&_[role=slider]]:bg-indigo-500 [&_[role=slider]]:border-indigo-400" />
+          <Slider value={sleepQuality} onValueChange={setSleepQuality} max={5} min={1} step={1} className="[&_[role=slider]]:bg-primary [&_[role=slider]]:border-primary/40" />
         </div>
 
         <div className="space-y-4 pt-4 border-t border-border">
@@ -94,7 +94,7 @@ export default function SleepStressLogger({ userId }) {
         <Button 
           onClick={() => logMutation.mutate()} 
           disabled={logMutation.isPending}
-          className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold"
+          className="w-full bg-primary hover:bg-primary text-white font-bold"
         >
           {logMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Send className="w-4 h-4 mr-2" />}
           Log & Get Recovery Plan

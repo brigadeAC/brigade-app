@@ -110,7 +110,7 @@ export default function ProgressChartForm({ clientId, initialData, onComplete })
       </Card>
 
       <div className="flex justify-end gap-3">
-        <Button type="submit" className="bg-gradient-to-r from-emerald-500 to-teal-600">
+        <Button type="submit" className="bg-gradient-to-r from-primary to-primary">
           Save Progress Chart
         </Button>
       </div>

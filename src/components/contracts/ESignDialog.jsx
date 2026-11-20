@@ -39,7 +39,7 @@ export default function ESignDialog({ contract, open, onOpenChange, onSigned }) 
           user_id: user?.id || null,
         }),
       });
-      toast.success("Contract signed!");
+      toast.success("Contract signed.");
       onSigned?.();
       onOpenChange(false);
       setTypedName("");

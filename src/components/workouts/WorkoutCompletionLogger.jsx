@@ -24,7 +24,7 @@ export default function WorkoutCompletionLogger({ workoutPlan, clientProfile, on
       queryClient.setQueryData(["workoutLogs"], (old) => {
         return [{ id: `temp-${Date.now()}`, ...newLog }, ...(old || [])];
       });
-      toast.success("Workout logged successfully!");
+      toast.success("Workout logged successfully.");
       setNotes("");
       onComplete?.();
       return { previous };
@@ -81,7 +81,7 @@ export default function WorkoutCompletionLogger({ workoutPlan, clientProfile, on
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Button className="gap-2 bg-emerald-600 hover:bg-emerald-700">
+        <Button className="gap-2 bg-primary hover:bg-primary">
           <CheckCircle2 className="w-4 h-4" />
           Log Completion
         </Button>
@@ -122,7 +122,7 @@ export default function WorkoutCompletionLogger({ workoutPlan, clientProfile, on
           <Button
             onClick={handleLogCompletion}
             disabled={logWorkoutMutation.isPending}
-            className="w-full bg-emerald-600 hover:bg-emerald-700"
+            className="w-full bg-primary hover:bg-primary"
           >
             {logWorkoutMutation.isPending ? "Logging..." : "Log Workout"}
           </Button>
@@ -134,12 +134,12 @@ export default function WorkoutCompletionLogger({ workoutPlan, clientProfile, on
             </div>
           )}
           {aiAnalysis && (
-            <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 space-y-2">
-              <p className="text-sm font-semibold text-purple-700 flex items-center gap-1"><Sparkles className="w-4 h-4" /> AI Post-Workout Analysis</p>
-              <p className="text-sm text-purple-900"><strong>Performance:</strong> {aiAnalysis.performance}</p>
-              <p className="text-sm text-purple-900"><strong>Recovery:</strong> {aiAnalysis.recovery}</p>
-              <p className="text-sm text-purple-900"><strong>Nutrition Now:</strong> {aiAnalysis.nutrition}</p>
-              {aiAnalysis.highlight && <p className="text-sm text-emerald-700 font-medium">⭐ {aiAnalysis.highlight}</p>}
+            <div className="bg-primary/10 border border-primary/20 rounded-lg p-4 space-y-2">
+              <p className="text-sm font-semibold text-primary flex items-center gap-1"><Sparkles className="w-4 h-4" /> AI Post-Workout Analysis</p>
+              <p className="text-sm text-primary"><strong>Performance:</strong> {aiAnalysis.performance}</p>
+              <p className="text-sm text-primary"><strong>Recovery:</strong> {aiAnalysis.recovery}</p>
+              <p className="text-sm text-primary"><strong>Nutrition Now:</strong> {aiAnalysis.nutrition}</p>
+              {aiAnalysis.highlight && <p className="text-sm text-primary font-medium">⭐ {aiAnalysis.highlight}</p>}
             </div>
           )}
         </div>

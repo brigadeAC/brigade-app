@@ -156,7 +156,7 @@ export default function HabitTracker({ clientId, trainerId, readOnly = false }) 
         {!readOnly && (
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
-            <Button size="sm" className="bg-gradient-to-r from-emerald-500 to-teal-600">
+            <Button size="sm" className="bg-gradient-to-r from-primary to-primary">
               <Plus className="w-4 h-4 mr-2" />
               Assign Habit
             </Button>
@@ -213,7 +213,7 @@ export default function HabitTracker({ clientId, trainerId, readOnly = false }) 
                             <Button 
                               key={opt.val}
                               variant={formData.type === opt.val ? "default" : "outline"}
-                              className={formData.type === opt.val ? "bg-emerald-600" : ""}
+                              className={formData.type === opt.val ? "bg-primary" : ""}
                               onClick={() => setFormData({ ...formData, type: opt.val })}
                             >
                               {opt.label}
@@ -287,8 +287,8 @@ export default function HabitTracker({ clientId, trainerId, readOnly = false }) 
                 <CardContent className="pt-6">
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center">
-                        <Icon className="w-5 h-5 text-emerald-400" />
+                      <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center">
+                        <Icon className="w-5 h-5 text-primary" />
                       </div>
                       <div>
                         <h4 className="font-medium text-foreground">{habit.name}</h4>
@@ -303,7 +303,7 @@ export default function HabitTracker({ clientId, trainerId, readOnly = false }) 
                           variant={isCompletedToday ? "default" : "outline"}
                           size="sm"
                           onClick={() => toggleHabitToday(habit)}
-                          className={isCompletedToday ? "bg-emerald-600 hover:bg-emerald-700 text-foreground" : "border-border text-muted-foreground hover:text-foreground"}
+                          className={isCompletedToday ? "bg-primary hover:bg-primary text-foreground" : "border-border text-muted-foreground hover:text-foreground"}
                         >
                           {isCompletedToday ? <Check className="w-4 h-4 mr-1" /> : null}
                           {isCompletedToday ? "Done" : "Complete"}
@@ -311,7 +311,7 @@ export default function HabitTracker({ clientId, trainerId, readOnly = false }) 
                       ) : (
                         <div className="flex items-center gap-2">
                           {isCompletedToday && (
-                            <span className="text-xs text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded font-medium max-w-[200px] truncate" title={(() => {
+                            <span className="text-xs text-primary bg-primary/10 px-2 py-1 rounded font-medium max-w-[200px] truncate" title={(() => {
                                 const log = habitLogs.find(l => l.habit_id === habit.id && l.date === format(new Date(), 'yyyy-MM-dd'));
                                 return log?.notes ? log.notes : 'Completed';
                               })()}>
@@ -342,7 +342,7 @@ export default function HabitTracker({ clientId, trainerId, readOnly = false }) 
                         {compliance.toFixed(0)}%
                       </span>
                     </div>
-                    <Progress value={compliance} className="h-2 bg-secondary" indicatorClassName="bg-emerald-500" />
+                    <Progress value={compliance} className="h-2 bg-secondary" indicatorClassName="bg-primary" />
                   </div>
                 </CardContent>
               </Card>

@@ -30,7 +30,7 @@ export default function WaitingList() {
         status: "pending"
       });
       setSubmitted(true);
-      toast.success("Successfully joined the waiting list!");
+      toast.success("Successfully joined the waiting list.");
     } catch (error) {
       toast.error("Failed to join waiting list. Please try again.");
     } finally {
@@ -41,13 +41,13 @@ export default function WaitingList() {
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col" style={{ fontFamily: "'Georgia', 'Times New Roman', serif" }}>
       {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50" style={{ background: 'rgba(6,6,8,0.95)', borderBottom: '1px solid rgba(212,175,55,0.2)', backdropFilter: 'blur(20px)' }}>
+      <nav className="fixed top-0 left-0 right-0 z-50" style={{ background: 'rgba(6,6,8,0.95)', borderBottom: '1px solid rgba(75,145,221,0.2)', backdropFilter: 'blur(20px)' }}>
         <div className="max-w-7xl mx-auto px-4 lg:px-8 py-4 flex items-center justify-between">
           <Link to={createPageUrl("PublicHome")} className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #d4a017, #f5c842)' }}>
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #4B91DD, #4B91DD)' }}>
               <Flame className="w-5 h-5 text-black" />
             </div>
-            <span className="text-xl font-black tracking-wide" style={{ background: 'linear-gradient(135deg, #f5c842, #d4a017)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>APEX COACH</span>
+            <span className="text-xl font-black tracking-wide" style={{ background: 'linear-gradient(135deg, #4B91DD, #4B91DD)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>APEX COACH</span>
           </Link>
           <Link to={createPageUrl("PublicHome")}>
             <Button variant="ghost" className="text-muted-foreground hover:text-foreground hover:bg-accent">
@@ -61,25 +61,25 @@ export default function WaitingList() {
       {/* Main Content */}
       <div className="flex-1 flex items-center justify-center px-4 pt-24 pb-12 relative overflow-hidden">
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-0 left-0 w-96 h-96 blur-3xl" style={{ background: 'radial-gradient(circle, rgba(212,175,55,0.12) 0%, transparent 70%)' }} />
-          <div className="absolute bottom-0 right-0 w-96 h-96 blur-3xl" style={{ background: 'radial-gradient(circle, rgba(139,92,246,0.08) 0%, transparent 70%)' }} />
-          <div className="absolute inset-0" style={{ backgroundImage: 'linear-gradient(rgba(212,175,55,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(212,175,55,0.04) 1px, transparent 1px)', backgroundSize: '60px 60px' }} />
+          <div className="absolute top-0 left-0 w-96 h-96 blur-3xl" style={{ background: 'radial-gradient(circle, rgba(75,145,221,0.12) 0%, transparent 70%)' }} />
+          <div className="absolute bottom-0 right-0 w-96 h-96 blur-3xl" style={{ background: 'radial-gradient(circle, rgba(75,145,221,0.08) 0%, transparent 70%)' }} />
+          <div className="absolute inset-0" style={{ backgroundImage: 'linear-gradient(rgba(75,145,221,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(75,145,221,0.04) 1px, transparent 1px)', backgroundSize: '60px 60px' }} />
         </div>
 
         <div className="w-full max-w-md relative z-10">
-          <div className="p-8 sm:p-10 rounded-2xl" style={{ background: 'rgba(12,12,14,0.8)', border: '1px solid rgba(212,175,55,0.2)', boxShadow: '0 20px 40px rgba(0,0,0,0.4)' }}>
+          <div className="p-8 sm:p-10 rounded-2xl" style={{ background: 'rgba(12,12,14,0.8)', border: '1px solid rgba(75,145,221,0.2)', boxShadow: '0 20px 40px rgba(0,0,0,0.4)' }}>
             
             {submitted ? (
               <div className="text-center space-y-6 py-8 animate-in fade-in zoom-in duration-500">
-                <div className="w-20 h-20 mx-auto rounded-full flex items-center justify-center bg-green-500/10 border border-green-500/20">
-                  <CheckCircle2 className="w-10 h-10 text-green-400" />
+                <div className="w-20 h-20 mx-auto rounded-full flex items-center justify-center bg-primary/10 border border-primary/20">
+                  <CheckCircle2 className="w-10 h-10 text-primary" />
                 </div>
                 <div>
                   <h2 className="text-2xl font-black mb-2 tracking-wide text-foreground" style={{ fontFamily: "'Georgia', serif" }}>YOU'RE ON THE LIST</h2>
                   <p className="text-muted-foreground font-sans mt-2">We'll notify you as soon as a spot opens up or when the closed beta finishes.</p>
                 </div>
                 <Link to={createPageUrl("PublicHome")} className="block">
-                  <Button className="w-full py-6 font-black tracking-wide text-sm text-black" style={{ background: 'linear-gradient(135deg, #d4a017, #f5c842)' }}>
+                  <Button className="w-full py-6 font-black tracking-wide text-sm text-black" style={{ background: 'linear-gradient(135deg, #4B91DD, #4B91DD)' }}>
                     RETURN HOME
                   </Button>
                 </Link>
@@ -87,8 +87,8 @@ export default function WaitingList() {
             ) : (
               <>
                 <div className="text-center mb-8">
-                  <p className="text-xs font-bold tracking-[0.3em] mb-3" style={{ color: '#d4a017' }}>CLOSED BETA</p>
-                  <h2 className="text-3xl font-black mb-3" style={{ fontFamily: "'Georgia', serif", background: 'linear-gradient(135deg, #ffffff 0%, #f5c842 60%, #d4a017 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                  <p className="text-xs font-bold tracking-[0.3em] mb-3" style={{ color: '#4B91DD' }}>CLOSED BETA</p>
+                  <h2 className="text-3xl font-black mb-3" style={{ fontFamily: "'Georgia', serif", background: 'linear-gradient(135deg, #ffffff 0%, #4B91DD 60%, #4B91DD 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
                     JOIN THE WAITING LIST
                   </h2>
                   <p className="text-muted-foreground text-sm font-sans">
@@ -103,7 +103,7 @@ export default function WaitingList() {
                       id="name" 
                       required 
                       placeholder="John Doe"
-                      className="bg-card border-border text-foreground focus:border-[#d4a017]"
+                      className="bg-card border-border text-foreground focus:border-[#4B91DD]"
                       value={formData.name}
                       onChange={(e) => setFormData({...formData, name: e.target.value})}
                     />
@@ -116,7 +116,7 @@ export default function WaitingList() {
                       type="email" 
                       required 
                       placeholder="john@example.com"
-                      className="bg-card border-border text-foreground focus:border-[#d4a017]"
+                      className="bg-card border-border text-foreground focus:border-[#4B91DD]"
                       value={formData.email}
                       onChange={(e) => setFormData({...formData, email: e.target.value})}
                     />
@@ -125,7 +125,7 @@ export default function WaitingList() {
                   <div className="space-y-2">
                     <Label className="text-muted-foreground">I am a...</Label>
                     <Select value={formData.role} onValueChange={(v) => setFormData({...formData, role: v})}>
-                      <SelectTrigger className="bg-card border-border text-foreground focus:ring-[#d4a017]">
+                      <SelectTrigger className="bg-card border-border text-foreground focus:ring-[#4B91DD]">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="bg-card border-border text-foreground">
@@ -139,7 +139,7 @@ export default function WaitingList() {
                     type="submit" 
                     disabled={isSubmitting}
                     className="w-full py-6 mt-4 font-black tracking-wide text-sm text-black border-none hover:opacity-90 transition-opacity" 
-                    style={{ background: 'linear-gradient(135deg, #d4a017, #f5c842)' }}
+                    style={{ background: 'linear-gradient(135deg, #4B91DD, #4B91DD)' }}
                   >
                     {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : "JOIN WAITING LIST"}
                   </Button>

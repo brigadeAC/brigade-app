@@ -176,10 +176,10 @@ export default function Settings() {
       payout_method: updatedUser.data?.payout_method || updatedUser.payout_method || "stripe"
       });
       window.dispatchEvent(new Event('profileUpdated'));
-      toast.success("Settings saved successfully!");
+      toast.success("Settings saved successfully.");
     } catch (error) {
       console.error("Failed to save settings:", error);
-      toast.error("Failed to save settings: " + error.message);
+      toast.error("Failed to save settings:" + error.message);
     }
     setIsLoading(false);
   };
@@ -225,7 +225,7 @@ export default function Settings() {
       setUser(updatedUser);
       window.dispatchEvent(new Event('profileUpdated'));
 
-      toast.success("Beta key verified successfully!");
+      toast.success("Beta key verified successfully.");
     } catch (error) {
       console.error(error);
       setBetaKeyError("Failed to verify beta key. Please try again.");
@@ -247,7 +247,7 @@ export default function Settings() {
 
     toast.promise(uploadPromise(), {
       loading: 'Uploading photo...',
-      success: 'Profile photo updated!',
+      success: 'Profile photo updated.',
       error: 'Failed to upload photo'
     });
     
@@ -269,7 +269,7 @@ export default function Settings() {
 
     toast.promise(uploadPromise(), {
       loading: 'Uploading logo...',
-      success: 'Business logo updated!',
+      success: 'Business logo updated.',
       error: 'Failed to upload logo'
     });
     
@@ -292,7 +292,7 @@ export default function Settings() {
       const total = Object.values(data.record_counts || {}).reduce((n, c) => n + c, 0);
       toast.success(`Exported ${total} record${total === 1 ? "" : "s"}.`);
     } catch (error) {
-      toast.error("Failed to export your data: " + error.message);
+      toast.error("Failed to export your data:" + error.message);
     } finally {
       setIsExporting(false);
     }
@@ -313,7 +313,7 @@ export default function Settings() {
       }, 1500);
     } catch (error) {
       console.error("Failed to delete account:", error);
-      toast.error("Failed to delete account: " + error.message);
+      toast.error("Failed to delete account:" + error.message);
       setIsDeleting(false);
     }
   };
@@ -321,7 +321,7 @@ export default function Settings() {
   if (!user) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600" />
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
       </div>);
 
   }
@@ -380,11 +380,11 @@ export default function Settings() {
               <div className="relative">
                 <Avatar className="w-24 h-24 ring-4 ring-white shadow-lg">
                   <AvatarImage src={user.avatar_url || user.data?.avatar_url} />
-                  <AvatarFallback className="bg-gradient-to-br from-emerald-400 to-teal-500 text-foreground text-2xl">
+                  <AvatarFallback className="bg-gradient-to-br from-primary to-primary text-foreground text-2xl">
                     {(user.data?.full_name || user.full_name)?.[0]?.toUpperCase() || user.email?.[0]?.toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
-                <label className="absolute bottom-0 right-0 w-8 h-8 bg-emerald-600 rounded-full flex items-center justify-center cursor-pointer hover:bg-emerald-700 transition-colors shadow-lg">
+                <label className="absolute bottom-0 right-0 w-8 h-8 bg-primary rounded-full flex items-center justify-center cursor-pointer hover:bg-primary transition-colors shadow-lg">
                   <Camera className="w-4 h-4 text-foreground" />
                   <input type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
                 </label>
@@ -406,12 +406,12 @@ export default function Settings() {
                     {(user.data?.business_logo_url || user.business_logo_url) ? (
                       <AvatarImage src={user.data?.business_logo_url || user.business_logo_url} className="object-contain" />
                     ) : (
-                      <AvatarFallback className="bg-gradient-to-br from-emerald-400 to-teal-500 text-foreground text-2xl">
+                      <AvatarFallback className="bg-gradient-to-br from-primary to-primary text-foreground text-2xl">
                         <Building className="w-8 h-8" />
                       </AvatarFallback>
                     )}
                   </Avatar>
-                  <label className="absolute bottom-0 right-0 w-8 h-8 bg-emerald-600 rounded-full flex items-center justify-center cursor-pointer hover:bg-emerald-700 transition-colors shadow-lg">
+                  <label className="absolute bottom-0 right-0 w-8 h-8 bg-primary rounded-full flex items-center justify-center cursor-pointer hover:bg-primary transition-colors shadow-lg">
                     <Camera className="w-4 h-4 text-foreground" />
                     <input type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
                   </label>
@@ -546,10 +546,10 @@ export default function Settings() {
             <div className="flex justify-end mt-6">
               <Button
                 onClick={() => {
-                  console.log("Button clicked!");
+                  console.log("Button clicked.");
                   handleSave();
                 }}
-                className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700"
+                className="bg-gradient-to-r from-primary to-primary hover:from-primary hover:to-primary"
                 disabled={isLoading}>
 
                 <Save className="w-4 h-4 mr-2" />
@@ -591,7 +591,7 @@ export default function Settings() {
 
                 <Button
                 onClick={handleBetaKeyVerify}
-                className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 w-full">
+                className="bg-gradient-to-r from-primary to-primary hover:from-primary hover:to-primary w-full">
 
                   Verify Beta Key
                 </Button>
@@ -719,7 +719,7 @@ export default function Settings() {
           <div className="glass-card rounded-2xl p-6">
             <h3 className="text-lg font-semibold text-foreground mb-1">Appearance</h3>
             <p className="text-sm text-muted-foreground mb-4">
-              Choose how ApexCoach looks on this device. "System" follows your phone or
+              Choose how Brigade looks on this device. "System" follows your phone or
               computer's own light/dark setting.
             </p>
             <div className="grid grid-cols-3 gap-3 max-w-md">

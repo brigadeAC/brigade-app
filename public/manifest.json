@@ -1,12 +1,12 @@
 {
-  "name": "ApexCoach",
-  "short_name": "ApexCoach",
-  "description": "Training, nutrition, and habit coaching — for trainers, clients, and solo athletes.",
+  "name": "Brigade Athletic Club",
+  "short_name": "Brigade",
+  "description": "Coaching, training, nutrition and habits for Brigade Athletic Club members.",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
-  "background_color": "#F5F7FA",
-  "theme_color": "#F5F7FA",
+  "background_color": "#F9F7F6",
+  "theme_color": "#F9F7F6",
   "icons": [
     {
       "src": "/icon.svg",

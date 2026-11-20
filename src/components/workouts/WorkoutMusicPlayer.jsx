@@ -4,10 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Play, Pause, SkipForward, SkipBack, Music, Volume2, VolumeX } from "lucide-react";
 
 const PLAYLISTS = {
-  warmup: { name: "Warm-up Flow", color: "text-blue-400", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" },
+  warmup: { name: "Warm-up Flow", color: "text-primary", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" },
   heavy_lift: { name: "Heavy Metal Lift", color: "text-red-500", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-13.mp3" },
-  cardio: { name: "High BPM Cardio", color: "text-yellow-500", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3" },
-  cooldown: { name: "Zen Cool-down", color: "text-emerald-400", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-15.mp3" }
+  cardio: { name: "High BPM Cardio", color: "text-primary", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3" },
+  cooldown: { name: "Zen Cool-down", color: "text-primary", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-15.mp3" }
 };
 
 export default function WorkoutMusicPlayer({ currentPhase = "warmup" }) {

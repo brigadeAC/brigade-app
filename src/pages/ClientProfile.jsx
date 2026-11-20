@@ -73,11 +73,11 @@ import {
 "@/components/ui/alert-dialog";
 
 const statusStyles = {
-  active: "bg-emerald-100 text-emerald-700",
+  active: "bg-primary/10 text-primary",
   inactive: "bg-slate-100 text-slate-600",
   paused: "bg-amber-100 text-amber-700",
   draft: "bg-slate-100 text-slate-600",
-  completed: "bg-green-100 text-green-700",
+  completed: "bg-primary/10 text-primary",
   archived: "bg-slate-100 text-slate-500"
 };
 
@@ -461,7 +461,7 @@ export default function ClientProfile() {
         <div className="flex items-center gap-4 flex-1">
           <Avatar className="h-16 w-16 ring-4 ring-white shadow-lg">
             <AvatarImage src={client.avatar_url} />
-            <AvatarFallback className="bg-gradient-to-br from-emerald-400 to-teal-500 text-foreground text-2xl font-semibold">
+            <AvatarFallback className="bg-gradient-to-br from-primary to-primary text-foreground text-2xl font-semibold">
               {client.full_name?.[0]?.toUpperCase()}
             </AvatarFallback>
           </Avatar>
@@ -475,13 +475,13 @@ export default function ClientProfile() {
               </div>
               <div className="flex items-center gap-4 mt-2">
                 {client.email &&
-                <a href={`mailto:${client.email}`} className="flex items-center gap-2 text-sm text-slate-500 hover:text-emerald-600">
+                <a href={`mailto:${client.email}`} className="flex items-center gap-2 text-sm text-slate-500 hover:text-primary">
                     <Mail className="w-4 h-4" />
                     {client.email}
                   </a>
                 }
                 {client.phone &&
-                <a href={`tel:${client.phone}`} className="flex items-center gap-2 text-sm text-slate-500 hover:text-emerald-600">
+                <a href={`tel:${client.phone}`} className="flex items-center gap-2 text-sm text-slate-500 hover:text-primary">
                     <Phone className="w-4 h-4" />
                     {client.phone}
                   </a>
@@ -560,13 +560,13 @@ export default function ClientProfile() {
                   setShowFitnessProgramForm(true);
                 }}
                 variant="outline" 
-                className="border-[#8b5cf6]/30 text-[#a78bfa] hover:bg-[#8b5cf6]/10"
+                className="border-[#4B91DD]/30 text-[#4B91DD] hover:bg-[#4B91DD]/10"
               >
                 <Plus className="w-4 h-4 mr-2" />
                 Add Program
               </Button>
               <Button
-                className="bg-gradient-to-r from-[#d4a017] to-[#f5c842] text-black font-bold border-none hover:opacity-90"
+                className="bg-gradient-to-r from-[#4B91DD] to-[#4B91DD] text-black font-bold border-none hover:opacity-90"
                 onClick={() => navigate(createPageUrl("Workouts") + `?client_id=${clientId}`)}
               >
                 <Plus className="w-4 h-4 mr-2" />
@@ -582,7 +582,7 @@ export default function ClientProfile() {
                   <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
                     <div className="space-y-1 flex-1">
                       <CardTitle className="flex items-center gap-3 text-foreground">
-                        <Dumbbell className="w-5 h-5 text-[#8b5cf6]" />
+                        <Dumbbell className="w-5 h-5 text-[#4B91DD]" />
                         {prog.client_name ? `${prog.client_name}'s Program` : 'Fitness Program'}
                       </CardTitle>
                       <p className="text-sm text-muted-foreground">
@@ -635,8 +635,8 @@ export default function ClientProfile() {
                           {prog.client_info.body_fat && <div><span className="text-muted-foreground text-xs block">Body Fat</span><span className="text-sm font-medium text-foreground">{prog.client_info.body_fat}%</span></div>}
                           {prog.client_info.bmi && <div><span className="text-muted-foreground text-xs block">BMI</span><span className="text-sm font-medium text-foreground">{prog.client_info.bmi}</span></div>}
                           {(prog.client_info.height_feet || prog.client_info.height_inches) && <div><span className="text-muted-foreground text-xs block">Height</span><span className="text-sm font-medium text-foreground">{convertHeightDisplay(((parseFloat(prog.client_info.height_feet) || 0) * 12 + (parseFloat(prog.client_info.height_inches) || 0)) * 2.54)} {heightUnit}</span></div>}
-                          {prog.client_info.target_body_fat && <div><span className="text-[#d4a017]/70 text-xs block">Target Fat</span><span className="text-sm font-medium text-[#d4a017]">{prog.client_info.target_body_fat}%</span></div>}
-                          {prog.client_info.target_bmi && <div><span className="text-[#d4a017]/70 text-xs block">Target BMI</span><span className="text-sm font-medium text-[#d4a017]">{prog.client_info.target_bmi}</span></div>}
+                          {prog.client_info.target_body_fat && <div><span className="text-[#4B91DD]/70 text-xs block">Target Fat</span><span className="text-sm font-medium text-[#4B91DD]">{prog.client_info.target_body_fat}%</span></div>}
+                          {prog.client_info.target_bmi && <div><span className="text-[#4B91DD]/70 text-xs block">Target BMI</span><span className="text-sm font-medium text-[#4B91DD]">{prog.client_info.target_bmi}</span></div>}
                           {prog.client_info.suggestions && <div className="col-span-full mt-1"><span className="text-muted-foreground text-xs block">Suggestions</span><span className="text-sm text-muted-foreground">{prog.client_info.suggestions}</span></div>}
                         </div>
                       </div>
@@ -650,7 +650,7 @@ export default function ClientProfile() {
                   <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
                     <div className="space-y-1 flex-1">
                       <CardTitle className="flex items-center gap-3 text-foreground">
-                        <Dumbbell className="w-5 h-5 text-[#d4a017]" />
+                        <Dumbbell className="w-5 h-5 text-[#4B91DD]" />
                         {workout.name}
                       </CardTitle>
                       {workout.description &&
@@ -773,13 +773,13 @@ export default function ClientProfile() {
                   setShowCalorieForm(true);
                 }}
                 variant="outline" 
-                className="border-[#d4a017]/30 text-[#d4a017] hover:bg-[#d4a017]/10"
+                className="border-[#4B91DD]/30 text-[#4B91DD] hover:bg-[#4B91DD]/10"
               >
                 <Plus className="w-4 h-4 mr-2" />
                 Add Calorie Log
               </Button>
               <Button
-                className="bg-gradient-to-r from-[#d4a017] to-[#f5c842] text-black font-bold border-none hover:opacity-90"
+                className="bg-gradient-to-r from-[#4B91DD] to-[#4B91DD] text-black font-bold border-none hover:opacity-90"
                 onClick={() => navigate(createPageUrl("Meals") + `?client_id=${clientId}`)}
               >
                 <Plus className="w-4 h-4 mr-2" />
@@ -800,7 +800,7 @@ export default function ClientProfile() {
                     <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
                       <div className="space-y-1 flex-1">
                         <CardTitle className="flex items-center gap-3 text-foreground">
-                          <Apple className="w-5 h-5 text-[#d4a017]" />
+                          <Apple className="w-5 h-5 text-[#4B91DD]" />
                           {log.log_name || "Calorie Log"}
                         </CardTitle>
                         <p className="text-sm text-muted-foreground">
@@ -856,7 +856,7 @@ export default function ClientProfile() {
                   <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
                     <div className="space-y-1 flex-1">
                       <CardTitle className="flex items-center gap-3 text-foreground">
-                        <Apple className="w-5 h-5 text-[#22c55e]" />
+                        <Apple className="w-5 h-5 text-[#4B91DD]" />
                         {meal.name}
                       </CardTitle>
                       {meal.description &&
@@ -937,8 +937,8 @@ export default function ClientProfile() {
                             return acc;
                           }, {})
                         ).map(([day, dailyMeals]) => (
-                          <div key={day} className="rounded-lg overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.08)' }}>
-                            <div className="px-3 py-2 text-xs font-semibold text-orange-400" style={{ background: 'rgba(255,255,255,0.04)' }}>
+                          <div key={day} className="rounded-lg overflow-hidden" style={{ border: '1px solid hsl(var(--border))' }}>
+                            <div className="px-3 py-2 text-xs font-semibold text-primary" style={{ background: 'hsl(var(--secondary))' }}>
                               Day {day}
                             </div>
                             <div className="divide-y divide-white/5">
@@ -991,7 +991,7 @@ export default function ClientProfile() {
                 setEditingProgress(null);
                 setShowProgressForm(true);
               }}
-              className="bg-gradient-to-r from-[#d4a017] to-[#f5c842] text-black font-bold border-none hover:opacity-90">
+              className="bg-gradient-to-r from-[#4B91DD] to-[#4B91DD] text-black font-bold border-none hover:opacity-90">
               <Plus className="w-4 h-4 mr-2" />
               Log Progress
             </Button>
@@ -1011,7 +1011,7 @@ export default function ClientProfile() {
                     <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-3">
                       <div className="space-y-1">
                         <CardTitle className="text-base flex items-center gap-2 text-foreground">
-                          <CalendarIcon className="w-4 h-4 text-[#8b5cf6]" />
+                          <CalendarIcon className="w-4 h-4 text-[#4B91DD]" />
                           {new Date(log.date).toLocaleDateString('en-US', {
                         year: 'numeric',
                         month: 'long',
@@ -1112,10 +1112,10 @@ export default function ClientProfile() {
         {/* Assessments Tab */}
         <TabsContent value="assessments" className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card className="glass-card cursor-pointer hover:border-[#8b5cf6]/50 transition-all group" onClick={() => setShowProgressChart(!showProgressChart)}>
+            <Card className="glass-card cursor-pointer hover:border-[#4B91DD]/50 transition-all group" onClick={() => setShowProgressChart(!showProgressChart)}>
               <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2 text-foreground group-hover:text-[#8b5cf6] transition-colors">
-                  <TrendingUp className="w-5 h-5 text-[#8b5cf6]" />
+                <CardTitle className="text-lg flex items-center gap-2 text-foreground group-hover:text-[#4B91DD] transition-colors">
+                  <TrendingUp className="w-5 h-5 text-[#4B91DD]" />
                   Fitness Progress Chart
                 </CardTitle>
               </CardHeader>
@@ -1124,10 +1124,10 @@ export default function ClientProfile() {
               </CardContent>
             </Card>
 
-            <Card className="glass-card cursor-pointer hover:border-[#d4a017]/50 transition-all group" onClick={() => setShowParQ(!showParQ)}>
+            <Card className="glass-card cursor-pointer hover:border-[#4B91DD]/50 transition-all group" onClick={() => setShowParQ(!showParQ)}>
               <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2 text-foreground group-hover:text-[#d4a017] transition-colors">
-                  <FileText className="w-5 h-5 text-[#d4a017]" />
+                <CardTitle className="text-lg flex items-center gap-2 text-foreground group-hover:text-[#4B91DD] transition-colors">
+                  <FileText className="w-5 h-5 text-[#4B91DD]" />
                   PAR-Q Form
                 </CardTitle>
               </CardHeader>
@@ -1138,8 +1138,8 @@ export default function ClientProfile() {
 
             <Card className="glass-card cursor-pointer hover:border-border/50 transition-all group" onClick={() => setShowIntake(!showIntake)}>
               <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2 text-foreground group-hover:text-[#22c55e] transition-colors">
-                  <FileText className="w-5 h-5 text-[#22c55e]" />
+                <CardTitle className="text-lg flex items-center gap-2 text-foreground group-hover:text-[#4B91DD] transition-colors">
+                  <FileText className="w-5 h-5 text-[#4B91DD]" />
                   Client Intake Form
                 </CardTitle>
               </CardHeader>
@@ -1162,7 +1162,7 @@ export default function ClientProfile() {
           </div>
 
           {showProgressChart &&
-          <Card className="mt-6 glass-card border-[#8b5cf6]/30">
+          <Card className="mt-6 glass-card border-[#4B91DD]/30">
               <CardHeader>
                 <CardTitle className="text-foreground">Fitness Progress Chart Entry</CardTitle>
               </CardHeader>
@@ -1179,7 +1179,7 @@ export default function ClientProfile() {
           }
 
           {showParQ &&
-          <Card className="mt-6 glass-card border-[#d4a017]/30">
+          <Card className="mt-6 glass-card border-[#4B91DD]/30">
               <CardHeader>
                 <CardTitle className="text-foreground">Physical Activity Readiness Questionnaire</CardTitle>
               </CardHeader>

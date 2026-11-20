@@ -5,24 +5,24 @@ import { DollarSign } from "lucide-react";
 
 const nivoTheme = {
   background: "transparent",
-  textColor: "#94a3b8",
+  textColor: "#726B65",
   fontSize: 11,
   axis: {
-    domain: { line: { stroke: "rgba(255,255,255,0.1)", strokeWidth: 1 } },
-    ticks: { line: { stroke: "rgba(255,255,255,0.1)", strokeWidth: 1 }, text: { fill: "#94a3b8", fontSize: 11 } },
-    legend: { text: { fill: "#94a3b8", fontSize: 12 } },
+    domain: { line: { stroke: "rgba(114,107,101,0.15)", strokeWidth: 1 } },
+    ticks: { line: { stroke: "rgba(114,107,101,0.15)", strokeWidth: 1 }, text: { fill: "#726B65", fontSize: 11 } },
+    legend: { text: { fill: "#726B65", fontSize: 12 } },
   },
-  grid: { line: { stroke: "rgba(255,255,255,0.06)", strokeWidth: 1 } },
+  grid: { line: { stroke: "rgba(114,107,101,0.15)", strokeWidth: 1 } },
   tooltip: {
     container: {
-      background: "#0d0d0f",
-      border: "1px solid rgba(255,255,255,0.1)",
+      background: "#191615",
+      border: "1px solid hsl(var(--border))",
       borderRadius: "10px",
-      color: "#e5e7eb",
+      color: "#E2DEDA",
       fontSize: "12px",
     },
   },
-  crosshair: { line: { stroke: "rgba(255,255,255,0.2)", strokeWidth: 1 } },
+  crosshair: { line: { stroke: "rgba(114,107,101,0.15)", strokeWidth: 1 } },
 };
 
 export default function RevenueChart({ payments }) {
@@ -54,25 +54,25 @@ export default function RevenueChart({ payments }) {
     })
     .reduce((sum, p) => sum + (p.amount || 0), 0);
 
-  const lineData = [{ id: "Revenue", color: "#10b981", data: rawData }];
+  const lineData = [{ id: "Revenue", color: "#4B91DD", data: rawData }];
 
   return (
     <Card className="glass-card">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-foreground">
-          <DollarSign className="w-5 h-5 text-emerald-400" />
+          <DollarSign className="w-5 h-5 text-primary" />
           Revenue Overview
         </CardTitle>
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-2 gap-4 mb-6">
-          <div className="p-4 bg-emerald-500/10 rounded-lg">
+          <div className="p-4 bg-primary/10 rounded-lg">
             <div className="text-sm text-muted-foreground">Total Revenue</div>
-            <div className="text-2xl font-bold text-emerald-400">${totalRevenue.toFixed(2)}</div>
+            <div className="text-2xl font-bold text-primary">${totalRevenue.toFixed(2)}</div>
           </div>
-          <div className="p-4 bg-blue-500/10 rounded-lg">
+          <div className="p-4 bg-primary/10 rounded-lg">
             <div className="text-sm text-muted-foreground">This Month</div>
-            <div className="text-2xl font-bold text-blue-400">${thisMonthRevenue.toFixed(2)}</div>
+            <div className="text-2xl font-bold text-primary">${thisMonthRevenue.toFixed(2)}</div>
           </div>
         </div>
 
@@ -88,17 +88,17 @@ export default function RevenueChart({ payments }) {
               axisBottom={{ tickSize: 5, tickPadding: 8 }}
               axisLeft={{ tickSize: 5, tickPadding: 8, format: v => `$${v}` }}
               enableGridX={false}
-              colors={["#10b981"]}
+              colors={["#4B91DD"]}
               lineWidth={3}
               pointSize={8}
-              pointColor="#10b981"
+              pointColor="#4B91DD"
               pointBorderWidth={2}
-              pointBorderColor="#080808"
+              pointBorderColor="#191615"
               enableArea={true}
               areaOpacity={0.15}
               useMesh={true}
               tooltip={({ point }) => (
-                <div style={{ background: "#0d0d0f", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: "8px 12px", color: "#e5e7eb", fontSize: 12 }}>
+                <div style={{ background: "#191615", border: "1px solid hsl(var(--border))", borderRadius: 8, padding: "8px 12px", color: "#E2DEDA", fontSize: 12 }}>
                   <strong>{point.data.xFormatted}</strong>: ${Number(point.data.y).toFixed(2)}
                 </div>
               )}

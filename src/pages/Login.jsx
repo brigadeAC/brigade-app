@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { BrandIcon, BrandWordmark } from "@/components/BrandMark";
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import { createPageUrl } from '@/utils';
@@ -48,10 +49,9 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
       <div className="w-full max-w-md">
         <div className="flex flex-col items-center mb-8">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-400 to-green-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
-            <Dumbbell className="w-7 h-7 text-foreground" />
-          </div>
-          <h1 className="mt-4 text-2xl font-bold tracking-wide text-foreground">ApexCoach</h1>
+          <BrandIcon className="w-14 h-14" />
+          <BrandWordmark className="mt-4 text-2xl">Brigade</BrandWordmark>
+          <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground mt-1">Athletic Club</p>
           <p className="text-muted-foreground text-sm mt-1">
             {mode === 'login' ? 'Sign in to your account' : 'Create your account'}
           </p>
@@ -136,7 +136,7 @@ export default function Login() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-lg bg-primary py-2.5 font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-60 transition"
+            className="w-full rounded-[6px] bg-primary py-3 text-sm font-bold uppercase tracking-[0.08em] text-primary-foreground hover:opacity-90 disabled:opacity-60 transition"
           >
             {loading ? 'Please wait…' : mode === 'login' ? 'Sign in' : 'Create account'}
           </button>
@@ -149,7 +149,7 @@ export default function Login() {
                 setMode(mode === 'login' ? 'register' : 'login');
                 setError('');
               }}
-              className="text-emerald-400 hover:underline font-medium"
+              className="text-primary hover:underline font-medium"
             >
               {mode === 'login' ? 'Sign up' : 'Sign in'}
             </button>

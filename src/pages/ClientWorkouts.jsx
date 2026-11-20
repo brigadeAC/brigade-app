@@ -64,7 +64,7 @@ function FitnessProgramCard({ program }) {
               </p>
             </div>
           </div>
-          <Badge className="bg-purple-100 text-purple-700 dark:bg-purple-500/15 dark:text-purple-300 shrink-0 w-fit">{allExercises.length} exercises</Badge>
+          <Badge className="bg-primary/10 text-primary dark:bg-primary/15 dark:text-primary shrink-0 w-fit">{allExercises.length} exercises</Badge>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -90,9 +90,9 @@ function FitnessProgramCard({ program }) {
               </div>
             )}
             {program.client_info.suggestions && (
-              <div className="col-span-2 sm:col-span-1 rounded-lg p-3" style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.25)' }}>
-                <div className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">Notes</div>
-                <div className="text-xs text-emerald-700 dark:text-emerald-300 mt-1">{program.client_info.suggestions}</div>
+              <div className="col-span-2 sm:col-span-1 rounded-lg p-3" style={{ background: 'rgba(75,145,221,0.1)', border: '1px solid rgba(75,145,221,0.25)' }}>
+                <div className="text-xs text-primary dark:text-primary font-medium">Notes</div>
+                <div className="text-xs text-primary dark:text-primary mt-1">{program.client_info.suggestions}</div>
               </div>
             )}
           </div>
@@ -332,7 +332,7 @@ export default function ClientWorkouts() {
           </div>
           <div className="text-right">
             <p className="text-xs text-muted-foreground">Sessions</p>
-            <p className="text-xl font-bold text-emerald-400">{workoutLogs.length}</p>
+            <p className="text-xl font-bold text-primary">{workoutLogs.length}</p>
           </div>
         </div>
         <div className="flex gap-2 flex-wrap">
@@ -392,12 +392,12 @@ export default function ClientWorkouts() {
                       <div className="flex items-center gap-2">
                         {clientProfile?.trainer_id && (
                           workout.self_added ? (
-                            <Badge className="bg-sky-500/10 text-sky-600 border border-sky-500/20">Added by you</Badge>
+                            <Badge className="bg-primary/10 text-primary border border-primary/20">Added by you</Badge>
                           ) : (
                             <Badge className="bg-primary/10 text-primary border border-primary/20">From your trainer</Badge>
                           )
                         )}
-                        <Badge className="bg-green-500/10 text-green-600 border border-green-500/20">Active</Badge>
+                        <Badge className="bg-primary/10 text-primary border border-primary/20">Active</Badge>
                         {clientProfile && !clientProfile.trainer_id && (
                           <Button 
                             variant="ghost" 
@@ -415,15 +415,15 @@ export default function ClientWorkouts() {
                     <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-4 bg-secondary p-4 rounded-xl border border-border gap-4">
                       <div className="flex flex-wrap gap-4 sm:gap-6 text-sm w-full md:w-auto">
                         <div className="flex items-center gap-2 text-muted-foreground">
-                          <Calendar className="h-4 w-4 text-yellow-500" />
+                          <Calendar className="h-4 w-4 text-primary" />
                           <span className="text-foreground">{workout.duration_weeks} weeks</span>
                         </div>
                         <div className="flex items-center gap-2 text-muted-foreground">
-                          <TrendingUp className="h-4 w-4 text-yellow-500" />
+                          <TrendingUp className="h-4 w-4 text-primary" />
                           <span className="text-foreground">{workout.days_per_week} days/week</span>
                         </div>
                         <div className="flex items-center gap-2 text-muted-foreground">
-                          <Dumbbell className="h-4 w-4 text-yellow-500" />
+                          <Dumbbell className="h-4 w-4 text-primary" />
                           <span className="text-foreground">{workout.exercises?.length || 0} exercises</span>
                         </div>
                       </div>
@@ -442,11 +442,11 @@ export default function ClientWorkouts() {
                           className="px-3 border-border bg-secondary hover:bg-accent text-foreground flex-shrink-0"
                         >
                           {calendarSynced[workout.id] ? (
-                            <CheckCircle2 className="h-4 w-4 text-green-500" />
+                            <CheckCircle2 className="h-4 w-4 text-primary" />
                           ) : syncingCalendar ? (
                             <div className="animate-spin h-4 w-4 border-2 border-gray-400 border-t-green-500 rounded-full" />
                           ) : (
-                            <Calendar className="h-4 w-4 text-muted-foreground group-hover:text-green-400 transition-colors" />
+                            <Calendar className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
                           )}
                         </Button>
                       </div>
@@ -455,7 +455,7 @@ export default function ClientWorkouts() {
                     {days.length > 0 && (
                       <div className="space-y-3 mt-6">
                         <div className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
-                          <div className="w-1.5 h-4 bg-green-500 rounded-full"></div>
+                          <div className="w-1.5 h-4 bg-primary rounded-full"></div>
                           Exercise Routine
                         </div>
                         <div className="grid gap-3">
@@ -486,7 +486,7 @@ export default function ClientWorkouts() {
                 <h3 className="text-lg font-medium text-foreground">No active workout plans</h3>
                 <p className="text-muted-foreground mt-2">
                   {clientProfile && !clientProfile.trainer_id 
-                    ? "Head to the AI Assistant to generate a personalized workout plan!" 
+                    ? "Head to the AI Assistant to generate a personalized workout plan." 
                     : "Your trainer will assign workout plans to you"}
                 </p>
                 {clientProfile && !clientProfile.trainer_id && (

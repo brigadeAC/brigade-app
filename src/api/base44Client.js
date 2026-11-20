@@ -198,7 +198,7 @@ const agents = {
         .map((m) => `${m.role === 'user' ? (String(m.content).startsWith('System Context:') ? 'CONTEXT' : 'TRAINER') : 'ASSISTANT'}: ${m.content}`)
         .join('\n\n');
       const prompt =
-        `You are an expert AI assistant for a personal trainer inside the ApexTraining app (NASM/ISSA-aligned). ` +
+        `You are an expert AI assistant for a personal trainer inside the Brigade Athletic Club app (NASM/ISSA-aligned). ` +
         `Help with programming, nutrition strategy, client adherence, and business decisions. Be concise, practical, and specific. ` +
         `Write out any workout or meal plans in full so the trainer can copy them into the planner.\n\n` +
         `Conversation so far:\n${history}\n\nASSISTANT:`;

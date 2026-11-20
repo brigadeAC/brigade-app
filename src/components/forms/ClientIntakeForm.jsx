@@ -48,7 +48,7 @@ export default function ClientIntakeForm({ clientId, clientUserId, clientName, o
 
   return (
     <div className="space-y-6">
-      <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-800">
+      <div className="p-3 bg-primary/10 border border-primary/20 rounded-lg text-xs text-primary">
         <strong>HIPAA Privacy Notice:</strong> The information you provide is confidential. It will only be shared with your assigned trainer and used solely to design your fitness program. You have the right to request a copy of your records at any time.
       </div>
       <Card>
@@ -154,7 +154,7 @@ export default function ClientIntakeForm({ clientId, clientUserId, clientName, o
         By submitting this form I consent to my trainer using this information to design and monitor my fitness program in accordance with NASM/ISSA professional standards.
       </div>
       <div className="flex justify-end gap-3">
-        <Button type="submit" onClick={handleSubmit} disabled={isSubmitting} className="bg-gradient-to-r from-emerald-500 to-teal-600">
+        <Button type="submit" onClick={handleSubmit} disabled={isSubmitting} className="bg-gradient-to-r from-primary to-primary">
           {isSubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
           Save Intake Form
         </Button>

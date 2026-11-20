@@ -71,7 +71,7 @@ export default function VideoCallRoom({ open, onOpenChange, roomId, userName }) 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl w-full h-[80vh] p-0 overflow-hidden bg-black border-yellow-500/20 sm:rounded-2xl" hideCloseButton>
+      <DialogContent className="max-w-5xl w-full h-[80vh] p-0 overflow-hidden bg-black border-primary/20 sm:rounded-2xl" hideCloseButton>
         <div ref={containerRef} className="w-full h-full bg-black flex items-center justify-center">
           <p className="text-muted-foreground animate-pulse">Loading secure connection...</p>
         </div>

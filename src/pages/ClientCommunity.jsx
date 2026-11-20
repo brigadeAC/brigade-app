@@ -32,11 +32,11 @@ const postTypeIcons = {
 };
 
 const postTypeColors = {
-  update: "bg-blue-100 text-blue-700",
-  progress: "bg-emerald-100 text-emerald-700",
+  update: "bg-primary/10 text-primary",
+  progress: "bg-primary/10 text-primary",
   question: "bg-amber-100 text-amber-700",
-  achievement: "bg-purple-100 text-purple-700",
-  motivation: "bg-pink-100 text-pink-700"
+  achievement: "bg-primary/10 text-primary",
+  motivation: "bg-primary/10 text-primary"
 };
 
 export default function ClientCommunity() {
@@ -81,7 +81,7 @@ export default function ClientCommunity() {
       setNewPost("");
       setUploadedFiles([]);
       setPostType("update");
-      toast.success("Post shared with the community!");
+      toast.success("Post shared with the community.");
     }
   });
 
@@ -176,7 +176,7 @@ export default function ClientCommunity() {
           <div className="flex gap-3">
             <Avatar className="h-10 w-10">
               <AvatarImage src={client?.avatar_url} />
-              <AvatarFallback className="bg-emerald-100 text-emerald-700">
+              <AvatarFallback className="bg-primary/10 text-primary">
                 {client?.full_name?.[0] || user?.full_name?.[0]}
               </AvatarFallback>
             </Avatar>
@@ -240,7 +240,7 @@ export default function ClientCommunity() {
                 <Button
                   onClick={handleCreatePost}
                   disabled={createPostMutation.isPending}
-                  className="bg-gradient-to-r from-emerald-500 to-teal-600">
+                  className="bg-gradient-to-r from-primary to-primary">
 
                   {createPostMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
                   Share
@@ -263,7 +263,7 @@ export default function ClientCommunity() {
                 <div className="flex gap-3">
                   <Avatar className="h-10 w-10">
                     <AvatarImage src={post.author_avatar} />
-                    <AvatarFallback className="bg-emerald-100 text-emerald-700">
+                    <AvatarFallback className="bg-primary/10 text-primary">
                       {post.author_name?.[0]}
                     </AvatarFallback>
                   </Avatar>
@@ -310,7 +310,7 @@ export default function ClientCommunity() {
                       
                       <button
                         onClick={() => setCommentingOn(commentingOn === post.id ? null : post.id)}
-                        className="flex items-center gap-1.5 text-muted-foreground hover:text-emerald-500 transition-colors">
+                        className="flex items-center gap-1.5 text-muted-foreground hover:text-primary transition-colors">
 
                         <MessageCircle className="w-4 h-4" />
                         <span>{(post.comments || []).length}</span>
@@ -332,7 +332,7 @@ export default function ClientCommunity() {
                               <div className="flex items-center gap-2">
                                 <span className="text-sm font-medium">{comment.author_name}</span>
                                 {comment.is_trainer &&
-                            <Badge className="text-xs bg-emerald-100 text-emerald-700">Trainer</Badge>
+                            <Badge className="text-xs bg-primary/10 text-primary">Trainer</Badge>
                             }
                                 <span className="text-xs text-muted-foreground">
                                   {formatDistanceToNow(new Date(comment.timestamp), { addSuffix: true })}
@@ -350,7 +350,7 @@ export default function ClientCommunity() {
                     <div className="mt-4 flex gap-2">
                         <Avatar className="h-8 w-8">
                           <AvatarImage src={client?.avatar_url} />
-                          <AvatarFallback className="bg-emerald-100 text-emerald-700 text-xs">
+                          <AvatarFallback className="bg-primary/10 text-primary text-xs">
                             {client?.full_name?.[0]}
                           </AvatarFallback>
                         </Avatar>
@@ -384,7 +384,7 @@ export default function ClientCommunity() {
               <MessageCircle className="w-12 h-12 mx-auto text-muted-foreground" />
               <h3 className="mt-4 font-medium text-slate-900">No posts yet</h3>
               <p className="text-sm text-slate-500 mt-1">
-                Be the first to share your progress with the community!
+                Be the first to share your progress with the community.
               </p>
             </CardContent>
           </Card>

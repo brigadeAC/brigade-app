@@ -5,19 +5,19 @@ import { format, parseISO } from "date-fns";
 
 const nivoTheme = {
   background: "transparent",
-  textColor: "#94a3b8",
+  textColor: "#726B65",
   fontSize: 11,
   axis: {
-    domain: { line: { stroke: "rgba(255,255,255,0.1)", strokeWidth: 1 } },
-    ticks: { line: { stroke: "rgba(255,255,255,0.1)", strokeWidth: 1 }, text: { fill: "#94a3b8", fontSize: 11 } },
+    domain: { line: { stroke: "rgba(114,107,101,0.15)", strokeWidth: 1 } },
+    ticks: { line: { stroke: "rgba(114,107,101,0.15)", strokeWidth: 1 }, text: { fill: "#726B65", fontSize: 11 } },
   },
-  grid: { line: { stroke: "rgba(255,255,255,0.06)", strokeWidth: 1 } },
+  grid: { line: { stroke: "rgba(114,107,101,0.15)", strokeWidth: 1 } },
   tooltip: {
     container: {
-      background: "#0d0d0f",
-      border: "1px solid rgba(255,255,255,0.1)",
+      background: "#191615",
+      border: "1px solid hsl(var(--border))",
       borderRadius: "10px",
-      color: "#e5e7eb",
+      color: "#E2DEDA",
       fontSize: "12px",
     },
   },
@@ -53,7 +53,7 @@ export default function VolumeChart({ logs }) {
 
   if (chartData.length === 0) return null;
 
-  const volumeLineData = [{ id: "Volume", color: "#8b5cf6", data: chartData.map(d => ({ x: d.displayDate, y: d.totalVolume })) }];
+  const volumeLineData = [{ id: "Volume", color: "#4B91DD", data: chartData.map(d => ({ x: d.displayDate, y: d.totalVolume })) }];
   const rirBarData = chartData.filter(d => d.avgRir !== null).map(d => ({ date: d.displayDate, "Avg RIR": d.avgRir }));
 
   return (
@@ -71,17 +71,17 @@ export default function VolumeChart({ logs }) {
             axisBottom={{ tickSize: 5, tickPadding: 8 }}
             axisLeft={{ tickSize: 5, tickPadding: 8, format: v => v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v }}
             enableGridX={false}
-            colors={["#8b5cf6"]}
+            colors={["#4B91DD"]}
             lineWidth={3}
             pointSize={7}
-            pointColor="#8b5cf6"
+            pointColor="#4B91DD"
             pointBorderWidth={2}
-            pointBorderColor="#080808"
+            pointBorderColor="#191615"
             enableArea={true}
             areaOpacity={0.2}
             useMesh={true}
             tooltip={({ point }) => (
-              <div style={{ background: "#0d0d0f", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: "8px 12px", color: "#e5e7eb", fontSize: 12 }}>
+              <div style={{ background: "#191615", border: "1px solid hsl(var(--border))", borderRadius: 8, padding: "8px 12px", color: "#E2DEDA", fontSize: 12 }}>
                 <strong>{point.data.xFormatted}</strong>: {point.data.y} vol
               </div>
             )}
@@ -101,14 +101,14 @@ export default function VolumeChart({ logs }) {
               margin={{ top: 10, right: 20, bottom: 40, left: 40 }}
               padding={0.4}
               maxValue={5}
-              colors={["#10b981"]}
+              colors={["#4B91DD"]}
               borderRadius={4}
               axisBottom={{ tickSize: 5, tickPadding: 8 }}
               axisLeft={{ tickSize: 5, tickPadding: 8 }}
               enableGridX={false}
               enableLabel={false}
               tooltip={({ id, value, indexValue }) => (
-                <div style={{ background: "#0d0d0f", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: "8px 12px", color: "#e5e7eb", fontSize: 12 }}>
+                <div style={{ background: "#191615", border: "1px solid hsl(var(--border))", borderRadius: 8, padding: "8px 12px", color: "#E2DEDA", fontSize: 12 }}>
                   <strong>{indexValue}</strong>: {value} RIR
                 </div>
               )}

@@ -201,7 +201,7 @@ export default function ClientProgress() {
         </div>
         <Button
           onClick={() => setShowLogForm(true)}
-          className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 shadow-lg"
+          className="bg-gradient-to-r from-primary to-primary hover:from-primary hover:to-primary shadow-lg"
         >
           <Plus className="w-4 h-4 mr-2" />
           Log Progress
@@ -215,7 +215,7 @@ export default function ClientProgress() {
             <Card className="glass-card border-border">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">Current Weight</CardTitle>
-                <Scale className="w-4 h-4 text-blue-400" />
+                <Scale className="w-4 h-4 text-primary" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-foreground">{convertWeightDisplay(latestLog.weight_kg)} {weightUnit}</div>
@@ -223,7 +223,7 @@ export default function ClientProgress() {
                   <p
                     className={cn(
                       "text-xs mt-1",
-                      parseFloat(weightChange) < 0 ? "text-emerald-400" : "text-amber-400"
+                      parseFloat(weightChange) < 0 ? "text-primary" : "text-amber-400"
                     )}
                   >
                     {parseFloat(weightChange) > 0 ? "+" : ""}{weightChange} {weightUnit}
@@ -247,7 +247,7 @@ export default function ClientProgress() {
                   <p
                     className={cn(
                       "text-xs mt-1",
-                      parseFloat(bodyFatChange) < 0 ? "text-emerald-400" : "text-amber-400"
+                      parseFloat(bodyFatChange) < 0 ? "text-primary" : "text-amber-400"
                     )}
                   >
                     {parseFloat(bodyFatChange) > 0 ? "+" : ""}{bodyFatChange}%
@@ -261,7 +261,7 @@ export default function ClientProgress() {
             <Card className="glass-card border-border">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">Waist</CardTitle>
-                <Ruler className="w-4 h-4 text-purple-400" />
+                <Ruler className="w-4 h-4 text-primary" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-foreground">
@@ -274,7 +274,7 @@ export default function ClientProgress() {
           <Card className="glass-card border-border">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">Total Logs</CardTitle>
-              <Award className="w-4 h-4 text-emerald-400" />
+              <Award className="w-4 h-4 text-primary" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-foreground">{progressLogs.length}</div>
@@ -354,7 +354,7 @@ export default function ClientProgress() {
             </p>
             <Button
               onClick={() => setShowLogForm(true)}
-              className="mt-4 bg-gradient-to-r from-blue-500 to-indigo-600"
+              className="mt-4 bg-gradient-to-r from-primary to-primary"
             >
               Log Your First Entry
             </Button>
@@ -367,7 +367,7 @@ export default function ClientProgress() {
         <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto bg-card text-foreground border-border">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-xl text-foreground">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary flex items-center justify-center">
                 <TrendingUp className="w-5 h-5 text-foreground" />
               </div>
               Log Your Progress
@@ -588,13 +588,13 @@ export default function ClientProgress() {
               />
             </div>
 
-            <div className="flex justify-end gap-3 pt-4 border-t">
+            <div className="flex justify-end gap-3 pt-4 border-t flex-wrap">
               <Button type="button" variant="outline" onClick={() => setShowLogForm(false)}>
                 Cancel
               </Button>
               <Button
                 type="submit"
-                className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 gap-2"
+                className="bg-gradient-to-r from-primary to-primary hover:from-primary hover:to-primary gap-2"
                 disabled={createLogMutation.isPending}
               >
                 {createLogMutation.isPending && (

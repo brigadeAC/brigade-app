@@ -63,7 +63,7 @@ export default function ClientProgressOverview({ clients, progressLogs }) {
               <div key={idx} className="flex items-center gap-4 p-3 bg-secondary rounded-lg border border-border">
                 <Avatar className="h-12 w-12">
                   <AvatarImage src={progress.client.avatar_url} />
-                  <AvatarFallback className="bg-emerald-500/20 text-emerald-400">
+                  <AvatarFallback className="bg-primary/20 text-primary">
                     {progress.client.full_name?.[0]}
                   </AvatarFallback>
                 </Avatar>
@@ -74,7 +74,7 @@ export default function ClientProgressOverview({ clients, progressLogs }) {
                   <div className="flex gap-3 mt-1 text-xs">
                     {progress.weightChange !== null && (
                       <span className={`flex items-center gap-1 ${
-                        progress.weightChange < 0 ? 'text-green-400' : 'text-amber-400'
+                        progress.weightChange < 0 ? 'text-primary' : 'text-amber-400'
                       }`}>
                         {progress.weightChange < 0 ? (
                           <TrendingDown className="w-3 h-3" />
@@ -86,7 +86,7 @@ export default function ClientProgressOverview({ clients, progressLogs }) {
                     )}
                     {progress.bodyFatChange !== null && (
                       <span className={`flex items-center gap-1 ${
-                        progress.bodyFatChange < 0 ? 'text-green-400' : 'text-amber-400'
+                        progress.bodyFatChange < 0 ? 'text-primary' : 'text-amber-400'
                       }`}>
                         {progress.bodyFatChange < 0 ? (
                           <TrendingDown className="w-3 h-3" />
@@ -97,7 +97,7 @@ export default function ClientProgressOverview({ clients, progressLogs }) {
                       </span>
                     )}
                     {progress.strengthGain !== null && progress.strengthGain > 0 && (
-                      <span className="flex items-center gap-1 text-blue-400">
+                      <span className="flex items-center gap-1 text-primary">
                         <TrendingUp className="w-3 h-3" />
                         +{progress.strengthGain.toFixed(1)} kg bench
                       </span>

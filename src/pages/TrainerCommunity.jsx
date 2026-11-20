@@ -27,18 +27,18 @@ import { formatDistanceToNow } from "date-fns";
 
 const trainerPostTypes = {
   tip: { icon: Lightbulb, color: "bg-amber-100 text-amber-700", label: "Tip" },
-  question: { icon: HelpCircle, color: "bg-blue-100 text-blue-700", label: "Question" },
-  success_story: { icon: Trophy, color: "bg-emerald-100 text-emerald-700", label: "Success Story" },
-  resource: { icon: BookOpen, color: "bg-purple-100 text-purple-700", label: "Resource" },
+  question: { icon: HelpCircle, color: "bg-primary/10 text-primary", label: "Question" },
+  success_story: { icon: Trophy, color: "bg-primary/10 text-primary", label: "Success Story" },
+  resource: { icon: BookOpen, color: "bg-primary/10 text-primary", label: "Resource" },
   discussion: { icon: MessageSquare, color: "bg-slate-100 text-slate-700", label: "Discussion" }
 };
 
 const clientPostTypes = {
-  update: { icon: MessageSquare, color: "bg-blue-100 text-blue-700" },
-  progress: { icon: Trophy, color: "bg-emerald-100 text-emerald-700" },
+  update: { icon: MessageSquare, color: "bg-primary/10 text-primary" },
+  progress: { icon: Trophy, color: "bg-primary/10 text-primary" },
   question: { icon: HelpCircle, color: "bg-amber-100 text-amber-700" },
-  achievement: { icon: Trophy, color: "bg-purple-100 text-purple-700" },
-  motivation: { icon: MessageSquare, color: "bg-pink-100 text-pink-700" }
+  achievement: { icon: Trophy, color: "bg-primary/10 text-primary" },
+  motivation: { icon: MessageSquare, color: "bg-primary/10 text-primary" }
 };
 
 export default function TrainerCommunity() {
@@ -82,7 +82,7 @@ export default function TrainerCommunity() {
       setNewPost("");
       setUploadedFiles([]);
       setPostType("discussion");
-      toast.success("Post shared with trainers!");
+      toast.success("Post shared with trainers.");
     }
   });
 
@@ -218,7 +218,7 @@ export default function TrainerCommunity() {
           <div className="flex gap-3">
             <Avatar className="h-10 w-10">
               <AvatarImage src={post.author_avatar} />
-              <AvatarFallback className="bg-emerald-500/20 text-emerald-400">
+              <AvatarFallback className="bg-primary/20 text-primary">
                 {post.author_name?.[0]}
               </AvatarFallback>
             </Avatar>
@@ -265,7 +265,7 @@ export default function TrainerCommunity() {
                 
                 <button
                   onClick={() => setCommentingOn(commentingOn === post.id ? null : post.id)}
-                  className="flex items-center gap-1.5 text-muted-foreground hover:text-emerald-500 transition-colors">
+                  className="flex items-center gap-1.5 text-muted-foreground hover:text-primary transition-colors">
 
                   <MessageCircle className="w-4 h-4" />
                   <span>{(post.comments || []).length}</span>
@@ -287,7 +287,7 @@ export default function TrainerCommunity() {
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-medium text-foreground">{comment.author_name}</span>
                           {comment.is_trainer &&
-                      <Badge className="text-xs bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">Trainer</Badge>
+                      <Badge className="text-xs bg-primary/20 text-primary border border-primary/30">Trainer</Badge>
                       }
                           <span className="text-xs text-muted-foreground">
                             {formatDistanceToNow(new Date(comment.timestamp), { addSuffix: true })}
@@ -305,7 +305,7 @@ export default function TrainerCommunity() {
               <div className="mt-4 flex gap-2">
                   <Avatar className="h-8 w-8">
                     <AvatarImage src={user?.avatar_url} />
-                    <AvatarFallback className="bg-emerald-100 text-emerald-700 text-xs">
+                    <AvatarFallback className="bg-primary/10 text-primary text-xs">
                       {user?.full_name?.[0]}
                     </AvatarFallback>
                   </Avatar>
@@ -360,7 +360,7 @@ export default function TrainerCommunity() {
               <div className="flex gap-3">
                 <Avatar className="h-10 w-10">
                   <AvatarImage src={user?.avatar_url} />
-                  <AvatarFallback className="bg-emerald-100 text-emerald-700">
+                  <AvatarFallback className="bg-primary/10 text-primary">
                     {user?.full_name?.[0]}
                   </AvatarFallback>
                 </Avatar>
@@ -388,7 +388,7 @@ export default function TrainerCommunity() {
                     </div>
                   }
 
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex gap-2">
                       <input
                         type="file"
@@ -424,7 +424,7 @@ export default function TrainerCommunity() {
                     <Button
                       onClick={handleCreateTrainerPost}
                       disabled={createTrainerPostMutation.isPending}
-                      className="bg-gradient-to-r from-emerald-500 to-teal-600">
+                      className="bg-gradient-to-r from-primary to-primary">
 
                       {createTrainerPostMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
                       Share
@@ -445,7 +445,7 @@ export default function TrainerCommunity() {
                   <Users className="w-12 h-12 mx-auto text-gray-600" />
                   <h3 className="mt-4 font-medium text-foreground">No posts yet</h3>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Be the first to share with the trainer community!
+                    Be the first to share with the trainer community.
                   </p>
                 </CardContent>
               </Card>

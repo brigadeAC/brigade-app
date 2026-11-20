@@ -18,10 +18,10 @@ export default function AdminFullDashboard({
 }) {
   const [refreshKey, setRefreshKey] = useState(0);
   const stats = [
-    { label: "Total Users", value: allUsers.length, color: "#00E676", path: "Clients" },
-    { label: "Trainers", value: trainers.length, color: "#FF6B00", path: "TrainerCommunity" },
-    { label: "Clients", value: allClients.length, color: "#3b82f6", path: "Clients" },
-    { label: "Sessions", value: allSessions.length, color: "#a855f7", path: "Schedule" }
+    { label: "Total Users", value: allUsers.length, color: "#4B91DD", path: "Clients" },
+    { label: "Trainers", value: trainers.length, color: "#4B91DD", path: "TrainerCommunity" },
+    { label: "Clients", value: allClients.length, color: "#4B91DD", path: "Clients" },
+    { label: "Sessions", value: allSessions.length, color: "#4B91DD", path: "Schedule" }
   ];
 
   const adminActions = [
@@ -35,12 +35,12 @@ export default function AdminFullDashboard({
 
   return (
     <div className="text-foreground font-sans">
-      <div className="flex justify-between items-center mb-8">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-8">
         <div>
           <h1 className="text-xl font-bold tracking-wide">Admin overview</h1>
-          <p className="text-sm text-muted-foreground mt-1">Everything happening across ApexCoach</p>
+          <p className="text-sm text-muted-foreground mt-1">Everything happening across Brigade</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {onToggleTrainerView && (
             <Button
               variant="outline"
@@ -67,9 +67,9 @@ export default function AdminFullDashboard({
         {/* Stats Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {stats.map((stat) => {
-            const glowClass = stat.color === '#00E676' ? 'glass-card-green' : 
-                              stat.color === '#FF6B00' ? 'glass-card-gold' : 
-                              stat.color === '#3b82f6' ? 'glass-card' : 'glass-card-purple';
+            const glowClass = stat.color === '#4B91DD' ? 'glass-card-green' : 
+                              stat.color === '#4B91DD' ? 'glass-card-gold' : 
+                              stat.color === '#4B91DD' ? 'glass-card' : 'glass-card-purple';
             return (
             <Link key={stat.label} to={createPageUrl(stat.path)}>
               <div className={`${glowClass} p-6 rounded-2xl cursor-pointer group transition-all duration-500 h-full relative overflow-hidden`}>
@@ -96,7 +96,7 @@ export default function AdminFullDashboard({
             {adminActions.map((action) => (
               <Link key={action.path} to={createPageUrl(action.path)}>
                 <div className="glass-card p-5 rounded-2xl hover:border-primary/40 transition-all duration-500 group cursor-pointer relative overflow-hidden">
-                  <div className="absolute inset-0 bg-gradient-to-br from-[#00E676]/0 to-[#00E676]/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                  <div className="absolute inset-0 bg-gradient-to-br from-[#4B91DD]/0 to-[#4B91DD]/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
                   <div className="flex items-center justify-between mb-2 relative z-10">
                     <h3 className="font-bold text-foreground group-hover:text-primary group-hover:drop- transition-all">{action.label}</h3>
                     <ArrowRight className="w-4 h-4 text-gray-600 group-hover:text-primary group-hover:translate-x-1 transition-all" />
@@ -119,14 +119,14 @@ export default function AdminFullDashboard({
                 <p className="text-3xl font-bold text-primary drop-">{allUsers.length}</p>
                 <p className="text-xs text-muted-foreground mt-1">{trainers.length} trainers</p>
               </div>
-              <div className="bg-secondary p-4 rounded-2xl border border-border hover:border-[#FF6B00]/30 transition-all duration-300">
+              <div className="bg-secondary p-4 rounded-2xl border border-border hover:border-[#4B91DD]/30 transition-all duration-300">
                 <p className="text-xs font-bold tracking-wide text-muted-foreground uppercase mb-1">Total clients</p>
-                <p className="text-3xl font-bold text-[#FF6B00] drop-">{allClients.length}</p>
+                <p className="text-3xl font-bold text-[#4B91DD] drop-">{allClients.length}</p>
                 <p className="text-xs text-muted-foreground mt-1">across all trainers</p>
               </div>
               <div className="bg-secondary p-4 rounded-2xl border border-border hover:border-border transition-all duration-300">
                 <p className="text-xs font-bold tracking-wide text-muted-foreground uppercase mb-1">Total sessions</p>
-                <p className="text-3xl font-bold text-[#3b82f6] drop-">{allSessions.length}</p>
+                <p className="text-3xl font-bold text-[#4B91DD] drop-">{allSessions.length}</p>
                 <p className="text-xs text-muted-foreground mt-1">all time</p>
               </div>
             </div>

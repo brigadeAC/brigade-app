@@ -142,18 +142,18 @@ export default function Clients() {
           <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Clients</h1>
           <p className="text-muted-foreground mt-1">{clients.length} total clients</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-3 flex-wrap">
           <Button
             onClick={() => navigate(createPageUrl("BulkImport"))}
             variant="outline"
-            className="border-green-500/40 text-green-400 hover:bg-green-500/10"
+            className="border-primary/40 text-primary hover:bg-primary/10"
           >
             <Sheet className="w-4 h-4 mr-2" />
             Import
           </Button>
           <Button 
             onClick={() => { setEditingClient(null); setShowOnboarding(true); }}
-            className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 shadow-lg shadow-emerald-500/25"
+            className="bg-gradient-to-r from-primary to-primary hover:from-primary hover:to-primary shadow-lg shadow-primary/25"
           >
             <Plus className="w-4 h-4 mr-2" />
             Onboard Client
@@ -185,7 +185,7 @@ export default function Clients() {
               <SelectItem value="paused">Paused</SelectItem>
             </SelectContent>
           </Select>
-          <div className="flex bg-secondary border border-border rounded-lg p-1">
+          <div className="flex bg-secondary border border-border rounded-lg p-1 flex-wrap">
             <Button
               variant="ghost"
               size="icon"

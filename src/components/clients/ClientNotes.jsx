@@ -12,9 +12,9 @@ import { cn } from "@/lib/utils";
 const categoryColors = {
   general: "bg-slate-100 text-slate-700",
   medical: "bg-red-100 text-red-700",
-  progress: "bg-green-100 text-green-700",
-  goal: "bg-blue-100 text-blue-700",
-  session: "bg-purple-100 text-purple-700"
+  progress: "bg-primary/10 text-primary",
+  goal: "bg-primary/10 text-primary",
+  session: "bg-primary/10 text-primary"
 };
 
 export default function ClientNotes({ clientId, trainerId }) {
@@ -66,7 +66,7 @@ export default function ClientNotes({ clientId, trainerId }) {
             size="sm"
             variant={isAdding ? "outline" : "default"}
             onClick={() => setIsAdding(!isAdding)}
-            className={!isAdding && "bg-gradient-to-r from-emerald-500 to-teal-600"}
+            className={!isAdding && "bg-gradient-to-r from-primary to-primary"}
           >
             <Plus className="w-4 h-4 mr-1" />
             {isAdding ? "Cancel" : "Add Note"}
@@ -102,7 +102,7 @@ export default function ClientNotes({ clientId, trainerId }) {
                 size="sm" 
                 onClick={handleAddNote}
                 disabled={!newNote.trim()}
-                className="bg-gradient-to-r from-emerald-500 to-teal-600"
+                className="bg-gradient-to-r from-primary to-primary"
               >
                 Save Note
               </Button>

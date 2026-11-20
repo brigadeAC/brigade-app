@@ -33,7 +33,7 @@ function greeting() {
   return "Good evening";
 }
 
-function ProgressRing({ value, max, size = 120, stroke = 10, color = "#10B981", label, sublabel }) {
+function ProgressRing({ value, max, size = 120, stroke = 10, color = "#4B91DD", label, sublabel }) {
   const pct = max > 0 ? Math.min(1, value / max) : 0;
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
@@ -255,7 +255,7 @@ export default function ClientDashboard() {
           </h1>
         </div>
         <div className="flex items-center gap-2 bg-card border border-border rounded-2xl px-4 py-2.5">
-          <Flame className={`w-5 h-5 ${streak > 0 ? "text-orange-400" : "text-muted-foreground"}`} />
+          <Flame className={`w-5 h-5 ${streak > 0 ? "text-primary" : "text-muted-foreground"}`} />
           <div className="leading-tight">
             <p className="text-lg font-bold text-foreground">{streak}</p>
             <p className="text-[10px] text-muted-foreground uppercase tracking-wide">day streak</p>
@@ -300,7 +300,7 @@ export default function ClientDashboard() {
             max={weeklyTarget}
             label={`${workoutsThisWeek}/${weeklyTarget}`}
             sublabel="workouts"
-            color="#10B981"
+            color="#4B91DD"
           />
           <p className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
             <TrendingUp className="w-4 h-4" /> This week
@@ -313,7 +313,7 @@ export default function ClientDashboard() {
             max={Math.max(habits.length, 1)}
             label={`${habitsDoneToday}/${habits.length || 0}`}
             sublabel="habits"
-            color="#38BDF8"
+            color="#4B91DD"
           />
           <p className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
             <CheckCircle2 className="w-4 h-4" /> Today
@@ -400,14 +400,14 @@ export default function ClientDashboard() {
               to={createPageUrl("Messages")}
               className="flex flex-col items-center gap-1.5 rounded-xl bg-secondary/60 border border-border py-3 hover:border-primary/40 transition"
             >
-              <MessageCircle className="w-5 h-5 text-sky-400" />
+              <MessageCircle className="w-5 h-5 text-primary" />
               <span className="text-xs text-muted-foreground">Message</span>
             </Link>
             <Link
               to={createPageUrl("ClientJournal")}
               className="flex flex-col items-center gap-1.5 rounded-xl bg-secondary/60 border border-border py-3 hover:border-primary/40 transition"
             >
-              <BookOpen className="w-5 h-5 text-violet-400" />
+              <BookOpen className="w-5 h-5 text-primary" />
               <span className="text-xs text-muted-foreground">Journal</span>
             </Link>
             <button
@@ -468,7 +468,7 @@ export default function ClientDashboard() {
         ) : (
           <div className="flex flex-col items-center py-8 text-muted-foreground">
             <Camera className="w-8 h-8 mb-2 opacity-50" />
-            <p className="text-sm">No photos yet — upload your first!</p>
+            <p className="text-sm">No photos yet — upload your first.</p>
           </div>
         )}
       </div>

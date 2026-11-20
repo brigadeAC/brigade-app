@@ -119,8 +119,8 @@ export default function Contracts() {
   const statusBadge = (status) => {
     const variants = {
       draft: { variant: 'secondary', icon: Edit, color: 'text-slate-600' },
-      sent: { variant: 'default', icon: Send, color: 'text-blue-600' },
-      signed: { variant: 'default', icon: CheckCircle, color: 'text-green-600' },
+      sent: { variant: 'default', icon: Send, color: 'text-primary' },
+      signed: { variant: 'default', icon: CheckCircle, color: 'text-primary' },
       expired: { variant: 'destructive', icon: Clock, color: 'text-red-600' }
     };
     const config = variants[status] || variants.draft;
@@ -149,9 +149,9 @@ Phone: ___________________________________ Email: ______________________________
 
 This Agreement is made and entered into on _________________ ("Date"), by and between the above-named Trainer and Client.
 
-Congratulations on your decision to participate in an exercise program! With the help of your personal trainer, you will greatly improve your ability to accomplish your training goals faster, safer, and with maximum benefits.
+Congratulations on your decision to participate in an exercise program. With the help of your personal trainer, you will greatly improve your ability to accomplish your training goals faster, safer, and with maximum benefits.
 
-In order to maximize progress, it is necessary for you to follow program guidelines during supervised and (if applicable) unsupervised training days. Remember, exercise and healthy eating are EQUALLY important!
+In order to maximize progress, it is necessary for you to follow program guidelines during supervised and (if applicable) unsupervised training days. Remember, exercise and healthy eating are EQUALLY important.
 
 ASSUMPTION OF RISK:
 During your exercise program, every effort will be made to assure your safety. However, as with any exercise program, there are risks, including increased heart stress and the chance of musculoskeletal injuries. In volunteering for this program, you agree to assume responsibility for these risks and waive any possibility for personal damage. You also agree that, to your knowledge, you have no limiting physical conditions or disability that would preclude an exercise program.
@@ -183,7 +183,7 @@ TOTAL INVESTMENT: $___________________
 METHOD OF PAYMENT: ___________________
 
 LIABILITY DISCLAIMER:
-ApexCoaching and its trainers shall not be held liable for any injuries, damages, or losses sustained by Client during or after participation in the personal training program. Client acknowledges that participation in fitness activities is at Client's own risk.
+Brigade Athletic Club and its trainers shall not be held liable for any injuries, damages, or losses sustained by Client during or after participation in the personal training program. Client acknowledges that participation in fitness activities is at Client's own risk.
 
 WE WISH YOU THE BEST OF LUCK ON YOUR NEW PERSONAL TRAINING PROGRAM!
 
@@ -207,11 +207,11 @@ Name: ___________________________________
 Address: ___________________________________
 Phone: ___________________________________ Email: ___________________________________
 
-Welcome!
+Welcome.
 
-Congratulations on beginning your personal training program! We are delighted you chose us as a part of your commitment to health and fitness. With the help of your personal trainer, you will improve your ability to accomplish your training goals faster, safer, and with maximum benefits.
+Congratulations on beginning your personal training program. We are delighted you chose us as a part of your commitment to health and fitness. With the help of your personal trainer, you will improve your ability to accomplish your training goals faster, safer, and with maximum benefits.
 
-In order to maximize progress, it is important to follow program guidelines during supervised and (if applicable) unsupervised training days. Remember, exercise and healthy eating are EQUALLY important!
+In order to maximize progress, it is important to follow program guidelines during supervised and (if applicable) unsupervised training days. Remember, exercise and healthy eating are EQUALLY important.
 
 This Agreement is made and entered into on [DATE], by and between [CLIENT_NAME] ("Client") and [TRAINER_NAME] ("Trainer").
 
@@ -264,9 +264,9 @@ Payment Options:
 ☐ Four months - Amount: $_________________ Date: __________________
 
 LIABILITY DISCLAIMER:
-ApexCoaching and its trainers shall not be held liable for any injuries, damages, or losses sustained by Client during or after participation in the personal training program. Client acknowledges that participation in fitness activities is at Client's own risk.
+Brigade Athletic Club and its trainers shall not be held liable for any injuries, damages, or losses sustained by Client during or after participation in the personal training program. Client acknowledges that participation in fitness activities is at Client's own risk.
 
-We wish you best of luck on your new personal training program!
+We wish you best of luck on your new personal training program.
 
 Participant Name (Print): _________________________________
 Participant Signature: _________________________________  Date: __________
@@ -334,7 +334,7 @@ You acknowledge that you have carefully read this waiver and release and fully u
 This release is not intended as an attempted release of claims of gross negligence or intentional acts.
 
 LIABILITY DISCLAIMER:
-ApexCoaching and its trainers shall not be held liable for any injuries, damages, or losses sustained by Client during or after participation in the personal training program. Client acknowledges that participation in fitness activities is at Client's own risk.
+Brigade Athletic Club and its trainers shall not be held liable for any injuries, damages, or losses sustained by Client during or after participation in the personal training program. Client acknowledges that participation in fitness activities is at Client's own risk.
 
 I have read and voluntarily signed this waiver and release and further agree that no oral representations, statements, or inducement apart from the foregoing written agreement have been made.
 
@@ -455,7 +455,7 @@ ________________________________________________________________________________
 5. What could your trainer do to improve your experience?
 ____________________________________________________________________________________
 
-Thank you for your feedback!`
+Thank you for your feedback.`
   };
 
   return (
@@ -466,11 +466,11 @@ Thank you for your feedback!`
           <p className="text-muted-foreground mt-1 text-sm">Manage client agreements and liability waivers</p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <Button onClick={() => setUploadOpen(true)} variant="outline" className="border-[#8b5cf6]/40 text-[#a78bfa] hover:bg-[#8b5cf6]/10 flex-1 sm:flex-none">
+          <Button onClick={() => setUploadOpen(true)} variant="outline" className="border-[#4B91DD]/40 text-[#4B91DD] hover:bg-[#4B91DD]/10 flex-1 sm:flex-none">
             <Upload className="w-4 h-4 mr-2" />
             Upload
           </Button>
-          <Button onClick={() => { resetForm(); setFormOpen(true); }} className="flex-1 sm:flex-none" style={{ background: 'linear-gradient(135deg, #d4a017, #f5c842)', color: 'black', fontWeight: 700 }}>
+          <Button onClick={() => { resetForm(); setFormOpen(true); }} className="flex-1 sm:flex-none" style={{ background: 'linear-gradient(135deg, #4B91DD, #4B91DD)', color: 'black', fontWeight: 700 }}>
             <Plus className="w-4 h-4 mr-2" />
             New Contract
           </Button>
@@ -485,7 +485,7 @@ Thank you for your feedback!`
         {contracts.map((contract) => (
           <div key={contract.id} className="glass-card rounded-xl p-4 space-y-3">
             <div className="flex items-start gap-3">
-              <FileText className="w-4 h-4 text-emerald-500 mt-0.5 flex-shrink-0" />
+              <FileText className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
               <div className="flex-1 min-w-0">
                 <p className="font-semibold text-foreground text-sm truncate">{contract.title}</p>
                 {contract.client_name && <p className="text-xs text-muted-foreground mt-0.5">{contract.client_name}</p>}
@@ -496,7 +496,7 @@ Thank you for your feedback!`
               <span className="capitalize">{contract.type?.replace(/_/g, ' ')}</span>
               <span>{format(new Date(contract.created_date), 'MMM d, yyyy')}</span>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               <Button size="sm" variant="outline" className="flex-1" onClick={() => handleEdit(contract)}>Edit</Button>
               {contract.status === 'draft' && (
                 <Button size="sm" className="flex-1" onClick={() => sendMutation.mutate(contract.id)}>
@@ -529,7 +529,7 @@ Thank you for your feedback!`
               {contracts.map((contract) => (
                 <TableRow key={contract.id}>
                   <TableCell className="font-medium flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-emerald-600" />
+                    <FileText className="w-4 h-4 text-primary" />
                     {contract.title}
                   </TableCell>
                   <TableCell>{contract.client_name}</TableCell>
@@ -537,7 +537,7 @@ Thank you for your feedback!`
                   <TableCell>{statusBadge(contract.status)}</TableCell>
                   <TableCell>{format(new Date(contract.created_date), 'MMM d, yyyy')}</TableCell>
                   <TableCell>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 flex-wrap">
                       <Button size="sm" variant="outline" onClick={() => handleEdit(contract)}>Edit</Button>
                       {contract.status === 'draft' && (
                         <Button size="sm" onClick={() => sendMutation.mutate(contract.id)}>
@@ -656,7 +656,7 @@ Thank you for your feedback!`
                       <input
                         key={idx}
                         type="text"
-                        className="border-b-2 border-emerald-500 bg-emerald-50 px-2 py-1 font-medium"
+                        className="border-b-2 border-primary bg-primary/10 px-2 py-1 font-medium"
                         placeholder={placeholder}
                         onChange={(e) => {
                           const newContent = formData.content.replace(segment, e.target.value || segment);
@@ -670,7 +670,7 @@ Thank you for your feedback!`
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 pt-4">
+            <div className="flex justify-end gap-3 pt-4 flex-wrap">
               <Button type="button" variant="outline" onClick={() => setFormOpen(false)}>Cancel</Button>
               <Button type="submit">{editingContract ? 'Update' : 'Create'} Contract</Button>
             </div>

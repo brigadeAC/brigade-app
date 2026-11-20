@@ -98,7 +98,7 @@ export default function QuickAddResources({ onAdd, trainerId }) {
       <Card className="glass-card border-border h-full flex flex-col">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg text-foreground">
-            <BookOpen className="w-5 h-5 text-green-400" />
+            <BookOpen className="w-5 h-5 text-primary" />
             Quick Add
           </CardTitle>
           <p className="text-sm text-muted-foreground">
@@ -139,7 +139,7 @@ export default function QuickAddResources({ onAdd, trainerId }) {
                     href={source.url} 
                     target="_blank" 
                     rel="noopener noreferrer"
-                    className="text-emerald-600 hover:text-emerald-700"
+                    className="text-primary hover:text-primary"
                   >
                     <ExternalLink className="w-5 h-5" />
                   </a>
@@ -155,7 +155,7 @@ export default function QuickAddResources({ onAdd, trainerId }) {
                             size="sm"
                             onClick={() => handleQuickAdd(source, resource)}
                             disabled={adding === resource.title}
-                            className="bg-gradient-to-r from-emerald-500 to-teal-600"
+                            className="bg-gradient-to-r from-primary to-primary"
                           >
                             {adding === resource.title ? (
                               <Loader2 className="w-4 h-4 animate-spin" />
@@ -175,14 +175,14 @@ export default function QuickAddResources({ onAdd, trainerId }) {
                   ))}
                 </div>
 
-                <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                  <p className="text-sm text-blue-900">
+                <div className="p-4 bg-primary/10 rounded-lg border border-primary/20">
+                  <p className="text-sm text-primary">
                     <strong>Tip:</strong> Visit{' '}
                     <a 
                       href={source.url} 
                       target="_blank" 
                       rel="noopener noreferrer"
-                      className="underline hover:text-blue-700"
+                      className="underline hover:text-primary"
                     >
                       {source.name}
                     </a>

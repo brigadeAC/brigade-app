@@ -70,7 +70,7 @@ export default function ItemCompletionTracker({ clientId, trainerId, type, itemI
       }}
       className={`flex items-center justify-center w-6 h-6 rounded-md transition-colors focus:outline-none shrink-0`}
       style={{ 
-        background: isCompleted ? '#10b981' : 'transparent',
+        background: isCompleted ? '#4B91DD' : 'transparent',
         border: isCompleted ? 'none' : '2px solid rgba(255,255,255,0.3)'
       }}
     >

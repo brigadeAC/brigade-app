@@ -27,7 +27,7 @@ export default function AdminContactMessages() {
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="w-8 h-8 rounded-full border-4 border-yellow-500 border-t-transparent animate-spin"></div>
+        <div className="w-8 h-8 rounded-full border-4 border-primary border-t-transparent animate-spin"></div>
       </div>
     );
   }
@@ -36,7 +36,7 @@ export default function AdminContactMessages() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-black text-foreground tracking-wider flex items-center gap-3">
-          <Mail className="w-8 h-8 text-[#d4a017]" />
+          <Mail className="w-8 h-8 text-[#4B91DD]" />
           CONTACT MESSAGES
         </h1>
       </div>
@@ -51,20 +51,20 @@ export default function AdminContactMessages() {
           </Card>
         ) : (
           messages.map(msg => (
-            <Card key={msg.id} className="glass-card transition-all hover:border-[#d4a017]/30">
+            <Card key={msg.id} className="glass-card transition-all hover:border-[#4B91DD]/30">
               <CardContent className="p-6">
                 <div className="flex flex-col md:flex-row justify-between gap-4 mb-4">
                   <div>
                     <div className="flex items-center gap-3 mb-1">
                       <h3 className="font-bold text-lg text-foreground">{msg.subject}</h3>
                       {msg.status === 'new' && (
-                        <Badge className="bg-yellow-500/20 text-yellow-500 hover:bg-yellow-500/30 border-none">New</Badge>
+                        <Badge className="bg-primary/20 text-primary hover:bg-primary/30 border-none">New</Badge>
                       )}
                       {msg.status === 'read' && (
-                        <Badge className="bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 border-none">Read</Badge>
+                        <Badge className="bg-primary/20 text-primary hover:bg-primary/30 border-none">Read</Badge>
                       )}
                       {msg.status === 'resolved' && (
-                        <Badge className="bg-green-500/20 text-green-400 hover:bg-green-500/30 border-none">Resolved</Badge>
+                        <Badge className="bg-primary/20 text-primary hover:bg-primary/30 border-none">Resolved</Badge>
                       )}
                     </div>
                     <div className="text-sm text-muted-foreground flex items-center gap-4">
@@ -77,7 +77,7 @@ export default function AdminContactMessages() {
                       <Button 
                         size="sm" 
                         variant="outline" 
-                        className="border-blue-500/30 text-blue-400 hover:bg-blue-500/10 hover:text-blue-300"
+                        className="border-primary/30 text-primary hover:bg-primary/10 hover:text-primary"
                         onClick={() => updateStatusMutation.mutate({ id: msg.id, status: 'read' })}
                       >
                         <Circle className="w-4 h-4 mr-2" /> Mark Read
@@ -86,7 +86,7 @@ export default function AdminContactMessages() {
                     {msg.status !== 'resolved' && (
                       <Button 
                         size="sm" 
-                        className="bg-green-500/20 text-green-400 hover:bg-green-500/30 border border-green-500/30"
+                        className="bg-primary/20 text-primary hover:bg-primary/30 border border-primary/30"
                         onClick={() => updateStatusMutation.mutate({ id: msg.id, status: 'resolved' })}
                       >
                         <CheckCircle2 className="w-4 h-4 mr-2" /> Resolve

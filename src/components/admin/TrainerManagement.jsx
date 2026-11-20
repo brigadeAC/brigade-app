@@ -65,9 +65,9 @@ export default function TrainerManagement({ trainers, onRefresh, title = "Manage
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3 flex-1">
-                <Avatar className="h-10 w-10 ring-2 ring-[#00E676]/20">
+                <Avatar className="h-10 w-10 ring-2 ring-[#4B91DD]/20">
                   <AvatarImage src={trainer.avatar_url} />
-                  <AvatarFallback className="text-xs font-bold text-black" style={{ background: 'linear-gradient(135deg, #00E676, #00A859)' }}>
+                  <AvatarFallback className="text-xs font-bold text-black" style={{ background: 'linear-gradient(135deg, #4B91DD, #4B91DD)' }}>
                     {(trainer.data?.full_name || trainer.full_name)?.[0] || "U"}
                   </AvatarFallback>
                 </Avatar>
@@ -112,7 +112,7 @@ export default function TrainerManagement({ trainers, onRefresh, title = "Manage
                       <div className="text-xs text-muted-foreground">
                         This will update their profile across the platform
                       </div>
-                      <div className="flex gap-2 justify-end">
+                      <div className="flex gap-2 justify-end flex-wrap">
                         <Button 
                           variant="outline"
                           onClick={() => setEditingTrainer(null)}
@@ -123,7 +123,7 @@ export default function TrainerManagement({ trainers, onRefresh, title = "Manage
                         <Button 
                           onClick={handleSave}
                           disabled={isLoading || !editName.trim()}
-                          className="bg-[#00E676] hover:bg-primary/90 text-black"
+                          className="bg-[#4B91DD] hover:bg-primary/90 text-primary-foreground"
                         >
                           {isLoading ? "Saving..." : "Save Changes"}
                         </Button>

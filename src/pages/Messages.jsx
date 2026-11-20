@@ -305,8 +305,8 @@ export default function Messages() {
       )} style={sidebarBg}>
         <div className="p-4" style={{ borderBottom: '1px solid hsl(var(--border))' }}>
           <div className="flex items-center gap-2 mb-3">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.2)' }}>
-              <MessageCircle className="w-4 h-4 text-green-400" />
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(75,145,221,0.12)', border: '1px solid rgba(75,145,221,0.2)' }}>
+              <MessageCircle className="w-4 h-4 text-primary" />
             </div>
             <h2 className="font-bold text-foreground">Messages</h2>
           </div>
@@ -327,9 +327,9 @@ export default function Messages() {
                   {conversations.map((conv) => (
                     <button key={conv.id} onClick={() => setSelectedConversation(conv.id)}
                       className="w-full px-4 py-3 flex items-center gap-3 transition-colors"
-                      style={{ background: selectedConversation === conv.id ? 'rgba(34,197,94,0.08)' : 'transparent', borderLeft: selectedConversation === conv.id ? '2px solid #22c55e' : '2px solid transparent' }}>
+                      style={{ background: selectedConversation === conv.id ? 'rgba(75,145,221,0.08)' : 'transparent', borderLeft: selectedConversation === conv.id ? '2px solid #4B91DD' : '2px solid transparent' }}>
                       <Avatar className="h-9 w-9 flex-shrink-0">
-                        <AvatarFallback className="text-sm font-bold text-foreground" style={{ background: 'linear-gradient(135deg, #22c55e, #15803d)' }}>
+                        <AvatarFallback className="text-sm font-bold text-foreground" style={{ background: 'linear-gradient(135deg, #4B91DD, #4B91DD)' }}>
                           {conv.otherUserName?.[0]?.toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
@@ -337,7 +337,7 @@ export default function Messages() {
                         <div className="flex items-center justify-between">
                           <span className="font-semibold text-sm text-foreground truncate">{conv.otherUserName}</span>
                           {conv.unreadCount > 0 && (
-                            <span className="text-xs rounded-full px-1.5 py-0.5 font-bold text-black ml-2" style={{ background: '#22c55e' }}>{conv.unreadCount}</span>
+                            <span className="text-xs rounded-full px-1.5 py-0.5 font-bold text-black ml-2" style={{ background: '#4B91DD' }}>{conv.unreadCount}</span>
                           )}
                         </div>
                         <p className="text-xs text-gray-600 truncate">{conv.lastMessage}</p>
@@ -356,9 +356,9 @@ export default function Messages() {
                   {conversations.map((conv) => (
                     <button key={conv.id} onClick={() => setSelectedConversation(conv.id)}
                       className="w-full px-4 py-3 flex items-center gap-3 transition-colors"
-                      style={{ background: selectedConversation === conv.id ? 'rgba(212,175,55,0.08)' : 'transparent', borderLeft: selectedConversation === conv.id ? '2px solid #d4a017' : '2px solid transparent' }}>
+                      style={{ background: selectedConversation === conv.id ? 'rgba(75,145,221,0.08)' : 'transparent', borderLeft: selectedConversation === conv.id ? '2px solid #4B91DD' : '2px solid transparent' }}>
                       <Avatar className="h-9 w-9 flex-shrink-0">
-                        <AvatarFallback className="text-sm font-bold text-black" style={{ background: 'linear-gradient(135deg, #d4a017, #f5c842)' }}>
+                        <AvatarFallback className="text-sm font-bold text-black" style={{ background: 'linear-gradient(135deg, #4B91DD, #4B91DD)' }}>
                           {conv.otherUserName?.[0]?.toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
@@ -366,7 +366,7 @@ export default function Messages() {
                         <div className="flex items-center justify-between">
                           <span className="font-semibold text-sm text-foreground truncate">{conv.otherUserName}</span>
                           {conv.unreadCount > 0 && (
-                            <span className="text-xs rounded-full px-1.5 py-0.5 font-bold text-black ml-2" style={{ background: '#d4a017' }}>{conv.unreadCount}</span>
+                            <span className="text-xs rounded-full px-1.5 py-0.5 font-bold text-black ml-2" style={{ background: '#4B91DD' }}>{conv.unreadCount}</span>
                           )}
                         </div>
                         <p className="text-xs text-gray-600 truncate">{conv.lastMessage}</p>
@@ -452,7 +452,7 @@ export default function Messages() {
                 <ArrowLeft className="w-5 h-5" />
               </Button>
               <Avatar className="h-10 w-10">
-                <AvatarFallback className="font-bold text-foreground" style={{ background: clientProfile ? 'linear-gradient(135deg, #22c55e, #15803d)' : 'linear-gradient(135deg, #d4a017, #f5c842)', color: clientProfile ? 'white' : 'black' }}>
+                <AvatarFallback className="font-bold text-foreground" style={{ background: clientProfile ? 'linear-gradient(135deg, #4B91DD, #4B91DD)' : 'linear-gradient(135deg, #4B91DD, #4B91DD)', color: clientProfile ? 'white' : 'black' }}>
                   {selectedClient?.otherUserName?.[0]?.toUpperCase()}
                 </AvatarFallback>
               </Avatar>
@@ -480,13 +480,13 @@ export default function Messages() {
                   </Button>
                 )}
                 {upcomingVideoSessions.length > 0 && (
-                  <Button onClick={() => handleJoinCall(upcomingVideoSessions[0].video_room_id)} size="sm" className="bg-green-600 hover:bg-green-700 text-foreground font-bold gap-2 text-xs sm:text-sm">
+                  <Button onClick={() => handleJoinCall(upcomingVideoSessions[0].video_room_id)} size="sm" className="bg-primary hover:bg-primary text-foreground font-bold gap-2 text-xs sm:text-sm">
                     <Video className="w-4 h-4" />
                     <span className="hidden sm:inline">Join Call</span>
                   </Button>
                 )}
                 {!clientProfile && selectedClient && selectedClient.otherUserId && (
-                  <Button onClick={() => setScheduleModalOpen(true)} size="sm" variant="outline" className="border-yellow-500/50 text-yellow-500 hover:bg-yellow-500/10 gap-2 text-xs sm:text-sm">
+                  <Button onClick={() => setScheduleModalOpen(true)} size="sm" variant="outline" className="border-primary/50 text-primary hover:bg-primary/10 gap-2 text-xs sm:text-sm">
                     <CalendarPlus className="w-4 h-4" />
                     <span className="hidden sm:inline">Schedule</span>
                   </Button>
@@ -501,7 +501,7 @@ export default function Messages() {
                   <div key={message.id} className={cn("flex gap-2 items-end group", isOwn && "flex-row-reverse")}>
                     <Avatar className="h-7 w-7 flex-shrink-0 mb-1">
                       <AvatarFallback className="text-xs font-bold" style={{
-                        background: isOwn ? (clientProfile ? 'linear-gradient(135deg, #22c55e, #15803d)' : 'linear-gradient(135deg, #d4a017, #f5c842)') : 'hsl(var(--secondary))',
+                        background: isOwn ? (clientProfile ? 'linear-gradient(135deg, #4B91DD, #4B91DD)' : 'linear-gradient(135deg, #4B91DD, #4B91DD)') : 'hsl(var(--secondary))',
                         color: isOwn && !clientProfile ? 'black' : 'white'
                       }}>
                         {message.sender_name?.[0]?.toUpperCase()}
@@ -509,8 +509,8 @@ export default function Messages() {
                     </Avatar>
                     <div className={cn("flex flex-col max-w-[70%]", isOwn && "items-end")}>
                       <div className="rounded-2xl px-4 py-2.5 relative" style={isOwn ? {
-                        background: clientProfile ? 'linear-gradient(135deg, rgba(34,197,94,0.8), rgba(21,128,61,0.9))' : 'linear-gradient(135deg, rgba(212,175,55,0.85), rgba(180,140,30,0.9))',
-                        color: clientProfile ? 'white' : '#1a1a00'
+                        background: clientProfile ? 'linear-gradient(135deg, rgba(75,145,221,0.8), rgba(21,128,61,0.9))' : 'linear-gradient(135deg, rgba(75,145,221,0.85), rgba(180,140,30,0.9))',
+                        color: clientProfile ? 'white' : '#191615'
                       } : { background: 'hsl(var(--secondary))', color: 'hsl(var(--foreground))' }}>
                         <p className="text-sm whitespace-pre-wrap">{message.content}</p>
                         {isOwn && (
@@ -575,7 +575,7 @@ export default function Messages() {
                   {isUploadingMedia ? <Loader2 className="w-4 h-4 animate-spin" /> : <Image className="w-4 h-4" />}
                 </Button>
                 <Button type="submit" disabled={!messageContent.trim() && attachedMedia.length === 0} className="h-10 px-4 font-bold"
-                  style={clientProfile ? { background: 'linear-gradient(135deg, #22c55e, #15803d)', color: 'white' } : { background: 'linear-gradient(135deg, #d4a017, #f5c842)', color: 'black' }}>
+                  style={clientProfile ? { background: 'linear-gradient(135deg, #4B91DD, #4B91DD)', color: 'white' } : { background: 'linear-gradient(135deg, #4B91DD, #4B91DD)', color: 'black' }}>
                   <Send className="w-4 h-4" />
                 </Button>
               </form>
@@ -584,8 +584,8 @@ export default function Messages() {
         ) : (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center space-y-3">
-              <div className="w-16 h-16 rounded-2xl mx-auto flex items-center justify-center" style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.15)' }}>
-                <MessageCircle className="w-8 h-8 text-green-500/50" />
+              <div className="w-16 h-16 rounded-2xl mx-auto flex items-center justify-center" style={{ background: 'rgba(75,145,221,0.08)', border: '1px solid rgba(75,145,221,0.15)' }}>
+                <MessageCircle className="w-8 h-8 text-primary/50" />
               </div>
               <h3 className="font-bold text-foreground">Select a conversation</h3>
               <p className="text-gray-600 text-sm">Choose someone to start messaging</p>

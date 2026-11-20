@@ -51,17 +51,17 @@ import {
 
 const statusStyles = {
   draft: "bg-slate-100 text-slate-700",
-  active: "bg-emerald-100 text-emerald-700",
-  completed: "bg-blue-100 text-blue-700",
+  active: "bg-primary/10 text-primary",
+  completed: "bg-primary/10 text-primary",
   archived: "bg-gray-100 text-gray-600",
 };
 
 const categoryStyles = {
-  weight_loss: "bg-orange-100 text-orange-700",
-  muscle_gain: "bg-purple-100 text-purple-700",
-  maintenance: "bg-blue-100 text-blue-700",
+  weight_loss: "bg-primary/10 text-primary",
+  muscle_gain: "bg-primary/10 text-primary",
+  maintenance: "bg-primary/10 text-primary",
   performance: "bg-red-100 text-red-700",
-  health: "bg-green-100 text-green-700",
+  health: "bg-primary/10 text-primary",
 };
 
 export default function Meals() {
@@ -293,7 +293,7 @@ export default function Meals() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center shadow-lg shadow-orange-500/25">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-red-600 flex items-center justify-center shadow-lg shadow-primary/25">
               <Apple className="w-7 h-7 text-foreground" />
             </div>
             {urlClientId ? "Client's Meal Plans" : "Meal Plans"}
@@ -308,7 +308,7 @@ export default function Meals() {
               setEditingPlan(urlClientId ? { client_id: urlClientId, status: "active" } : null);
               setShowForm(true);
             }}
-            className="bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 shadow-lg shadow-orange-500/25"
+            className="bg-gradient-to-r from-primary to-red-600 hover:from-primary hover:to-red-700 shadow-lg shadow-primary/25"
           >
             <Plus className="w-5 h-5 mr-2" />
             Create Meal Plan
@@ -496,7 +496,7 @@ export default function Meals() {
         <TabsContent value="templates" className="space-y-4">
           {templatesLoading ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
             </div>
           ) : filteredTemplates.length === 0 ? (
             <div className="glass-card rounded-2xl">

@@ -172,14 +172,14 @@ export default function Dashboard() {
             </div>
             <h2 className="text-5xl font-bold mb-1 text-foreground drop-">{totalSessionsCount.toLocaleString()}</h2>
             <p className="text-xs text-muted-foreground mb-2">all time</p>
-            <div className="flex items-center gap-1.5 text-[10px] text-green-700 dark:text-green-300 bg-green-500/10 w-max px-2 py-0.5 rounded border border-green-500/20 mb-4">
+            <div className="flex items-center gap-1.5 text-[10px] text-primary dark:text-primary bg-primary/10 w-max px-2 py-0.5 rounded border border-primary/20 mb-4">
               <Sparkles className="w-3 h-3" />
               {upcomingSessionsCount} upcoming
             </div>
           </div>
           
           <div className="w-full bg-secondary h-3 rounded-full mt-auto relative overflow-hidden border border-primary/20 backdrop-blur-sm z-10">
-            <div className="absolute top-0 left-0 bottom-0 bg-gradient-to-r from-[#00E676] to-[#10B981] rounded-full" style={{ width: '65%' }}></div>
+            <div className="absolute top-0 left-0 bottom-0 bg-gradient-to-r from-[#4B91DD] to-[#4B91DD] rounded-full" style={{ width: '65%' }}></div>
           </div>
         </div>
 
@@ -187,15 +187,15 @@ export default function Dashboard() {
         <div key="clients" className="glass-card-purple p-6 relative overflow-hidden flex justify-between h-full rounded-2xl group">
           <div className="flex flex-col w-full h-full relative z-10">
             <div className="flex justify-between items-center mb-1">
-              <p className="text-xs font-bold tracking-wide text-[#A855F7] uppercase">Active Clients</p>
-              <GripHorizontal className="w-5 h-5 text-muted-foreground cursor-grab drag-handle hover:text-[#A855F7] transition-colors" />
+              <p className="text-xs font-bold tracking-wide text-[#4B91DD] uppercase">Active Clients</p>
+              <GripHorizontal className="w-5 h-5 text-muted-foreground cursor-grab drag-handle hover:text-[#4B91DD] transition-colors" />
             </div>
             <h2 className="text-5xl font-bold text-foreground drop-">{activeClientsCount}</h2>
             <div className="flex items-end gap-2.5 h-full pt-4 w-full">
               {[40, 70, 30, 90, 50].map((h, i) => (
-                <div key={i} className="flex-1 bg-secondary border border-[#A855F7]/20 rounded-t-lg relative overflow-hidden transition-all duration-500 group-hover:bg-[#A855F7]/30" style={{ height: `${h}%` }}>
-                  {i === 3 && <div className="absolute top-0 left-0 right-0 h-1 bg-[#A855F7]"></div>}
-                  {i === 3 && <div className="absolute inset-0 bg-gradient-to-b from-[#A855F7]/40 to-transparent"></div>}
+                <div key={i} className="flex-1 bg-secondary border border-[#4B91DD]/20 rounded-t-lg relative overflow-hidden transition-all duration-500 group-hover:bg-[#4B91DD]/30" style={{ height: `${h}%` }}>
+                  {i === 3 && <div className="absolute top-0 left-0 right-0 h-1 bg-[#4B91DD]"></div>}
+                  {i === 3 && <div className="absolute inset-0 bg-gradient-to-b from-[#4B91DD]/40 to-transparent"></div>}
                 </div>
               ))}
             </div>
@@ -206,15 +206,15 @@ export default function Dashboard() {
         <div key="sessions" className="glass-card-gold p-6 relative overflow-hidden flex justify-between h-full rounded-2xl group">
           <div className="flex flex-col w-full h-full relative z-10">
             <div className="flex justify-between items-center mb-1">
-              <p className="text-xs font-bold tracking-wide text-[#FACC15] uppercase">Upcoming Sessions</p>
-              <GripHorizontal className="w-5 h-5 text-muted-foreground cursor-grab drag-handle hover:text-[#FACC15] transition-colors" />
+              <p className="text-xs font-bold tracking-wide text-[#4B91DD] uppercase">Upcoming Sessions</p>
+              <GripHorizontal className="w-5 h-5 text-muted-foreground cursor-grab drag-handle hover:text-[#4B91DD] transition-colors" />
             </div>
             <h2 className="text-5xl font-bold text-foreground drop-">{upcomingSessionsCount}</h2>
             <div className="flex items-end gap-2.5 h-full pt-4 w-full">
               {[50, 30, 80, 40, 60].map((h, i) => (
-                <div key={i} className="flex-1 bg-secondary border border-[#FACC15]/20 rounded-t-lg relative overflow-hidden transition-all duration-500 group-hover:bg-[#FACC15]/30" style={{ height: `${h}%` }}>
-                  {i === 2 && <div className="absolute top-0 left-0 right-0 h-1 bg-[#FACC15]"></div>}
-                  {i === 2 && <div className="absolute inset-0 bg-gradient-to-b from-[#FACC15]/40 to-transparent"></div>}
+                <div key={i} className="flex-1 bg-secondary border border-[#4B91DD]/20 rounded-t-lg relative overflow-hidden transition-all duration-500 group-hover:bg-[#4B91DD]/30" style={{ height: `${h}%` }}>
+                  {i === 2 && <div className="absolute top-0 left-0 right-0 h-1 bg-[#4B91DD]"></div>}
+                  {i === 2 && <div className="absolute inset-0 bg-gradient-to-b from-[#4B91DD]/40 to-transparent"></div>}
                 </div>
               ))}
             </div>
@@ -306,8 +306,8 @@ export default function Dashboard() {
                 ].map((col, idx) => (
                   <div key={idx} className="relative z-10 flex flex-col items-center group h-full justify-end w-[14%] pb-6">
                     <div className="flex items-end justify-center gap-1.5 sm:gap-3 w-full h-[90%]">
-                      <div className="w-3 sm:w-5 bg-gradient-to-t from-[#00E676]/60 to-[#00E676] rounded-t-full transition-all duration-300 group-hover:" style={{ height: `${col.rev}%` }}></div>
-                      <div className="w-3 sm:w-5 bg-gradient-to-t from-orange-400/60 to-orange-400 rounded-t-full transition-all duration-300 group-hover:" style={{ height: `${col.perf}%` }}></div>
+                      <div className="w-3 sm:w-5 bg-gradient-to-t from-[#4B91DD]/60 to-[#4B91DD] rounded-t-full transition-all duration-300 group-hover:" style={{ height: `${col.rev}%` }}></div>
+                      <div className="w-3 sm:w-5 bg-gradient-to-t from-primary/60 to-primary rounded-t-full transition-all duration-300 group-hover:" style={{ height: `${col.perf}%` }}></div>
                     </div>
                     <span className="absolute bottom-0 text-[9px] sm:text-[10px] text-muted-foreground font-medium whitespace-nowrap">{col.label}</span>
                   </div>
@@ -323,8 +323,8 @@ export default function Dashboard() {
                 ].map((col, idx) => (
                   <div key={idx} className="relative z-10 flex flex-col items-center group h-full justify-end w-[14%] pb-6">
                     <div className="flex items-end justify-center gap-1.5 sm:gap-3 w-full h-[90%]">
-                      <div className="w-3 sm:w-5 bg-gradient-to-t from-blue-500/60 to-blue-500 rounded-t-full transition-all duration-300 group-hover:" style={{ height: `${col.val1}%` }} title="Goal Completion"></div>
-                      <div className="w-3 sm:w-5 bg-gradient-to-t from-purple-500/60 to-purple-500 rounded-t-full transition-all duration-300 group-hover:" style={{ height: `${col.val2}%` }} title="Check-in Rate"></div>
+                      <div className="w-3 sm:w-5 bg-gradient-to-t from-primary/60 to-primary rounded-t-full transition-all duration-300 group-hover:" style={{ height: `${col.val1}%` }} title="Goal Completion"></div>
+                      <div className="w-3 sm:w-5 bg-gradient-to-t from-primary/60 to-primary rounded-t-full transition-all duration-300 group-hover:" style={{ height: `${col.val2}%` }} title="Check-in Rate"></div>
                     </div>
                     <span className="absolute bottom-0 text-[9px] sm:text-[10px] text-muted-foreground font-medium whitespace-nowrap">{col.label}</span>
                   </div>
@@ -340,7 +340,7 @@ export default function Dashboard() {
                 ].map((col, idx) => (
                   <div key={idx} className="relative z-10 flex flex-col items-center group h-full justify-end w-[14%] pb-6">
                     <div className="flex items-end justify-center gap-1.5 sm:gap-3 w-full h-[90%]">
-                      <div className="w-3 sm:w-5 bg-gradient-to-t from-pink-500/60 to-pink-500 rounded-t-full transition-all duration-300 group-hover:" style={{ height: `${col.val1}%` }} title="Active Sessions"></div>
+                      <div className="w-3 sm:w-5 bg-gradient-to-t from-primary/60 to-primary rounded-t-full transition-all duration-300 group-hover:" style={{ height: `${col.val1}%` }} title="Active Sessions"></div>
                     </div>
                     <span className="absolute bottom-0 text-[9px] sm:text-[10px] text-muted-foreground font-medium whitespace-nowrap">{col.label}</span>
                   </div>
@@ -350,19 +350,19 @@ export default function Dashboard() {
               <div className="flex justify-center gap-6 mt-4 pt-4 border-t border-border">
                  {activeChart === 'revenue' && (
                     <>
-                      <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-[#00E676]"></div><span className="text-xs text-muted-foreground">Activity</span></div>
-                      <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-orange-400"></div><span className="text-xs text-muted-foreground">Performance</span></div>
+                      <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-[#4B91DD]"></div><span className="text-xs text-muted-foreground">Activity</span></div>
+                      <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-primary/80"></div><span className="text-xs text-muted-foreground">Performance</span></div>
                     </>
                  )}
                  {activeChart === 'progress' && (
                     <>
-                      <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-blue-500"></div><span className="text-xs text-muted-foreground">Goal Completion</span></div>
-                      <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-purple-500"></div><span className="text-xs text-muted-foreground">Check-in Rate</span></div>
+                      <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-primary"></div><span className="text-xs text-muted-foreground">Goal Completion</span></div>
+                      <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-primary"></div><span className="text-xs text-muted-foreground">Check-in Rate</span></div>
                     </>
                  )}
                   {activeChart === 'engagement' && (
                     <>
-                      <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-pink-500"></div><span className="text-xs text-muted-foreground">Active Sessions</span></div>
+                      <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-primary"></div><span className="text-xs text-muted-foreground">Active Sessions</span></div>
                     </>
                  )}
               </div>
@@ -395,7 +395,7 @@ export default function Dashboard() {
                 const isCurrent = d === 5 && i < 14;
                 return (
                   <div key={i} className={`w-6 h-6 sm:w-8 sm:h-8 mx-auto flex items-center justify-center rounded-full cursor-pointer transition-colors
-                    ${isSelected ? 'bg-[#00E676] text-black' : 
+                    ${isSelected ? 'bg-[#4B91DD] text-black' : 
                       isCurrent ? 'bg-primary/20 text-primary border border-primary/50' : 
                       (i < 3 || i > 33) ? 'text-gray-600' : 'text-muted-foreground hover:bg-accent hover:'}`}
                   >
@@ -426,26 +426,26 @@ export default function Dashboard() {
                 </div>
                 <span className="font-black text-red-500">{sessions.filter(s => s.status === "missed" || s.status === "no_show").length}</span>
               </div>
-              <div className="bg-orange-500/10 border border-orange-500/20 p-3 rounded-xl flex items-center justify-between">
+              <div className="bg-primary/10 border border-primary/20 p-3 rounded-xl flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="bg-orange-500/20 p-2 rounded-lg"><CheckCircle className="w-4 h-4 text-orange-400" /></div>
+                  <div className="bg-primary/20 p-2 rounded-lg"><CheckCircle className="w-4 h-4 text-primary" /></div>
                   <span className="text-sm font-medium text-foreground">Pending Form Checks</span>
                 </div>
-                <span className="font-black text-orange-500">{formChecks.length}</span>
+                <span className="font-black text-primary">{formChecks.length}</span>
               </div>
-              <div className="bg-blue-500/10 border border-blue-500/20 p-3 rounded-xl flex items-center justify-between">
+              <div className="bg-primary/10 border border-primary/20 p-3 rounded-xl flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="bg-blue-500/20 p-2 rounded-lg"><Mail className="w-4 h-4 text-blue-400" /></div>
+                  <div className="bg-primary/20 p-2 rounded-lg"><Mail className="w-4 h-4 text-primary" /></div>
                   <span className="text-sm font-medium text-foreground">Lead Follow-ups Due</span>
                 </div>
-                <span className="font-black text-blue-500">{leads.filter(l => l.status === "contacted").length}</span>
+                <span className="font-black text-primary">{leads.filter(l => l.status === "contacted").length}</span>
               </div>
             </div>
           </div>
         </div>
 
         {/* Quick Pipeline */}
-        <div key="pipeline" className="glass-card-purple p-6 h-full flex flex-col justify-between hover:border-[#A855F7]/40 transition-all duration-500 relative overflow-hidden group">
+        <div key="pipeline" className="glass-card-purple p-6 h-full flex flex-col justify-between hover:border-[#4B91DD]/40 transition-all duration-500 relative overflow-hidden group">
           <div className="relative z-10 flex flex-col h-full justify-between">
           <div>
             <div className="flex justify-between items-center mb-4 sm:mb-6">
@@ -453,21 +453,21 @@ export default function Dashboard() {
               <GripHorizontal className="w-5 h-5 text-muted-foreground cursor-grab drag-handle hover:text-foreground transition-colors" />
             </div>
             <div className="flex flex-col items-center gap-2 max-w-[200px] mx-auto">
-              <div className="w-full h-8 sm:h-10 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full flex items-center justify-between px-4 shadow-[0_5px_20px_rgba(59,130,246,0.4)]">
+              <div className="w-full h-8 sm:h-10 bg-gradient-to-r from-primary to-primary rounded-full flex items-center justify-between px-4 shadow-[0_5px_20px_rgba(75,145,221,0.4)]">
                 <span className="text-foreground font-bold text-xs sm:text-sm">Leads</span>
                 <span className="text-foreground font-bold text-xs sm:text-sm">{leads.filter(l => l.status !== "won" && l.status !== "lost").length}</span>
               </div>
-              <div className="w-[90%] h-8 sm:h-10 bg-gradient-to-r from-[#00E676] to-[#00A859] rounded-full flex items-center justify-between px-4 shadow-[0_5px_20px_rgba(0,230,118,0.4)]">
+              <div className="w-[90%] h-8 sm:h-10 bg-gradient-to-r from-[#4B91DD] to-[#4B91DD] rounded-full flex items-center justify-between px-4 shadow-[0_5px_20px_rgba(75,145,221,0.4)]">
                 <span className="text-black font-bold text-xs sm:text-sm">Active</span>
                 <span className="text-black font-bold text-xs sm:text-sm">{clients.filter(c => c.status === "active").length}</span>
               </div>
-              <div className="w-[80%] h-8 sm:h-10 bg-gradient-to-r from-[#00E676]/80 to-[#00A859]/80 rounded-full flex items-center justify-between px-4 shadow-[0_5px_15px_rgba(0,230,118,0.2)]">
+              <div className="w-[80%] h-8 sm:h-10 bg-gradient-to-r from-[#4B91DD]/80 to-[#4B91DD]/80 rounded-full flex items-center justify-between px-4 shadow-[0_5px_15px_rgba(75,145,221,0.2)]">
                 <span className="text-black font-bold text-xs sm:text-sm">Paused</span>
                 <span className="text-black font-bold text-xs sm:text-sm">{clients.filter(c => c.status === "paused").length}</span>
               </div>
             </div>
             {leads.filter(l => l.status !== "won" && l.status !== "lost").length > 0 && (
-              <div className="mt-4 flex items-center gap-2 text-xs text-blue-700 dark:text-blue-300 bg-blue-500/10 border border-blue-500/20 px-3 py-1.5 rounded-lg justify-center w-max mx-auto">
+              <div className="mt-4 flex items-center gap-2 text-xs text-primary dark:text-primary bg-primary/10 border border-primary/20 px-3 py-1.5 rounded-lg justify-center w-max mx-auto">
                 <Bot className="w-3.5 h-3.5" />
                 AI is auto-following up with {leads.filter(l => l.status !== "won" && l.status !== "lost").length} leads
               </div>
@@ -476,13 +476,13 @@ export default function Dashboard() {
           
           <div className="mt-4 flex flex-col sm:flex-row justify-center gap-2">
             <Link to={createPageUrl("Workouts")} className="w-full sm:w-auto">
-              <button className="w-full justify-center px-4 py-2 sm:px-4 sm:py-2.5 bg-card backdrop-blur-md border border-[#A855F7]/30 rounded-full text-xs font-semibold hover:bg-[#A855F7]/20 hover:border-[#A855F7]/50 hover: transition-all duration-300 flex items-center gap-2">
-                <Plus className="w-4 h-4 text-[#A855F7]" /> Add Workout
+              <button className="w-full justify-center px-4 py-2 sm:px-4 sm:py-2.5 bg-card backdrop-blur-md border border-[#4B91DD]/30 rounded-full text-xs font-semibold hover:bg-[#4B91DD]/20 hover:border-[#4B91DD]/50 hover: transition-all duration-300 flex items-center gap-2">
+                <Plus className="w-4 h-4 text-[#4B91DD]" /> Add Workout
               </button>
             </Link>
             <Link to={createPageUrl("Meals")} className="w-full sm:w-auto">
-              <button className="w-full justify-center px-4 py-2 sm:px-4 sm:py-2.5 bg-card backdrop-blur-md border border-[#A855F7]/30 rounded-full text-xs font-semibold hover:bg-[#A855F7]/20 hover:border-[#A855F7]/50 hover: transition-all duration-300 flex items-center gap-2">
-                <Plus className="w-4 h-4 text-[#A855F7]" /> Add Meal Plan
+              <button className="w-full justify-center px-4 py-2 sm:px-4 sm:py-2.5 bg-card backdrop-blur-md border border-[#4B91DD]/30 rounded-full text-xs font-semibold hover:bg-[#4B91DD]/20 hover:border-[#4B91DD]/50 hover: transition-all duration-300 flex items-center gap-2">
+                <Plus className="w-4 h-4 text-[#4B91DD]" /> Add Meal Plan
               </button>
             </Link>
           </div>
@@ -509,7 +509,7 @@ export default function Dashboard() {
               {pendingContracts.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-muted-foreground pt-4">
                   <CheckCircle className="w-8 h-8 mb-2 opacity-50" />
-                  <p>All clients are up to date on their forms!</p>
+                  <p>All clients are up to date on their forms.</p>
                 </div>
               ) : (
                 pendingContracts.map(contract => {

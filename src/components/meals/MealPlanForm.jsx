@@ -135,7 +135,7 @@ export default function MealPlanForm({ open, onOpenChange, plan, clients, onSubm
         daily_meals: undefined
       };
       await onSubmit(submitData);
-      showSuccess(plan ? "Meal Plan Updated!" : "Meal Plan Created!", plan ? "Changes saved successfully" : "New meal plan is ready");
+      showSuccess(plan ? "Meal Plan Updated." : "Meal Plan Created.", plan ? "Changes saved successfully" : "New meal plan is ready");
     } finally {
       setIsLoading(false);
     }
@@ -227,7 +227,7 @@ export default function MealPlanForm({ open, onOpenChange, plan, clients, onSubm
         <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto bg-card border-border text-foreground" aria-describedby="meal-form-desc">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-xl text-foreground" id="meal-form-desc">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-red-600 flex items-center justify-center">
                 <Apple className="w-5 h-5 text-foreground" />
               </div>
               {plan ? "Edit Meal Plan" : "Create Meal Plan"}
@@ -358,15 +358,15 @@ export default function MealPlanForm({ open, onOpenChange, plan, clients, onSubm
 
             {!simpleMode && (
             <div className="space-y-2 sm:col-span-2 pt-2 pb-2">
-               <div className="flex items-center justify-between p-4 bg-orange-500/10 border border-orange-500/20 rounded-xl">
+               <div className="flex items-center justify-between p-4 bg-primary/10 border border-primary/20 rounded-xl">
                  <div>
-                   <Label className="text-orange-500 font-bold block mb-1">Circadian Nutritional Timing</Label>
+                   <Label className="text-primary font-bold block mb-1">Circadian Nutritional Timing</Label>
                    <p className="text-xs text-muted-foreground">AI predicts precise eating windows mapped to workout schedules and metabolic circadian rhythms. Integrates directly into client's daily schedule.</p>
                  </div>
                  <button
                    type="button"
                    onClick={() => handleChange("circadian_timing", !formData.circadian_timing)}
-                   className={`w-12 h-6 rounded-full transition-colors relative ${formData.circadian_timing ? 'bg-orange-500' : 'bg-gray-400'}`}
+                   className={`w-12 h-6 rounded-full transition-colors relative ${formData.circadian_timing ? 'bg-primary' : 'bg-gray-400'}`}
                  >
                    <div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-transform ${formData.circadian_timing ? 'translate-x-7' : 'translate-x-1'}`} />
                  </button>
@@ -395,7 +395,7 @@ export default function MealPlanForm({ open, onOpenChange, plan, clients, onSubm
                           <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${isOpen ? "rotate-180" : ""}`} />
                           <span className="font-semibold text-foreground">Day {dayNum}</span>
                           {totalFoods > 0 && (
-                            <span className="text-xs bg-orange-500/20 text-orange-300 px-2 py-0.5 rounded-full border border-orange-500/30">{totalFoods} food{totalFoods !== 1 ? "s" : ""}</span>
+                            <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full border border-primary/30">{totalFoods} food{totalFoods !== 1 ? "s" : ""}</span>
                           )}
                         </div>
                         <Button
@@ -407,7 +407,7 @@ export default function MealPlanForm({ open, onOpenChange, plan, clients, onSubm
                             setExpandedDays(prev => ({ ...prev, [dayNum]: true }));
                             setActiveMealType(`${dayNum}-breakfast`);
                           }}
-                          className="gap-1 h-7 text-xs bg-secondary border-border text-orange-400 hover:bg-orange-500/10 hover:text-orange-300"
+                          className="gap-1 h-7 text-xs bg-secondary border-border text-primary hover:bg-primary/10 hover:text-primary"
                         >
                           <Plus className="w-3 h-3" /> Add Food
                         </Button>
@@ -429,7 +429,7 @@ export default function MealPlanForm({ open, onOpenChange, plan, clients, onSubm
                             onOpenChange={(open) => setActiveMealType(open ? `${dayNum}-${mealType}` : null)}
                           >
                             <PopoverTrigger asChild>
-                              <Button type="button" variant="outline" size="sm" className="h-7 text-xs gap-1 border-orange-200 text-orange-600 hover:bg-orange-50">
+                              <Button type="button" variant="outline" size="sm" className="h-7 text-xs gap-1 border-primary/20 text-primary hover:bg-primary/10">
                                 <Plus className="w-3 h-3" /> Add Food
                               </Button>
                             </PopoverTrigger>
@@ -526,7 +526,7 @@ export default function MealPlanForm({ open, onOpenChange, plan, clients, onSubm
             </Button>
             <Button 
               type="submit" 
-              className="bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-foreground border-0"
+              className="bg-gradient-to-r from-primary to-red-600 hover:from-primary hover:to-red-700 text-foreground border-0"
               disabled={isLoading}
             >
               {isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
@@ -587,7 +587,7 @@ export default function MealPlanForm({ open, onOpenChange, plan, clients, onSubm
                     setSelectedFoodToAdd(null);
                     setSelectedMealTypeForFood(null);
                   }}
-                  className="bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700"
+                  className="bg-gradient-to-r from-primary to-red-600 hover:from-primary hover:to-red-700"
                 >
                   Add to {selectedMealTypeForFood.mealType}
                 </Button>

@@ -14,10 +14,10 @@ const PRESETS = [
 
 // Timer status shown in the ring, keyed off the current state.
 const TIMER_STATES = {
-  idle:    { Icon: Timer,         message: "Ready when you are.",            color: "#0f9d76" },
-  running: { Icon: Flame,         message: "Locked in — keep going.",        color: "#22c55e" },
+  idle:    { Icon: Timer,         message: "Ready when you are.",            color: "#4B91DD" },
+  running: { Icon: Flame,         message: "Locked in — keep going.",        color: "#4B91DD" },
   paused:  { Icon: Pause,         message: "Paused. Pick it back up.",       color: "#f59e0b" },
-  done:    { Icon: CheckCircle2,  message: "Session complete. Nice work.",   color: "#f97316" },
+  done:    { Icon: CheckCircle2,  message: "Session complete. Nice work.",   color: "#4B91DD" },
 };
 
 export default function FocusTimer({ onSessionComplete }) {
@@ -82,17 +82,17 @@ export default function FocusTimer({ onSessionComplete }) {
   return (
     <div className="glass-card rounded-2xl p-6">
       <div className="flex items-center gap-2 mb-5">
-        <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(212,175,55,0.12)', border: '1px solid rgba(212,175,55,0.25)' }}>
-          <Timer className="w-4 h-4 text-yellow-400" />
+        <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(75,145,221,0.12)', border: '1px solid rgba(75,145,221,0.25)' }}>
+          <Timer className="w-4 h-4 text-primary" />
         </div>
         <div>
           <h3 className="font-bold text-foreground">Focus Timer</h3>
           <p className="text-xs text-muted-foreground">Block out distractions and train with intent</p>
         </div>
         {sessionsToday > 0 && (
-          <div className="ml-auto flex items-center gap-1 px-2 py-1 rounded-lg" style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)' }}>
-            <Flame className="w-3 h-3 text-green-400" />
-            <span className="text-xs text-green-400 font-semibold">{sessionsToday} today</span>
+          <div className="ml-auto flex items-center gap-1 px-2 py-1 rounded-lg" style={{ background: 'rgba(75,145,221,0.1)', border: '1px solid rgba(75,145,221,0.2)' }}>
+            <Flame className="w-3 h-3 text-primary" />
+            <span className="text-xs text-primary font-semibold">{sessionsToday} today</span>
           </div>
         )}
       </div>
@@ -106,7 +106,7 @@ export default function FocusTimer({ onSessionComplete }) {
             disabled={running}
             className="flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all"
             style={preset.label === p.label ? {
-              background: 'rgba(212,175,55,0.15)', color: '#d4a017', border: '1px solid rgba(212,175,55,0.3)'
+              background: 'rgba(75,145,221,0.15)', color: '#4B91DD', border: '1px solid rgba(75,145,221,0.3)'
             } : {
               background: 'hsl(var(--secondary))', color: 'hsl(var(--muted-foreground))', border: '1px solid hsl(var(--border))'
             }}
@@ -123,7 +123,7 @@ export default function FocusTimer({ onSessionComplete }) {
             <circle cx="80" cy="80" r={r} fill="none" stroke="hsl(var(--border))" strokeWidth="8" />
             <circle
               cx="80" cy="80" r={r} fill="none"
-              stroke={done ? '#22c55e' : running ? '#d4a017' : 'rgba(212,175,55,0.3)'}
+              stroke={done ? '#4B91DD' : running ? '#4B91DD' : 'rgba(75,145,221,0.3)'}
               strokeWidth="8"
               strokeLinecap="round"
               strokeDasharray={circ}
@@ -161,7 +161,7 @@ export default function FocusTimer({ onSessionComplete }) {
           style={running ? {
             background: 'rgba(239,68,68,0.15)', color: '#f87171', border: '1px solid rgba(239,68,68,0.3)'
           } : {
-            background: 'linear-gradient(135deg, #d4a017, #f5c842)', color: '#000'
+            background: 'linear-gradient(135deg, #4B91DD, #4B91DD)', color: '#F9F7F6'
           }}
         >
           {running ? <><Pause className="w-4 h-4 mr-2" />Pause</> : <><Play className="w-4 h-4 mr-2" />Start Focus</>}
@@ -169,9 +169,9 @@ export default function FocusTimer({ onSessionComplete }) {
       </div>
 
       {done && (
-        <div className="mt-4 p-3 rounded-xl text-center" style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.2)' }}>
-          <CheckCircle2 className="w-5 h-5 text-green-400 mx-auto mb-1" />
-          <p className="text-green-400 text-sm font-bold">Session Complete! +{Math.round(preset.seconds / 60)} min focused</p>
+        <div className="mt-4 p-3 rounded-xl text-center" style={{ background: 'rgba(75,145,221,0.08)', border: '1px solid rgba(75,145,221,0.2)' }}>
+          <CheckCircle2 className="w-5 h-5 text-primary mx-auto mb-1" />
+          <p className="text-primary text-sm font-bold">Session Complete! +{Math.round(preset.seconds / 60)} min focused</p>
         </div>
       )}
     </div>

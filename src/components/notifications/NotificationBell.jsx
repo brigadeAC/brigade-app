@@ -215,13 +215,13 @@ export default function NotificationBell({ user }) {
                 onClick={() => handleNotificationClick(notification)}
                 className={cn(
                   "w-full p-4 text-left hover:bg-slate-50 border-b transition-colors",
-                  !notification.read && "bg-blue-50/50"
+                  !notification.read && "bg-primary/50"
                 )}
               >
                 <div className="flex gap-3">
                   <div className={cn(
                     "w-2 h-2 rounded-full mt-1.5 flex-shrink-0",
-                    !notification.read ? "bg-blue-600" : "bg-slate-300"
+                    !notification.read ? "bg-primary" : "bg-slate-300"
                   )} />
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-sm text-slate-900">{notification.title}</p>

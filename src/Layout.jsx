@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { BrandIcon, BrandWordmark } from "@/components/BrandMark";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { createPageUrl } from "./utils";
 import { base44 } from "@/api/base44Client";
@@ -309,7 +310,7 @@ export default function Layout({ children, currentPageName }) {
       themeMeta.name = 'theme-color';
       document.head.appendChild(themeMeta);
     }
-    themeMeta.content = '#080808';
+    themeMeta.content = '#191615';
   }, []);
 
   // Register service worker for PWA support
@@ -341,7 +342,7 @@ export default function Layout({ children, currentPageName }) {
   if (isLoading || (!user && !publicPages.includes(currentPageName))) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-[#d4a017] border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-2 border-[#4B91DD] border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -370,7 +371,7 @@ export default function Layout({ children, currentPageName }) {
     <div className="min-h-screen bg-background">
       <OfflineMessage />
       {adminViewMode === 'client' && (
-        <div className="fixed top-0 left-0 right-0 z-[999] flex items-center justify-center gap-3 px-4 py-1.5 text-xs font-bold text-black" style={{ background: 'linear-gradient(90deg, #22c55e, #16a34a)', boxShadow: '0 2px 12px rgba(34,197,94,0.4)' }}>
+        <div className="fixed top-0 left-0 right-0 z-[999] flex items-center justify-center gap-3 px-4 py-1.5 text-xs font-bold text-black" style={{ background: 'linear-gradient(90deg, #4B91DD, #4B91DD)', boxShadow: '0 2px 12px rgba(75,145,221,0.4)' }}>
           <Eye className="w-3.5 h-3.5" />
           Client portal PREVIEW MODE
           <button
@@ -404,21 +405,19 @@ export default function Layout({ children, currentPageName }) {
             appLogoUrl ?
             <img src={appLogoUrl} alt="Logo" className="w-8 h-8 object-contain rounded" /> :
 
-            <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #2CD49F, #10b981)' }}>
-                <Flame className="w-4 h-4 text-primary-foreground" />
-              </div>
+            <BrandIcon />
             }
-            <span className="font-black text-base tracking-wider text-foreground">
-              {user ? (user.data?.business_name || user.business_name || "ApexCoach") : "ApexCoach"}
-            </span>
+            <BrandWordmark className="text-base">
+              {user ? (user.data?.business_name || user.business_name || "Brigade") : "Brigade"}
+            </BrandWordmark>
           </div>
         </div>
         <div className="flex items-center gap-2">
           {user && <NotificationBell user={user} />}
           {user &&
-          <Avatar className="h-9 w-9 ring-2 ring-[#2CD49F]/50 transition-all duration-300">
+          <Avatar className="h-9 w-9 ring-2 ring-[#4B91DD]/50 transition-all duration-300">
               <AvatarImage src={user.avatar_url} />
-              <AvatarFallback className="text-sm font-bold text-primary-foreground" style={{ background: 'linear-gradient(135deg, #2CD49F, #10b981)' }}>
+              <AvatarFallback className="text-sm font-bold text-primary-foreground" style={{ background: 'linear-gradient(135deg, #4B91DD, #4B91DD)' }}>
                 {(user.data?.full_name || user.full_name)?.[0] || user.email?.[0]?.toUpperCase()}
               </AvatarFallback>
             </Avatar>
@@ -447,13 +446,13 @@ export default function Layout({ children, currentPageName }) {
           appLogoUrl ?
           <img src={appLogoUrl} alt="Logo" className="w-10 h-10 object-contain rounded" /> :
 
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #2CD49F, #10b981)', color: 'hsl(var(--card))' }}>
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #4B91DD, #4B91DD)', color: 'hsl(var(--card))' }}>
               <Flame className="w-6 h-6" />
             </div>
           }
           <div className="flex-1 min-w-0">
             <span className="font-black text-lg tracking-wider text-foreground block truncate">
-              {user ? (user.data?.business_name || user.business_name || "ApexCoach") : "ApexCoach"}
+              {user ? (user.data?.business_name || user.business_name || "Brigade") : "Brigade"}
             </span>
             <p className="text-foreground text-xs tracking-wide truncate" style={{ fontWeight: 700 }}>
               {user?.role === 'admin' ? 'Admin' : 'Trainer'}
@@ -475,7 +474,7 @@ export default function Layout({ children, currentPageName }) {
 
             return (
               <div key={gIdx} className="space-y-1">
-                <h4 className="px-4 text-xs font-semibold tracking-wider text-[#8F95B2] uppercase mb-2">{group.title}</h4>
+                <h4 className="px-4 text-xs font-semibold tracking-wider text-[#726B65] uppercase mb-2">{group.title}</h4>
                 {visibleItems.map((item) => {
                   let pageName = item.page;
                   let displayName = item.name;
@@ -491,10 +490,10 @@ export default function Layout({ children, currentPageName }) {
                       onClick={() => setSidebarOpen(false)}
                       className={cn(
                         "flex items-center gap-3 px-5 py-3 rounded-[20px] transition-all duration-300 group relative whitespace-nowrap mx-3",
-                        isActive ? "text-foreground bg-secondary font-semibold border border-border" : "text-[#8F95B2] hover:text-foreground hover:bg-accent border border-transparent"
+                        isActive ? "text-foreground bg-secondary font-semibold border border-border" : "text-[#726B65] hover:text-foreground hover:bg-accent border border-transparent"
                       )}
                     >
-                      <item.icon className={cn("w-5 h-5 flex-shrink-0 transition-colors", isActive ? "text-[#2CD49F]" : "text-[#8F95B2] group-hover:text-foreground")} />
+                      <item.icon className={cn("w-5 h-5 flex-shrink-0 transition-colors", isActive ? "text-[#4B91DD]" : "text-[#726B65] group-hover:text-foreground")} />
                       <span className="text-sm">{displayName}</span>
                       {item.page === 'Messages' && unreadMessages.length > 0 &&
                       <Badge className="ml-auto bg-red-600 text-white hover:bg-red-700 text-[10px] px-1.5 py-0 min-w-5 h-5 flex items-center justify-center rounded-full border-0">
@@ -511,7 +510,7 @@ export default function Layout({ children, currentPageName }) {
 
         {/* User section */}
         {user &&
-        <div className="flex-shrink-0 p-4 pb-[calc(1rem+60px+env(safe-area-inset-bottom))] lg:pb-4 space-y-2" style={{ borderTop: '1px solid rgba(0, 230, 118, 0.1)', background: 'transparent' }}>
+        <div className="flex-shrink-0 p-4 pb-[calc(1rem+60px+env(safe-area-inset-bottom))] lg:pb-4 space-y-2" style={{ borderTop: '1px solid rgba(75,145,221, 0.1)', background: 'transparent' }}>
             {/* Admin: return from trainer view */}
             {user?.role === 'admin' && adminViewMode === 'trainer' && (
               <button
@@ -537,7 +536,7 @@ export default function Layout({ children, currentPageName }) {
                   window.location.href = createPageUrl('Dashboard');
                 }}
                 className="w-full flex items-center gap-2 px-3 py-2 rounded-xl transition-all text-sm"
-                style={{ background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.3)', color: '#4ade80' }}
+                style={{ background: 'rgba(75,145,221,0.12)', border: '1px solid rgba(75,145,221,0.3)', color: '#4B91DD' }}
               >
                 <EyeOff className="w-4 h-4 flex-shrink-0" />
                 <span className="flex-1 text-left font-medium">Exit Client View</span>
@@ -546,17 +545,17 @@ export default function Layout({ children, currentPageName }) {
               <button
                 onClick={() => setClientPreviewPickerOpen(true)}
                 className="w-full flex items-center gap-2 px-3 py-2 rounded-xl transition-all text-sm"
-                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#9ca3af' }}
+                style={{ background: 'hsl(var(--secondary))', border: '1px solid hsl(var(--border))', color: '#726B65' }}
               >
                 <Eye className="w-4 h-4 flex-shrink-0" />
                 <span className="flex-1 text-left font-medium">Preview Client Portal</span>
               </button>
             )}
 
-            <div className="flex items-center gap-3 p-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
-              <Avatar className="h-9 w-9 ring-2 ring-[#2CD49F]/50 flex-shrink-0">
+            <div className="flex items-center gap-3 p-3 rounded-xl" style={{ background: 'hsl(var(--secondary))', border: '1px solid hsl(var(--border))' }}>
+              <Avatar className="h-9 w-9 ring-2 ring-[#4B91DD]/50 flex-shrink-0">
                 <AvatarImage src={user.avatar_url} />
-                <AvatarFallback className="text-sm font-bold text-primary-foreground" style={{ background: 'linear-gradient(135deg, #2CD49F, #10b981)' }}>
+                <AvatarFallback className="text-sm font-bold text-primary-foreground" style={{ background: 'linear-gradient(135deg, #4B91DD, #4B91DD)' }}>
                   {(user.data?.full_name || user.full_name)?.[0] || user.email?.[0]?.toUpperCase()}
                 </AvatarFallback>
               </Avatar>
@@ -600,9 +599,9 @@ export default function Layout({ children, currentPageName }) {
           <div className="bg-primary/10 border border-primary/20 px-4 py-1.5 rounded-full">
             <span className="text-xs font-bold tracking-wide text-primary">{user?.role === 'admin' ? 'Admin' : 'Trainer'}</span>
           </div>
-          <Avatar className="h-10 w-10 ring-2 ring-[#00E676]/30 hover:scale-105 transition-transform cursor-pointer">
+          <Avatar className="h-10 w-10 ring-2 ring-[#4B91DD]/30 hover:scale-105 transition-transform cursor-pointer">
             <AvatarImage src={user?.avatar_url} />
-            <AvatarFallback className="text-sm font-bold text-black bg-gradient-to-br from-[#00E676] to-[#00A859]">
+            <AvatarFallback className="text-sm font-bold text-black bg-gradient-to-br from-[#4B91DD] to-[#4B91DD]">
               {(user?.data?.full_name || user?.full_name)?.[0] || "T"}
             </AvatarFallback>
           </Avatar>
@@ -613,11 +612,11 @@ export default function Layout({ children, currentPageName }) {
       <main className="lg:pl-72 min-h-screen lg:pb-0 w-full overflow-x-hidden" style={{ paddingBottom: 'calc(80px + env(safe-area-inset-bottom))', paddingTop: 'calc(80px + env(safe-area-inset-top))' }}>
         {/* Floating AI Orb */}
         <Link to={createPageUrl("TrainerAssistant")} className="fixed bottom-24 lg:bottom-8 right-6 z-50 flex items-center justify-center pointer-events-none group hidden md:flex">
-          <div className="w-14 h-14 bg-gradient-to-br from-[#2CD49F] to-[#10b981] rounded-full border-2 border-border flex items-center justify-center animate-bounce pointer-events-auto cursor-pointer hover:scale-110 transition-transform">
+          <div className="w-14 h-14 bg-gradient-to-br from-[#4B91DD] to-[#4B91DD] rounded-full border-2 border-border flex items-center justify-center animate-bounce pointer-events-auto cursor-pointer hover:scale-110 transition-transform">
             <Bot className="w-6 h-6 text-primary-foreground" />
           </div>
         </Link>
-        <PullToRefresh onRefresh={handleRefresh} pullingContent="" refreshingContent={<div className="flex justify-center p-4"><div className="w-6 h-6 border-2 border-[#d4a017] border-t-transparent rounded-full animate-spin" /></div>}>
+        <PullToRefresh onRefresh={handleRefresh} pullingContent="" refreshingContent={<div className="flex justify-center p-4"><div className="w-6 h-6 border-2 border-[#4B91DD] border-t-transparent rounded-full animate-spin" /></div>}>
           <div className="p-4 lg:p-6 max-w-[1400px] mx-auto min-h-[calc(100vh-80px)]" style={{ paddingLeft: 'max(1rem, env(safe-area-inset-left))', paddingRight: 'max(1rem, env(safe-area-inset-right))' }}>
             <AnimatePresence mode="wait">
               <motion.div

@@ -26,7 +26,7 @@ function TrainerNoteField({ log, onSave }) {
   return (
     <div className="mt-4 space-y-2">
       <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Add notes..." className="bg-secondary text-sm border-border text-foreground" />
-      <div className="flex justify-end gap-2">
+      <div className="flex justify-end gap-2 flex-wrap">
         <Button size="sm" variant="ghost" onClick={() => setIsEditing(false)}>Cancel</Button>
         <Button size="sm" onClick={() => { onSave(notes); setIsEditing(false); }}>Save</Button>
       </div>
@@ -150,7 +150,7 @@ export default function FitnessTools() {
         {/* Training Programs */}
         <TabsContent value="programs" className="pt-4 space-y-4">
           <div className="flex justify-end">
-            <Button onClick={() => {setEditingProgram(null);setShowProgramForm(true);}} className="bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700">
+            <Button onClick={() => {setEditingProgram(null);setShowProgramForm(true);}} className="bg-gradient-to-r from-primary to-primary hover:from-primary hover:to-primary">
               <Plus className="w-4 h-4 mr-2" /> New Program
             </Button>
           </div>
@@ -198,7 +198,7 @@ export default function FitnessTools() {
                 <div className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" /> Start: {prog.start_date}</div>
                 }
                     {prog.weekly_tracking?.length > 0 &&
-                <Badge className="bg-purple-500/20 text-purple-400 border border-purple-500/30">{prog.weekly_tracking.length} week{prog.weekly_tracking.length !== 1 ? "s" : ""} tracked</Badge>
+                <Badge className="bg-primary/20 text-primary border border-primary/30">{prog.weekly_tracking.length} week{prog.weekly_tracking.length !== 1 ? "s" : ""} tracked</Badge>
                 }
                     <div className="text-xs text-muted-foreground">
                       {[prog.warmup?.filter((e) => e.name), prog.strength?.filter((e) => e.name), prog.cardio?.filter((e) => e.name)].flat().length} exercises planned
@@ -213,7 +213,7 @@ export default function FitnessTools() {
         {/* Calorie Logs */}
         <TabsContent value="calories" className="pt-4 space-y-4">
           <div className="flex justify-end">
-            <Button onClick={() => {setEditingLog(null);setShowCalorieForm(true);}} className="bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700">
+            <Button onClick={() => {setEditingLog(null);setShowCalorieForm(true);}} className="bg-gradient-to-r from-primary to-red-600 hover:from-primary hover:to-red-700">
               <Plus className="w-4 h-4 mr-2" /> New Calorie Log
             </Button>
           </div>
@@ -267,8 +267,8 @@ export default function FitnessTools() {
                           <div className="font-bold text-foreground">{Math.round(totalCals)}</div>
                           <div className="text-xs text-muted-foreground">Calories</div>
                         </div>
-                        <div className={`rounded-lg p-2 border border-border ${isOver ? "bg-red-500/10" : "bg-green-500/10"}`}>
-                          <div className={`font-bold ${isOver ? "text-red-400" : "text-green-400"}`}>{fatPct}%</div>
+                        <div className={`rounded-lg p-2 border border-border ${isOver ? "bg-red-500/10" : "bg-primary/10"}`}>
+                          <div className={`font-bold ${isOver ? "text-red-400" : "text-primary"}`}>{fatPct}%</div>
                           <div className="text-xs text-muted-foreground">Fat %</div>
                         </div>
                       </div>

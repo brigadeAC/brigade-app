@@ -8,10 +8,10 @@ import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 
 const navItems = [
-  { name: "Home", icon: LayoutDashboard, page: "Dashboard", accent: { color: '#d4a017', rgba: '212,175,55' } },
-  { name: "Clients", icon: Users, page: "Clients", accent: { color: '#22c55e', rgba: '34,197,94' } },
+  { name: "Home", icon: LayoutDashboard, page: "Dashboard", accent: { color: '#4B91DD', rgba: '212,175,55' } },
+  { name: "Clients", icon: Users, page: "Clients", accent: { color: '#4B91DD', rgba: '34,197,94' } },
   { name: "Workouts", icon: Dumbbell, page: "Workouts", accent: { color: '#ef4444', rgba: '239,68,68' } },
-  { name: "Schedule", icon: CalendarDays, page: "Schedule", accent: { color: '#8b5cf6', rgba: '139,92,246' } },
+  { name: "Schedule", icon: CalendarDays, page: "Schedule", accent: { color: '#4B91DD', rgba: '139,92,246' } },
 ];
 
 export default function BottomNav({ user, unreadMessages = [] }) {
@@ -64,11 +64,11 @@ export default function BottomNav({ user, unreadMessages = [] }) {
               <div
                 className="p-2 rounded-xl transition-all relative"
                 style={isActive ? {
-                  background: `rgba(0, 230, 118, 0.15)`,
-                  boxShadow: '0 0 10px rgba(0,230,118,0.2)'
+                  background: `rgba(75,145,221, 0.15)`,
+                  boxShadow: '0 0 10px rgba(75,145,221,0.2)'
                 } : {}}
               >
-                <Icon className="w-5 h-5 transition-transform group-hover:scale-110" style={{ color: isActive ? '#00E676' : '#9496A1', filter: isActive ? 'drop-shadow(0 0 5px rgba(0,230,118,0.5))' : 'none' }} />
+                <Icon className="w-5 h-5 transition-transform group-hover:scale-110" style={{ color: isActive ? '#4B91DD' : '#726B65', filter: isActive ? 'drop-shadow(0 0 5px rgba(75,145,221,0.5))' : 'none' }} />
                 {item.page === 'Messages' && unreadMessages.length > 0 && (
                   <Badge className="absolute -top-2 -right-2 bg-red-600 text-white text-[9px] px-1 py-0 min-w-[16px] h-4 flex items-center justify-center rounded-full border-0 shadow-lg">
                     {unreadMessages.length > 99 ? '99+' : unreadMessages.length}
@@ -82,7 +82,7 @@ export default function BottomNav({ user, unreadMessages = [] }) {
               </div>
               <span
                 className="text-[9px] font-bold tracking-wider transition-colors"
-                style={{ color: isActive ? '#00E676' : '#9496A1', textShadow: isActive ? '0 0 5px rgba(0,230,118,0.3)' : 'none' }}
+                style={{ color: isActive ? '#4B91DD' : '#726B65', textShadow: isActive ? '0 0 5px rgba(75,145,221,0.3)' : 'none' }}
               >
                 {item.name.toUpperCase()}
               </span>

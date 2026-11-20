@@ -62,11 +62,11 @@ export default function UploadContractDialog({ open, onOpenChange, clients, trai
         <DialogHeader className="px-6 pt-5 pb-4" style={{ borderBottom: '1px solid hsl(var(--border))' }}>
           <DialogTitle className="flex items-center gap-3 text-foreground">
             <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-              style={{ background: 'linear-gradient(135deg, #d4a017, #f5c842)' }}>
+              style={{ background: 'linear-gradient(135deg, #4B91DD, #4B91DD)' }}>
               <Upload className="w-4 h-4 text-black" />
             </div>
             <div>
-              <p className="text-xs font-medium tracking-wide uppercase mb-0.5" style={{ color: '#d4a017' }}>Upload</p>
+              <p className="text-xs font-medium tracking-wide uppercase mb-0.5" style={{ color: '#4B91DD' }}>Upload</p>
               <span className="text-base font-bold">Custom Document</span>
             </div>
           </DialogTitle>
@@ -123,7 +123,7 @@ export default function UploadContractDialog({ open, onOpenChange, clients, trai
                 onChange={e => setFile(e.target.files[0])} />
               {file ? (
                 <>
-                  <FileText className="w-8 h-8" style={{ color: '#d4a017' }} />
+                  <FileText className="w-8 h-8" style={{ color: '#4B91DD' }} />
                   <p className="text-sm font-medium text-foreground">{file.name}</p>
                   <p className="text-xs text-muted-foreground">{(file.size / 1024).toFixed(1)} KB</p>
                 </>
@@ -143,7 +143,7 @@ export default function UploadContractDialog({ open, onOpenChange, clients, trai
               Cancel
             </Button>
             <Button type="submit" disabled={uploading}
-              style={{ background: 'linear-gradient(135deg, #d4a017, #f5c842)', color: 'black', fontWeight: 700 }}>
+              style={{ background: 'linear-gradient(135deg, #4B91DD, #4B91DD)', color: 'black', fontWeight: 700 }}>
               {uploading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Uploading...</> : <><Upload className="w-4 h-4 mr-2" /> Upload Document</>}
             </Button>
           </div>

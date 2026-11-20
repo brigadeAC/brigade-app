@@ -55,10 +55,10 @@ function CalorieLogEditor({ log, onSave }) {
 
   return (
     <div className="space-y-3">
-      <div className="overflow-x-auto rounded-lg" style={{ border: '1px solid rgba(255,255,255,0.08)' }}>
+      <div className="overflow-x-auto rounded-lg" style={{ border: '1px solid hsl(var(--border))' }}>
         <table className="w-full text-sm">
           <thead>
-            <tr style={{ background: 'rgba(255,255,255,0.04)' }}>
+            <tr style={{ background: 'hsl(var(--secondary))' }}>
               <th className="text-left p-2 text-xs text-muted-foreground font-medium">Day</th>
               <th className="text-left p-2 text-xs text-muted-foreground font-medium">Food</th>
               <th className="text-left p-2 text-xs text-muted-foreground font-medium w-20">Calories</th>
@@ -193,7 +193,7 @@ export default function ClientMeals() {
         <div className="flex items-center gap-3 w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
           <div className="text-right whitespace-nowrap mr-2">
             <p className="text-sm text-muted-foreground">Meals Logged</p>
-            <p className="text-2xl font-bold text-orange-400">{mealLogs.length}</p>
+            <p className="text-2xl font-bold text-primary">{mealLogs.length}</p>
           </div>
           {clientProfile && (
             <Button onClick={() => setShowMealPlanForm(true)} className="whitespace-nowrap bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl font-bold">
@@ -228,7 +228,7 @@ export default function ClientMeals() {
             photo_urls: data.fileUrl ? [data.fileUrl] : []
           });
           queryClient.invalidateQueries({ queryKey: ["mealLogs"] });
-          toast.success("Meal saved to your history!");
+          toast.success("Meal saved to your history.");
         } catch (err) {
           console.error("Error saving meal log:", err);
           toast.error("Failed to save meal log.");
@@ -284,7 +284,7 @@ export default function ClientMeals() {
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Badge className="bg-emerald-900/50 text-emerald-400 border border-emerald-500/30">Active</Badge>
+                        <Badge className="bg-primary/50 text-primary border border-primary/30">Active</Badge>
                         {clientProfile && !clientProfile.trainer_id && (
                           <Button 
                             variant="ghost" 
@@ -311,8 +311,8 @@ export default function ClientMeals() {
                         </div>
                       }
                       {meal.protein_target_g &&
-                      <div className="flex items-center gap-2 p-2 rounded-lg" style={{ background: 'rgba(59,130,246,0.12)' }}>
-                          <Beef className="h-4 w-4 text-blue-400" />
+                      <div className="flex items-center gap-2 p-2 rounded-lg" style={{ background: 'rgba(75,145,221,0.12)' }}>
+                          <Beef className="h-4 w-4 text-primary" />
                           <div>
                             <p className="text-xs text-muted-foreground">Protein</p>
                             <p className="text-foreground text-sm font-semibold">{meal.protein_target_g}g</p>
@@ -330,7 +330,7 @@ export default function ClientMeals() {
                       }
                       {meal.fat_target_g &&
                       <div className="flex items-center gap-2 p-2 rounded-lg" style={{ background: 'rgba(234,179,8,0.12)' }}>
-                          <Droplet className="h-4 w-4 text-yellow-400" />
+                          <Droplet className="h-4 w-4 text-primary" />
                           <div>
                             <p className="text-xs text-muted-foreground">Fat</p>
                             <p className="text-foreground text-sm font-semibold">{meal.fat_target_g}g</p>
@@ -344,8 +344,8 @@ export default function ClientMeals() {
                     <div className="space-y-2 mt-4">
                         <p className="text-sm font-semibold text-muted-foreground mb-2">Meal Schedule ({days.length} days):</p>
                         {days.map((day) =>
-                      <div key={day} className="rounded-lg overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.08)' }}>
-                            <div className="px-3 py-2 text-xs font-semibold text-orange-400" style={{ background: 'rgba(255,255,255,0.04)' }}>
+                      <div key={day} className="rounded-lg overflow-hidden" style={{ border: '1px solid hsl(var(--border))' }}>
+                            <div className="px-3 py-2 text-xs font-semibold text-primary" style={{ background: 'hsl(var(--secondary))' }}>
                               Day {day}
                             </div>
                             <div className="divide-y divide-white/5">
@@ -371,7 +371,7 @@ export default function ClientMeals() {
                                   <Button
                               variant="ghost"
                               size="sm"
-                              className="text-orange-400 hover:text-orange-300 text-xs"
+                              className="text-primary hover:text-primary text-xs"
                               onClick={() => setSelectedMeal(m)}>
 
                                     View <ChevronRight className="h-3 w-3 ml-1" />
@@ -411,7 +411,7 @@ export default function ClientMeals() {
                 <h3 className="text-lg font-medium text-foreground">No active meal plans</h3>
                 <p className="text-muted-foreground mt-2">
                   {clientProfile && !clientProfile.trainer_id 
-                    ? "Head to the AI Assistant to generate a personalized meal plan!" 
+                    ? "Head to the AI Assistant to generate a personalized meal plan." 
                     : "Your trainer will assign meal plans to you"}
                 </p>
                 {clientProfile && !clientProfile.trainer_id && (
@@ -456,7 +456,7 @@ export default function ClientMeals() {
                   <div key={i} className="flex items-center justify-between text-sm py-1 border-b border-border">
                             <span className="text-muted-foreground w-24 text-xs">{entry.day}</span>
                             <span className="text-foreground flex-1 px-2">{entry.food}</span>
-                            <span className="text-orange-400 text-xs">{entry.calories} cal</span>
+                            <span className="text-primary text-xs">{entry.calories} cal</span>
                           </div>
                   )}
                         {(log.entries || []).length > 5 && <p className="text-xs text-muted-foreground">+{log.entries.length - 5} more entries</p>}
@@ -464,8 +464,8 @@ export default function ClientMeals() {
                 }
                     {/* Trainer notes section */}
                     {log.trainer_notes &&
-                <div className="mt-3 pt-3 border-t border-border p-3 rounded-lg" style={{ background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.15)' }}>
-                        <p className="text-xs text-green-400 font-semibold mb-1">Trainer Notes</p>
+                <div className="mt-3 pt-3 border-t border-border p-3 rounded-lg" style={{ background: 'rgba(75,145,221,0.06)', border: '1px solid rgba(75,145,221,0.15)' }}>
+                        <p className="text-xs text-primary font-semibold mb-1">Trainer Notes</p>
                         <p className="text-sm text-muted-foreground">{log.trainer_notes}</p>
                       </div>
                 }
@@ -530,7 +530,7 @@ export default function ClientMeals() {
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-lg bg-orange-500/20 flex items-center justify-center">
+                        <div className="h-10 w-10 rounded-lg bg-primary/20 flex items-center justify-center">
                           <span className="text-xl">{getMealIcon(log.meal_type)}</span>
                         </div>
                         <div>
@@ -546,16 +546,16 @@ export default function ClientMeals() {
                     {(log.calories > 0 || log.protein_g > 0) && (
                       <div className="flex flex-wrap gap-2">
                         {log.calories > 0 && <Badge variant="outline" className="bg-red-500/10 text-red-400 border-red-500/20">{log.calories} cal</Badge>}
-                        {log.protein_g > 0 && <Badge variant="outline" className="bg-blue-500/10 text-blue-400 border-blue-500/20">{log.protein_g}g Pro</Badge>}
+                        {log.protein_g > 0 && <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">{log.protein_g}g Pro</Badge>}
                         {log.carbs_g > 0 && <Badge variant="outline" className="bg-amber-500/10 text-amber-400 border-amber-500/20">{log.carbs_g}g Carb</Badge>}
-                        {log.fat_g > 0 && <Badge variant="outline" className="bg-yellow-500/10 text-yellow-400 border-yellow-500/20">{log.fat_g}g Fat</Badge>}
+                        {log.fat_g > 0 && <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">{log.fat_g}g Fat</Badge>}
                       </div>
                     )}
                     {log.notes && <p className="text-sm text-muted-foreground">{log.notes}</p>}
                     {log.trainer_feedback && (
-                      <div className="mt-2 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-                        <p className="text-xs font-semibold text-emerald-400 mb-1">Trainer Feedback</p>
-                        <p className="text-sm text-emerald-100">{log.trainer_feedback}</p>
+                      <div className="mt-2 p-3 rounded-lg bg-primary/10 border border-primary/20">
+                        <p className="text-xs font-semibold text-primary mb-1">Trainer Feedback</p>
+                        <p className="text-sm text-primary">{log.trainer_feedback}</p>
                       </div>
                     )}
                   </CardContent>

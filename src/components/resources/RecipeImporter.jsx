@@ -37,7 +37,7 @@ export default function RecipeImporter({ onImportComplete }) {
 
       setParsedRecipe(data.recipe);
       setShowDialog(true);
-      toast.success('Recipe parsed successfully!');
+      toast.success('Recipe parsed successfully.');
     } catch (error) {
       console.error('Failed to parse recipe:', error);
       toast.error("Couldn't read a recipe from that link. Try another source or add it manually.");
@@ -66,7 +66,7 @@ export default function RecipeImporter({ onImportComplete }) {
 
       await base44.entities.Recipe.create(recipeToCreate);
 
-      toast.success('Recipe imported successfully!');
+      toast.success('Recipe imported successfully.');
 
       // Critical: refresh the global recipes list
       queryClient.invalidateQueries({ queryKey: ['recipes'] });
@@ -94,7 +94,7 @@ export default function RecipeImporter({ onImportComplete }) {
       <Card className="glass-card border-border h-full flex flex-col">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg text-foreground">
-            <LinkIcon className="w-5 h-5 text-green-400" />
+            <LinkIcon className="w-5 h-5 text-primary" />
             Import Recipe
           </CardTitle>
           <p className="text-sm text-muted-foreground">
@@ -112,7 +112,7 @@ export default function RecipeImporter({ onImportComplete }) {
           <Button
             onClick={handleParse}
             disabled={!recipeUrl.trim() || processing}
-            className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-foreground border-0 transition-colors">
+            className="w-full bg-gradient-to-r from-primary to-primary hover:from-primary hover:to-primary text-foreground border-0 transition-colors">
 
             {processing ?
             <>
@@ -134,7 +134,7 @@ export default function RecipeImporter({ onImportComplete }) {
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <ChefHat className="w-5 h-5 text-emerald-600" />
+              <ChefHat className="w-5 h-5 text-primary" />
               Review Parsed Recipe
             </DialogTitle>
           </DialogHeader>
@@ -148,7 +148,7 @@ export default function RecipeImporter({ onImportComplete }) {
               }
                 <div className="flex flex-wrap gap-2 mt-2">
                   {parsedRecipe.category &&
-                <Badge className="bg-orange-100 text-orange-700 capitalize">
+                <Badge className="bg-primary/10 text-primary capitalize">
                       {parsedRecipe.category}
                     </Badge>
                 }
@@ -188,9 +188,9 @@ export default function RecipeImporter({ onImportComplete }) {
               </div>
 
               <div className="grid grid-cols-3 gap-3 text-sm">
-                <div className="text-center p-2 bg-blue-50 rounded">
+                <div className="text-center p-2 bg-primary/10 rounded">
                   <div className="text-xs text-slate-600">Protein</div>
-                  <div className="font-semibold text-blue-700">
+                  <div className="font-semibold text-primary">
                     {parsedRecipe.protein_per_serving ?? '—'}g
                   </div>
                 </div>
@@ -200,9 +200,9 @@ export default function RecipeImporter({ onImportComplete }) {
                     {parsedRecipe.carbs_per_serving ?? '—'}g
                   </div>
                 </div>
-                <div className="text-center p-2 bg-purple-50 rounded">
+                <div className="text-center p-2 bg-primary/10 rounded">
                   <div className="text-xs text-slate-600">Fat</div>
-                  <div className="font-semibold text-purple-700">
+                  <div className="font-semibold text-primary">
                     {parsedRecipe.fat_per_serving ?? '—'}g
                   </div>
                 </div>
@@ -239,7 +239,7 @@ export default function RecipeImporter({ onImportComplete }) {
             <Button
               onClick={handleImport}
               disabled={importing}
-              className="bg-gradient-to-r from-emerald-500 to-teal-600">
+              className="bg-gradient-to-r from-primary to-primary">
 
               {importing ?
               <>

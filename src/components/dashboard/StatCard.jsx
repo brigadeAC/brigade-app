@@ -10,8 +10,8 @@ export default function StatCard({
   trendUp
 }) {
   return (
-    <div className="relative overflow-hidden bg-secondary backdrop-blur-2xl border border-primary/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),_0_8px_32px_rgba(0,0,0,0.4)] rounded-3xl p-5 transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.1),_0_8px_32px_rgba(0,0,0,0.4),_0_0_20px_rgba(0,230,118,0.2)] group">
-      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 shadow-[inset_0_0_20px_rgba(0,230,118,0.1)]" />
+    <div className="relative overflow-hidden bg-secondary backdrop-blur-2xl border border-primary/10 shadow-[inset_0_1px_0_rgba(114,107,101,0.15),_0_8px_32px_rgba(0,0,0,0.4)] rounded-3xl p-5 transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-[inset_0_1px_0_rgba(114,107,101,0.15),_0_8px_32px_rgba(0,0,0,0.4),_0_0_20px_rgba(75,145,221,0.2)] group">
+      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 shadow-[inset_0_0_20px_rgba(75,145,221,0.1)]" />
       <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-20 transition-opacity">
         <Icon className="w-24 h-24 text-primary blur-[2px]" />
       </div>

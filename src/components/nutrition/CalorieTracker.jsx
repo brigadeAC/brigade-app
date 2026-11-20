@@ -19,8 +19,8 @@ export default function CalorieTracker({ target = {}, actual = {} }) {
 
   const macros = [
     { label: "Protein", actual: aPro, target: tPro, unit: "g", icon: Beef, color: "#ef4444", rgba: "239,68,68" },
-    { label: "Carbs", actual: aCarb, target: tCarb, unit: "g", icon: Wheat, color: "#d4a017", rgba: "212,175,55" },
-    { label: "Fat", actual: aFat, target: tFat, unit: "g", icon: Droplets, color: "#8b5cf6", rgba: "139,92,246" },
+    { label: "Carbs", actual: aCarb, target: tCarb, unit: "g", icon: Wheat, color: "#4B91DD", rgba: "212,175,55" },
+    { label: "Fat", actual: aFat, target: tFat, unit: "g", icon: Droplets, color: "#4B91DD", rgba: "139,92,246" },
   ];
 
   return (
@@ -36,10 +36,10 @@ export default function CalorieTracker({ target = {}, actual = {} }) {
         {/* Calorie ring */}
         <div className="relative flex-shrink-0" style={{ width: 128, height: 128 }}>
           <svg width="128" height="128" className="absolute inset-0 -rotate-90">
-            <circle cx="64" cy="64" r={r} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="10" />
+            <circle cx="64" cy="64" r={r} fill="none" stroke="rgba(114,107,101,0.18)" strokeWidth="10" />
             <circle
               cx="64" cy="64" r={r} fill="none"
-              stroke={calPct >= 100 ? '#22c55e' : '#ef4444'}
+              stroke={calPct >= 100 ? '#4B91DD' : '#ef4444'}
               strokeWidth="10"
               strokeLinecap="round"
               strokeDasharray={circ}
@@ -67,7 +67,7 @@ export default function CalorieTracker({ target = {}, actual = {} }) {
                   </div>
                   <span className="text-xs font-semibold text-foreground">{a}<span className="text-gray-600">/{t}{unit}</span></span>
                 </div>
-                <div className="h-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.05)' }}>
+                <div className="h-1.5 rounded-full" style={{ background: 'hsl(var(--secondary))' }}>
                   <div
                     className="h-1.5 rounded-full transition-all duration-500"
                     style={{ width: `${p}%`, background: `rgba(${rgba},0.7)` }}

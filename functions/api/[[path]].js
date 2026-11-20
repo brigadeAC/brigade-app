@@ -1,4 +1,4 @@
-// ApexTraining backend — single Cloudflare Pages Function handling all /api/* routes.
+// Brigade Athletic Club backend — single Cloudflare Pages Function handling all /api/* routes.
 // Bindings (wrangler.jsonc / Pages dashboard):
 //   env.DB          D1 database
 //   env.FILES       R2 bucket (optional; uploads fall back to data URLs if absent)
@@ -438,7 +438,7 @@ async function sendEmail(env, { to, subject, html }) {
       'content-type': 'application/json',
     },
     body: JSON.stringify({
-      from: env.EMAIL_FROM || 'ApexCoach <onboarding@resend.dev>',
+      from: env.EMAIL_FROM || 'Brigade Athletic Club <onboarding@resend.dev>',
       to: Array.isArray(to) ? to : [to],
       subject,
       html,
@@ -465,7 +465,7 @@ async function edbFetch(env, path) {
 const emailShell = (title, bodyHtml) => `
   <div style="font-family:Inter,Arial,sans-serif;background:#F5F7FA;padding:32px">
     <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:16px;border:1px solid #E4E9F0;padding:32px">
-      <h2 style="margin:0 0 4px;color:#0F172A">ApexCoach</h2>
+      <h2 style="margin:0 0 4px;color:#0F172A">Brigade Athletic Club</h2>
       <h3 style="margin:0 0 16px;color:#059669">${title}</h3>
       <div style="color:#334155;font-size:15px;line-height:1.6">${bodyHtml}</div>
     </div>
@@ -543,12 +543,12 @@ async function runFunction(name, payload, ctx) {
       const signup = payload?.signupLink || url.origin + '/Login';
       return sendEmail(env, {
         to,
-        subject: `${payload?.trainerName || 'Your trainer'} invited you to ApexCoach`,
-        html: emailShell('You\'re invited!', `
+        subject: `${payload?.trainerName || 'Your trainer'} invited you to Brigade Athletic Club`,
+        html: emailShell('You\'re invited.', `
           <p>Hi ${payload?.clientName || 'there'},</p>
-          <p><strong>${payload?.trainerName || 'Your trainer'}</strong> has invited you to train together on ApexCoach — workouts, nutrition, habits, and progress tracking in one place.</p>
+          <p><strong>${payload?.trainerName || 'Your trainer'}</strong> has invited you to train together on Brigade Athletic Club — workouts, nutrition, habits, and progress tracking in one place.</p>
           <p style="margin:24px 0"><a href="${signup}" style="background:#059669;color:#fff;padding:12px 24px;border-radius:10px;text-decoration:none;font-weight:600">Create your account</a></p>
-          <p>See you in the app!</p>`),
+          <p>See you in the app.</p>`),
       });
     }
 
@@ -569,7 +569,7 @@ async function runFunction(name, payload, ctx) {
       if (!to) return { success: false, error: 'No recipient' };
       return sendEmail(env, {
         to,
-        subject: 'Session reminder — ApexCoach',
+        subject: 'Session reminder — Brigade Athletic Club',
         html: emailShell('Upcoming session', `
           <p>Reminder: you have a training session on <strong>${payload?.date || ''} ${payload?.time || ''}</strong>.</p>
           ${payload?.notes ? `<p>${payload.notes}</p>` : ''}`),
@@ -1040,7 +1040,7 @@ async function runFunction(name, payload, ctx) {
       let content = payload?.text || '';
       if (!content && /^https?:\/\//i.test(url)) {
         try {
-          const r = await fetch(url, { headers: { 'user-agent': 'Mozilla/5.0 (ApexCoach recipe importer)' } });
+          const r = await fetch(url, { headers: { 'user-agent': 'Mozilla/5.0 (Brigade recipe importer)' } });
           const html = await r.text();
           content = html
             .replace(/<script[\s\S]*?<\/script>/gi, ' ')
@@ -1283,7 +1283,7 @@ async function ensureSchema(env) {
 // Beta keys gate trainer signup, so they are credentials — they live in the
 // BETA_KEYS secret, never in source (this repository is public).
 // Format: a JSON array, or a comma-separated list of KEY or KEY:Name:email
-//   npx wrangler pages secret put BETA_KEYS --project-name=apextraining
+//   npx wrangler pages secret put BETA_KEYS --project-name=brigade-app
 // Already-seeded keys stay in the database, so leaving this unset in an
 // existing deployment changes nothing.
 function betaKeysFromEnv(env) {

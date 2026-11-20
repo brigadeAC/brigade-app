@@ -161,11 +161,11 @@ export default function Recipes() {
           <h1 className="text-3xl font-bold text-slate-900">Recipe Library</h1>
           <p className="text-slate-600 mt-1">Manage healthy recipes for your clients</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <AIRecipeGenerator onRecipeGenerated={() => queryClient.invalidateQueries({ queryKey: ['recipes'] })} />
           <Button 
             onClick={() => { resetForm(); setFormOpen(true); }} 
-            className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700"
+            className="bg-gradient-to-r from-primary to-primary hover:from-primary hover:to-primary"
           >
             <Plus className="w-5 h-5 mr-2" />
             New Recipe
@@ -219,7 +219,7 @@ export default function Recipes() {
                 <div className="flex justify-between items-start">
                   <div className="flex-1">
                     <CardTitle className="flex items-center gap-2">
-                      <ChefHat className="w-5 h-5 text-emerald-600" />
+                      <ChefHat className="w-5 h-5 text-primary" />
                       {recipe.name}
                     </CardTitle>
                     {recipe.description && (
@@ -228,7 +228,7 @@ export default function Recipes() {
                       </CardDescription>
                     )}
                   </div>
-                  <div className="flex gap-1">
+                  <div className="flex gap-1 flex-wrap">
                     <Button variant="ghost" size="icon" onClick={() => handleEdit(recipe)}>
                       <Edit className="w-4 h-4" />
                     </Button>
@@ -459,14 +459,14 @@ export default function Recipes() {
               />
             </div>
 
-            <div className="flex justify-end gap-3 pt-4 border-t">
+            <div className="flex justify-end gap-3 pt-4 border-t flex-wrap">
               <Button type="button" variant="outline" onClick={() => setFormOpen(false)}>
                 Cancel
               </Button>
               <Button 
                 type="submit" 
                 disabled={createMutation.isPending || updateMutation.isPending}
-                className="bg-gradient-to-r from-emerald-500 to-teal-600"
+                className="bg-gradient-to-r from-primary to-primary"
               >
                 {createMutation.isPending || updateMutation.isPending ? "Saving..." : (editingRecipe ? 'Update' : 'Create')}
               </Button>

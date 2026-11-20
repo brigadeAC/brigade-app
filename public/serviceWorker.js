@@ -1,6 +1,6 @@
-/* ApexCoach service worker — offline shell + Web Push. */
+/* Brigade service worker — offline shell + Web Push. */
 
-const CACHE = 'apexcoach-v1';
+const CACHE = 'brigade-v1';
 const SHELL = ['/', '/manifest.json', '/icon.svg'];
 
 self.addEventListener('install', (event) => {
@@ -50,9 +50,9 @@ self.addEventListener('push', (event) => {
   try {
     data = event.data ? event.data.json() : {};
   } catch {
-    data = { title: 'ApexCoach', body: event.data ? event.data.text() : '' };
+    data = { title: 'Brigade', body: event.data ? event.data.text() : '' };
   }
-  const title = data.title || 'ApexCoach';
+  const title = data.title || 'Brigade';
   const options = {
     body: data.body || '',
     icon: '/icon.svg',

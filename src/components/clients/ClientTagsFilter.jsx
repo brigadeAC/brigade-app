@@ -38,7 +38,7 @@ export default function ClientTagsFilter({ selectedTags, onTagsChange }) {
             className={cn(
               "cursor-pointer transition-all",
               selectedTags.includes(tag)
-                ? "bg-emerald-600 text-foreground"
+                ? "bg-primary text-foreground"
                 : "bg-slate-100 text-slate-700 hover:bg-slate-200"
             )}
           >

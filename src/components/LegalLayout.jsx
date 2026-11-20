@@ -1,4 +1,5 @@
 import React from "react";
+import { BrandIcon, BrandWordmark } from "@/components/BrandMark";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, Dumbbell } from "lucide-react";
 import { createPageUrl } from "@/utils";
@@ -17,10 +18,8 @@ export default function LegalLayout({ title, updated, intro, body }) {
       <header className="border-b border-border bg-card/60 backdrop-blur sticky top-0 z-10">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
           <Link to={createPageUrl("Home")} className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center">
-              <Dumbbell className="w-4 h-4 text-primary-foreground" />
-            </div>
-            <span className="font-bold tracking-tight">ApexCoach</span>
+            <BrandIcon className="w-7 h-7" />
+            <BrandWordmark>Brigade</BrandWordmark>
           </Link>
           <button
             onClick={() => navigate(-1)}

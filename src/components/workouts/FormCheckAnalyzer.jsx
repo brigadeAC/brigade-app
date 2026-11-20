@@ -66,7 +66,7 @@ export default function FormCheckAnalyzer({ clientId, trainerId }) {
         status: "analyzed"
       });
 
-      toast.success("Form check analyzed successfully!");
+      toast.success("Form check analyzed successfully.");
       setExerciseName("");
     } catch (err) {
       console.error(err);
@@ -79,9 +79,9 @@ export default function FormCheckAnalyzer({ clientId, trainerId }) {
 
   return (
     <div className="space-y-6">
-      <Card className="glass-card border-blue-500/30">
+      <Card className="glass-card border-primary/30">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-blue-400">
+          <CardTitle className="flex items-center gap-2 text-primary">
             <Video className="w-5 h-5" /> AI Form Coach
           </CardTitle>
           <p className="text-sm text-muted-foreground">Upload a photo of your lift to receive instant AI form correction and tips.</p>
@@ -103,7 +103,7 @@ export default function FormCheckAnalyzer({ clientId, trainerId }) {
                 disabled={isUploading || isAnalyzing || !exerciseName}
               />
               <Button 
-                className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 pointer-events-none"
+                className="w-full sm:w-auto bg-primary hover:bg-primary pointer-events-none"
                 disabled={isUploading || isAnalyzing || !exerciseName}
               >
                 {isUploading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Uploading...</> :
@@ -121,7 +121,7 @@ export default function FormCheckAnalyzer({ clientId, trainerId }) {
             <CardHeader className="pb-2">
               <div className="flex justify-between items-start">
                 <CardTitle className="text-base text-foreground">{check.exercise_name}</CardTitle>
-                <Badge className="bg-emerald-500/20 text-emerald-400"><CheckCircle2 className="w-3 h-3 mr-1" /> Analyzed</Badge>
+                <Badge className="bg-primary/20 text-primary"><CheckCircle2 className="w-3 h-3 mr-1" /> Analyzed</Badge>
               </div>
             </CardHeader>
             <CardContent>
@@ -130,8 +130,8 @@ export default function FormCheckAnalyzer({ clientId, trainerId }) {
                   <img src={check.media_url} alt={check.exercise_name} className="w-full h-full object-contain" />
                 </div>
               )}
-              <div className="bg-blue-500/10 p-3 rounded-lg border border-blue-500/20">
-                <p className="text-xs font-semibold text-blue-400 mb-1">AI Feedback:</p>
+              <div className="bg-primary/10 p-3 rounded-lg border border-primary/20">
+                <p className="text-xs font-semibold text-primary mb-1">AI Feedback:</p>
                 <p className="text-sm text-muted-foreground whitespace-pre-wrap">{check.ai_feedback}</p>
               </div>
             </CardContent>

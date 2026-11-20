@@ -26,7 +26,7 @@ export default function GoalMilestoneTracker({ goal }) {
         {(goal.milestones || []).map((milestone, idx) => (
           <div key={idx} className="flex items-start gap-3 p-2 rounded hover:bg-slate-50">
             {milestone.achieved ? (
-              <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
+              <CheckCircle2 className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
             ) : (
               <Circle className="w-5 h-5 text-muted-foreground flex-shrink-0 mt-0.5" />
             )}
@@ -38,7 +38,7 @@ export default function GoalMilestoneTracker({ goal }) {
                 <p className="text-xs text-slate-500">Target: {milestone.value} {goal.unit}</p>
               )}
               {milestone.achieved && milestone.achieved_date && (
-                <p className="text-xs text-emerald-600 mt-1">
+                <p className="text-xs text-primary mt-1">
                   Completed {new Date(milestone.achieved_date).toLocaleDateString()}
                 </p>
               )}

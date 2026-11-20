@@ -177,7 +177,7 @@ export default function Progress() {
             setFormData(prev => ({ ...prev, client_id: selectedClientId }));
             setShowLogForm(true);
           }}
-          className="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 shadow-lg shadow-amber-500/25"
+          className="bg-gradient-to-r from-amber-500 to-primary hover:from-amber-600 hover:to-primary shadow-lg shadow-amber-500/25"
           disabled={!selectedClientId}
         >
           <Plus className="w-4 h-4 mr-2" />
@@ -196,7 +196,7 @@ export default function Progress() {
             {clients.map(client => (
               <SelectItem key={client.id} value={client.id}>
                 <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-foreground text-xs">
+                  <div className="w-6 h-6 rounded-full bg-gradient-to-br from-primary to-primary flex items-center justify-center text-foreground text-xs">
                     {client.full_name?.[0]}
                   </div>
                   {client.full_name}
@@ -221,7 +221,7 @@ export default function Progress() {
                   {clientLogs.filter(log => log.photo_urls?.length > 0).reverse().map((log) => (
                     <div key={log.id} className="glass-card rounded-2xl overflow-hidden">
                       <div className="p-4 border-b border-border flex items-center gap-2">
-                        <Camera className="h-5 w-5 text-emerald-400" />
+                        <Camera className="h-5 w-5 text-primary" />
                         <h3 className="font-semibold text-foreground">
                           {format(parseISO(log.date), 'MMMM yyyy')}
                         </h3>
@@ -259,7 +259,7 @@ export default function Progress() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="glass-card rounded-2xl p-6">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-primary flex items-center justify-center shadow-lg">
                   <Scale className="w-6 h-6 text-foreground" />
                 </div>
                 <div>
@@ -270,7 +270,7 @@ export default function Progress() {
                   {weightChange && (
                     <p className={cn(
                       "text-xs font-medium",
-                      parseFloat(weightChange) < 0 ? "text-emerald-400" : "text-amber-400"
+                      parseFloat(weightChange) < 0 ? "text-primary" : "text-amber-400"
                     )}>
                       {parseFloat(weightChange) > 0 ? "+" : ""}{weightChange} kg
                     </p>
@@ -281,7 +281,7 @@ export default function Progress() {
 
             <div className="glass-card rounded-2xl p-6">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center shadow-lg">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-primary flex items-center justify-center shadow-lg">
                   <TrendingUp className="w-6 h-6 text-foreground" />
                 </div>
                 <div>
@@ -295,7 +295,7 @@ export default function Progress() {
 
             <div className="glass-card rounded-2xl p-6">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-primary flex items-center justify-center shadow-lg">
                   <Ruler className="w-6 h-6 text-foreground" />
                 </div>
                 <div>
@@ -380,7 +380,7 @@ export default function Progress() {
         <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-xl">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-primary flex items-center justify-center">
                 <TrendingUp className="w-5 h-5 text-foreground" />
               </div>
               Log Progress
@@ -518,13 +518,13 @@ export default function Progress() {
               />
             </div>
 
-            <div className="flex justify-end gap-3 pt-4 border-t">
+            <div className="flex justify-end gap-3 pt-4 border-t flex-wrap">
               <Button type="button" variant="outline" onClick={() => setShowLogForm(false)}>
                 Cancel
               </Button>
               <Button 
                 type="submit" 
-                className="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700"
+                className="bg-gradient-to-r from-amber-500 to-primary hover:from-amber-600 hover:to-primary"
                 disabled={createLogMutation.isPending}
               >
                 Save Progress

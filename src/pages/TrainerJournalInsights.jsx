@@ -36,7 +36,7 @@ export default function TrainerJournalInsights() {
 
   const getSentimentIcon = (sentiment) => {
     switch (sentiment) {
-      case "positive": return <Smile className="w-5 h-5 text-green-500" />;
+      case "positive": return <Smile className="w-5 h-5 text-primary" />;
       case "negative": return <Frown className="w-5 h-5 text-red-500" />;
       default: return <TrendingUp className="w-5 h-5 text-muted-foreground" />;
     }
@@ -45,8 +45,8 @@ export default function TrainerJournalInsights() {
   return (
     <div className="max-w-6xl mx-auto space-y-8">
       <div className="flex items-center gap-3 mb-8">
-        <div className="p-3 bg-indigo-500/20 rounded-xl">
-          <BookOpen className="w-8 h-8 text-indigo-400" />
+        <div className="p-3 bg-primary/20 rounded-xl">
+          <BookOpen className="w-8 h-8 text-primary" />
         </div>
         <div>
           <h1 className="text-3xl font-black text-foreground">Client Journal Insights</h1>
@@ -56,7 +56,7 @@ export default function TrainerJournalInsights() {
 
       <div className="grid gap-4">
         {isLoading ? (
-          <div className="flex justify-center p-12"><Loader2 className="w-8 h-8 animate-spin text-indigo-500" /></div>
+          <div className="flex justify-center p-12"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
         ) : entries?.length === 0 ? (
           <Card className="glass-card">
             <CardContent className="p-12 text-center text-muted-foreground">
@@ -81,8 +81,8 @@ export default function TrainerJournalInsights() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {entry.trainer_summary ? (
-                    <div className="bg-indigo-500/10 border border-indigo-500/20 p-4 rounded-lg">
-                      <h4 className="text-xs font-bold text-indigo-400 uppercase tracking-wider mb-1">AI Summary</h4>
+                    <div className="bg-primary/10 border border-primary/20 p-4 rounded-lg">
+                      <h4 className="text-xs font-bold text-primary uppercase tracking-wider mb-1">AI Summary</h4>
                       <p className="text-foreground">{entry.trainer_summary}</p>
                     </div>
                   ) : (

@@ -39,7 +39,7 @@ export default function AdminCompactMenu({ user, currentPageName, onLogout }) {
       <header className="lg:hidden fixed top-0 left-0 right-0 z-50 flex items-center justify-between"
         style={{ 
           background: 'rgba(8,8,8,0.97)', 
-          borderBottom: '1px solid rgba(212,175,55,0.15)', 
+          borderBottom: '1px solid rgba(75,145,221,0.15)', 
           backdropFilter: 'blur(24px)', 
           height: 'calc(56px + env(safe-area-inset-top))',
           paddingTop: 'env(safe-area-inset-top)',
@@ -47,18 +47,18 @@ export default function AdminCompactMenu({ user, currentPageName, onLogout }) {
           paddingRight: 'max(16px, env(safe-area-inset-right))'
         }}>
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => setMenuOpen(!menuOpen)} className="text-foreground hover:bg-yellow-950/30">
+          <Button variant="ghost" size="icon" onClick={() => setMenuOpen(!menuOpen)} className="text-foreground hover:bg-primary/30">
             {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </Button>
-          <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #d4a017, #f5c842)' }}>
+          <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #4B91DD, #4B91DD)' }}>
             <Flame className="w-3.5 h-3.5 text-black" />
           </div>
           <span className="font-black text-sm tracking-wider text-foreground">ADMIN</span>
         </div>
         {user && (
-          <Avatar className="h-8 w-8 ring-2 ring-yellow-500/30">
+          <Avatar className="h-8 w-8 ring-2 ring-primary/30">
             <AvatarImage src={user.avatar_url} />
-            <AvatarFallback className="text-xs font-bold text-black" style={{ background: 'linear-gradient(135deg, #d4a017, #f5c842)' }}>
+            <AvatarFallback className="text-xs font-bold text-black" style={{ background: 'linear-gradient(135deg, #4B91DD, #4B91DD)' }}>
               {(user.data?.full_name || user.full_name)?.[0] || user.email?.[0]?.toUpperCase()}
             </AvatarFallback>
           </Avatar>
@@ -71,7 +71,7 @@ export default function AdminCompactMenu({ user, currentPageName, onLogout }) {
         menuOpen ? "translate-x-0" : "-translate-x-full"
       )} style={{ 
         background: 'rgba(6,6,8,0.98)', 
-        borderRight: '1px solid rgba(212,175,55,0.1)', 
+        borderRight: '1px solid rgba(75,145,221,0.1)', 
         backdropFilter: 'blur(24px)',
         paddingTop: 'calc(56px + env(safe-area-inset-top))'
       }}>
@@ -86,7 +86,7 @@ export default function AdminCompactMenu({ user, currentPageName, onLogout }) {
                 className={cn(
                   "flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200",
                   isActive 
-                    ? "text-yellow-400 bg-yellow-500/15 border border-yellow-500/30" 
+                    ? "text-primary bg-primary/15 border border-primary/30" 
                     : "text-muted-foreground hover:text-foreground hover:bg-accent"
                 )}
               >
@@ -101,9 +101,9 @@ export default function AdminCompactMenu({ user, currentPageName, onLogout }) {
         {user && (
           <div className="p-3 border-t border-border">
             <div className="flex items-center gap-2 mb-2">
-              <Avatar className="h-8 w-8 ring-2 ring-yellow-500/20">
+              <Avatar className="h-8 w-8 ring-2 ring-primary/20">
                 <AvatarImage src={user.avatar_url} />
-                <AvatarFallback className="text-xs font-bold text-black" style={{ background: 'linear-gradient(135deg, #d4a017, #f5c842)' }}>
+                <AvatarFallback className="text-xs font-bold text-black" style={{ background: 'linear-gradient(135deg, #4B91DD, #4B91DD)' }}>
                   {(user.data?.full_name || user.full_name)?.[0] || user.email?.[0]?.toUpperCase()}
                 </AvatarFallback>
               </Avatar>

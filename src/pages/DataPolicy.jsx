@@ -5,12 +5,12 @@ const UPDATED = "July 23, 2026";
 
 const body = `
 ## 1. Purpose of This Policy
-This Data Policy is a technical companion to our [Privacy Policy](/PrivacyPolicy). It describes, in specific terms, **where your data lives, who processes it on our behalf, and how it flows** through the ApexCoach Service at **https://apextraining.dev**. In case of any conflict, the Privacy Policy governs your legal rights.
+This Data Policy is a technical companion to our [Privacy Policy](/PrivacyPolicy). It describes, in specific terms, **where your data lives, who processes it on our behalf, and how it flows** through the Brigade Athletic Club Service at **https://brigade-app.pages.dev**. In case of any conflict, the Privacy Policy governs your legal rights.
 
 ---
 
 ## 2. Where Your Data Is Stored
-ApexCoach runs entirely on **Cloudflare** infrastructure:
+Brigade Athletic Club runs entirely on **Cloudflare** infrastructure:
 
 - **Application & API** — Cloudflare Pages and Pages Functions (serverless).
 - **Database** — Cloudflare **D1** (SQL), which stores your account, profile, and all fitness, nutrition, habit, messaging, and coaching records.
@@ -49,7 +49,7 @@ We do **not** use analytics-advertising networks, data brokers, or cross-site tr
 ---
 
 ## 5. Data Flows
-- **You → ApexCoach:** data you enter is transmitted over HTTPS/TLS and written to Cloudflare D1 (or R2 for files).
+- **You → Brigade Athletic Club:** data you enter is transmitted over HTTPS/TLS and written to Cloudflare D1 (or R2 for files).
 - **Trainer ↔ Client:** coaching data is shared only within an established trainer–client relationship. Server-side access controls prevent a trainer from reading another trainer's clients.
 - **AI features:** when you or your trainer trigger an AI feature, only the relevant slice of data is sent to the AI provider to generate a response, which is then returned and (where applicable) cached to your account.
 - **Email/search:** invitations and reminders are sent via Resend; food and exercise searches send only your query terms to the respective provider.
@@ -79,13 +79,13 @@ If we become aware of a security incident that affects your personal data, we wi
 ---
 
 ## 9. Your Control Over Your Data
-You can view and edit most of your data directly in the app, export a copy, or delete your account. For any data request we cannot fulfill in-app, contact **privacy@apextraining.dev**. See the [Privacy Policy](/PrivacyPolicy) for the full list of your rights.
+You can view and edit most of your data directly in the app, export a copy, or delete your account. For any data request we cannot fulfill in-app, contact **privacy@brigade-app.pages.dev**. See the [Privacy Policy](/PrivacyPolicy) for the full list of your rights.
 
 ---
 
 ## 10. Contact
-- **Email:** privacy@apextraining.dev
-- **Website:** https://apextraining.dev
+- **Email:** privacy@brigade-app.pages.dev
+- **Website:** https://brigade-app.pages.dev
 `;
 
 export default function DataPolicy() {

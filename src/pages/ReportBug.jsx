@@ -25,7 +25,7 @@ export default function ReportBug() {
         reporter_email: user?.email || "Unknown",
         reporter_role: user?.role || "user"
       });
-      toast.success("Bug reported successfully! Thank you for helping us improve.");
+      toast.success("Bug reported successfully. Thank you for helping us improve.");
       setTitle("");
       setDescription("");
     } catch (error) {
@@ -46,7 +46,7 @@ export default function ReportBug() {
             Report a Bug
           </CardTitle>
           <CardDescription className="text-muted-foreground">
-            Found something not working quite right? Let us know so we can fix it!
+            Found something not working quite right? Let us know so we can fix it.
           </CardDescription>
         </CardHeader>
         <CardContent>

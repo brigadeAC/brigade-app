@@ -95,7 +95,7 @@ export default function ProgressPhotos({ clientId }) {
               <Button
                 size="sm"
                 disabled={isUploading}
-                className="bg-gradient-to-r from-emerald-500 to-teal-600"
+                className="bg-gradient-to-r from-primary to-primary"
                 onClick={() => document.getElementById('photo-upload').click()}
               >
                 {isUploading ? (

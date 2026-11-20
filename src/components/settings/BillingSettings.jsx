@@ -81,11 +81,11 @@ export default function BillingSettings() {
   if (billing?.comped) {
     return (
       <div className="glass-card rounded-2xl p-8 text-center">
-        <div className="mx-auto w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
-          <ShieldCheck className="w-7 h-7 text-emerald-500" />
+        <div className="mx-auto w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center">
+          <ShieldCheck className="w-7 h-7 text-primary" />
         </div>
         <h3 className="mt-4 text-xl font-bold text-foreground">Founding Trainer</h3>
-        <Badge className="mt-2 bg-emerald-500/15 text-emerald-600 border-emerald-500/30">Free forever</Badge>
+        <Badge className="mt-2 bg-primary/15 text-primary border-primary/30">Free forever</Badge>
         <p className="mt-4 text-muted-foreground max-w-md mx-auto">
           You joined with a beta key, so your account is comped for life — unlimited clients,
           every feature, and no subscription. Thank you for being here early.
@@ -93,7 +93,7 @@ export default function BillingSettings() {
         <ul className="mt-7 mx-auto max-w-sm text-left space-y-2.5 border-t border-border pt-6">
           {FEATURES.map((f) => (
             <li key={f} className="flex items-start gap-2.5 text-sm">
-              <Check className="w-4 h-4 mt-0.5 text-emerald-500 shrink-0" />
+              <Check className="w-4 h-4 mt-0.5 text-primary shrink-0" />
               <span className="text-muted-foreground">{f}</span>
             </li>
           ))}
@@ -119,13 +119,13 @@ export default function BillingSettings() {
                 {billing?.planName || "No plan yet"}
               </h3>
               {billing?.status === "trialing" && (
-                <Badge className="bg-sky-500/15 text-sky-600 border-sky-500/30">Trial</Badge>
+                <Badge className="bg-primary/15 text-primary border-primary/30">Trial</Badge>
               )}
               {billing?.status === "past_due" && (
                 <Badge className="bg-amber-500/15 text-amber-600 border-amber-500/30">Payment failed</Badge>
               )}
               {billing?.status === "active" && (
-                <Badge className="bg-emerald-500/15 text-emerald-600 border-emerald-500/30">Active</Badge>
+                <Badge className="bg-primary/15 text-primary border-primary/30">Active</Badge>
               )}
             </div>
 
@@ -186,7 +186,7 @@ export default function BillingSettings() {
                   interval === v ? "bg-card text-foreground shadow-sm" : "text-muted-foreground"
                 }`}
               >
-                {label}{v === "annual" && <span className="ml-1.5 text-xs text-emerald-600">−2 months</span>}
+                {label}{v === "annual" && <span className="ml-1.5 text-xs text-primary">−2 months</span>}
               </button>
             ))}
           </div>
@@ -200,11 +200,11 @@ export default function BillingSettings() {
               <div
                 key={p.id}
                 className={`rounded-2xl border p-6 flex flex-col ${
-                  p.id === "pro" ? "border-emerald-500/40 bg-emerald-500/[0.03]" : "border-border"
+                  p.id === "pro" ? "border-primary/40 bg-primary/[0.03]" : "border-border"
                 }`}
               >
                 {p.id === "pro" && (
-                  <span className="self-start mb-3 inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-emerald-600">
+                  <span className="self-start mb-3 inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-primary">
                     <Sparkles className="w-3 h-3" /> Most popular
                   </span>
                 )}
@@ -234,14 +234,14 @@ export default function BillingSettings() {
         <ul className="mt-7 grid sm:grid-cols-2 gap-x-8 gap-y-3 border-t border-border pt-6">
           {FEATURES.map((f) => (
             <li key={f} className="flex items-start gap-2.5 text-sm">
-              <Check className="w-4 h-4 mt-0.5 text-emerald-500 shrink-0" />
+              <Check className="w-4 h-4 mt-0.5 text-primary shrink-0" />
               <span className="text-muted-foreground">{f}</span>
             </li>
           ))}
         </ul>
 
         <p className="mt-6 text-xs text-muted-foreground">
-          Payments are processed by Stripe. Card details never touch ApexCoach's servers.
+          Payments are processed by Stripe. Card details never touch Brigade's servers.
           Cancel any time from Manage billing — your plan stays active until the end of the period.
         </p>
       </div>

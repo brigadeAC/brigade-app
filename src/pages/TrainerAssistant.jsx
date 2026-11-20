@@ -35,8 +35,8 @@ const FunctionDisplay = ({ toolCall }) => {
         in_progress: { icon: Loader2, color: 'text-slate-500', text: 'Running...', spin: true },
         completed: isError ? 
             { icon: AlertCircle, color: 'text-red-500', text: 'Failed' } : 
-            { icon: CheckCircle2, color: 'text-green-600', text: 'Success' },
-        success: { icon: CheckCircle2, color: 'text-green-600', text: 'Success' },
+            { icon: CheckCircle2, color: 'text-primary', text: 'Success' },
+        success: { icon: CheckCircle2, color: 'text-primary', text: 'Success' },
         failed: { icon: AlertCircle, color: 'text-red-500', text: 'Failed' },
         error: { icon: AlertCircle, color: 'text-red-500', text: 'Failed' }
     }[status] || { icon: Zap, color: 'text-slate-500', text: '' };
@@ -104,7 +104,7 @@ const MessageBubble = ({ message, onSaveWorkout, onSaveMealPlan }) => {
     return (
         <div className={cn("flex gap-3", isUser ? "justify-end" : "justify-start")}>
             {!isUser && (
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-primary flex items-center justify-center flex-shrink-0 mt-0.5">
                     <Sparkles className="w-4 h-4 text-foreground" />
                 </div>
             )}
@@ -112,7 +112,7 @@ const MessageBubble = ({ message, onSaveWorkout, onSaveMealPlan }) => {
                 {message.content && (
                     <div className={cn(
                         "rounded-2xl px-4 py-2.5 shadow-sm",
-                        isUser ? "bg-gradient-to-r from-green-500 to-emerald-600 text-foreground" : "glass-card border border-border text-foreground"
+                        isUser ? "bg-gradient-to-r from-primary to-primary text-foreground" : "glass-card border border-border text-foreground"
                     )}>
                         {isUser ? (
                             <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
@@ -156,7 +156,7 @@ const MessageBubble = ({ message, onSaveWorkout, onSaveMealPlan }) => {
                                         <Button 
                                             size="sm" 
                                             onClick={() => onSaveWorkout(message.content)}
-                                            className="bg-green-600 hover:bg-green-700 text-foreground"
+                                            className="bg-primary hover:bg-primary text-foreground"
                                         >
                                             <Dumbbell className="w-4 h-4 mr-2" />
                                             Add to Workout Plan
@@ -168,7 +168,7 @@ const MessageBubble = ({ message, onSaveWorkout, onSaveMealPlan }) => {
                                         <Button 
                                             size="sm" 
                                             onClick={() => onSaveMealPlan(message.content)}
-                                            className="bg-yellow-600 hover:bg-yellow-700 text-foreground"
+                                            className="bg-primary hover:bg-primary text-foreground"
                                         >
                                             <Utensils className="w-4 h-4 mr-2" />
                                             Add to Meal Plan
@@ -336,7 +336,7 @@ Act as a proactive business manager: independently analyze their data and alert 
       <div className="w-full lg:w-80 glass-card rounded-2xl flex flex-col overflow-hidden">
         <div className="p-5 border-b border-border bg-secondary">
           <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
-            <Bot className="w-5 h-5 text-green-400" />
+            <Bot className="w-5 h-5 text-primary" />
             AI Proactive Manager
           </h2>
           <p className="text-sm text-muted-foreground mt-1">Business insights & smart programming</p>
@@ -359,7 +359,7 @@ Act as a proactive business manager: independently analyze their data and alert 
           <Button 
             onClick={createNewConversation}
             disabled={!selectedClientId || creating}
-            className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 transition-all text-foreground border-0"
+            className="w-full bg-gradient-to-r from-primary to-primary hover:from-primary hover:to-primary transition-all text-foreground border-0"
             size="sm"
           >
             {creating ? (
@@ -387,7 +387,7 @@ Act as a proactive business manager: independently analyze their data and alert 
                   className={cn(
                     "w-full text-left p-3 rounded-xl transition-all duration-200 border",
                     selectedConversation?.id === convo.id
-                      ? "bg-green-500/10 border-green-500/30"
+                      ? "bg-primary/10 border-primary/30"
                       : "bg-secondary border-transparent hover:border-border hover:bg-accent"
                   )}
                 >
@@ -456,7 +456,7 @@ Act as a proactive business manager: independently analyze their data and alert 
                               mesocycle_phase: "general",
                               status: "active",
                           });
-                          toast.success(`Workout plan "${out.name}" saved for this client!`);
+                          toast.success(`Workout plan "${out.name}" saved for this client.`);
                       } catch (e) {
                           toast.error(e.message || "Failed to save workout plan");
                       }
@@ -491,7 +491,7 @@ Act as a proactive business manager: independently analyze their data and alert 
                               trainer_id: user?.id,
                               status: "active",
                           });
-                          toast.success(`Meal plan "${out.name}" saved for this client!`);
+                          toast.success(`Meal plan "${out.name}" saved for this client.`);
                       } catch (e) {
                           toast.error(e.message || "Failed to save meal plan");
                       }
@@ -516,7 +516,7 @@ Act as a proactive business manager: independently analyze their data and alert 
                 <Button
                   onClick={sendMessage}
                   disabled={!inputMessage.trim() || loading}
-                  className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 px-6 text-foreground border-0"
+                  className="bg-gradient-to-r from-primary to-primary hover:from-primary hover:to-primary px-6 text-foreground border-0"
                 >
                   {loading ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -530,8 +530,8 @@ Act as a proactive business manager: independently analyze their data and alert 
         ) : (
           <div className="flex-1 flex items-center justify-center text-muted-foreground">
             <div className="text-center max-w-sm">
-              <div className="w-16 h-16 rounded-2xl bg-green-500/10 flex items-center justify-center mx-auto mb-4 border border-green-500/20">
-                <Sparkles className="w-8 h-8 text-green-400" />
+              <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4 border border-primary/20">
+                <Sparkles className="w-8 h-8 text-primary" />
               </div>
               <p className="text-xl font-bold text-foreground">AI Proactive Manager</p>
               <p className="text-sm mt-2 leading-relaxed text-muted-foreground">Select a conversation from the sidebar or create a new one to start generating personalized plans, or to receive proactive client adherence alerts.</p>

@@ -21,7 +21,7 @@ export function applyTheme(theme = readTheme()) {
   document.documentElement.classList.toggle("dark", dark);
   // Keep the mobile browser chrome in step with the app background.
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute("content", dark ? "#0A0C10" : "#F5F7FA");
+  if (meta) meta.setAttribute("content", dark ? "#191615" : "#F9F7F6");
 }
 
 /**

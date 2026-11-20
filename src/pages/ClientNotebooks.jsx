@@ -270,7 +270,7 @@ export default function ClientNotebooks() {
                     onClick={() => setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }))}
                   >
                     {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                    <Folder className="w-4 h-4 text-emerald-400" />
+                    <Folder className="w-4 h-4 text-primary" />
                     <span className="text-sm font-medium">{section}</span>
                     <Button 
                       variant="ghost" 
@@ -290,7 +290,7 @@ export default function ClientNotebooks() {
                       {sectionPages.map(page => (
                         <div 
                           key={page.id}
-                          className={`group flex items-center justify-between p-2 rounded-lg cursor-pointer text-sm transition-colors ${activePageId === page.id ? 'bg-emerald-500/20 text-emerald-400' : 'text-muted-foreground hover:bg-accent hover:text-foreground'}`}
+                          className={`group flex items-center justify-between p-2 rounded-lg cursor-pointer text-sm transition-colors ${activePageId === page.id ? 'bg-primary/20 text-primary' : 'text-muted-foreground hover:bg-accent hover:text-foreground'}`}
                           onClick={() => setActivePageId(page.id)}
                         >
                           <div className="flex items-center gap-2 truncate">
@@ -363,7 +363,7 @@ export default function ClientNotebooks() {
                   </Button>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 {mode === "draw" && (
                   <Button variant="outline" size="sm" onClick={handleExportDrawing} className="bg-secondary border-border text-muted-foreground hover:text-foreground">
                     <Download className="w-4 h-4 mr-2" /> Export
@@ -372,7 +372,7 @@ export default function ClientNotebooks() {
                 <Button 
                   onClick={handleSave} 
                   disabled={isSaving}
-                  className="bg-emerald-500 hover:bg-emerald-600 text-foreground"
+                  className="bg-primary hover:bg-primary text-foreground"
                 >
                   <Save className="w-4 h-4 mr-2" /> 
                   {isSaving ? "Saving..." : "Save"}
@@ -455,7 +455,7 @@ export default function ClientNotebooks() {
             <Button 
               onClick={() => createPageMutation.mutate(newPageData)}
               disabled={!newPageData.title.trim() || createPageMutation.isPending}
-              className="bg-emerald-500 hover:bg-emerald-600 text-foreground"
+              className="bg-primary hover:bg-primary text-foreground"
             >
               Create
             </Button>
@@ -470,7 +470,7 @@ export default function ClientNotebooks() {
         .ProseMirror p.is-editor-empty:first-child::before {
           content: attr(data-placeholder);
           float: left;
-          color: #6b7280;
+          color: #726B65;
           pointer-events: none;
           height: 0;
         }

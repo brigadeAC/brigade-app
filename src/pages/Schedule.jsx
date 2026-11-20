@@ -36,8 +36,8 @@ import VideoCallRoom from "@/components/video/VideoCallRoom";
 import { cn } from "@/lib/utils";
 
 const statusStyles = {
-  scheduled: "bg-blue-100 text-blue-700 border-blue-200",
-  completed: "bg-emerald-100 text-emerald-700 border-emerald-200",
+  scheduled: "bg-primary/10 text-primary border-primary/20",
+  completed: "bg-primary/10 text-primary border-primary/20",
   cancelled: "bg-slate-100 text-slate-600 border-slate-200",
   no_show: "bg-red-100 text-red-700 border-red-200"
 };
@@ -127,7 +127,7 @@ export default function Schedule() {
         </div>
         <Button 
           onClick={() => { setEditingSession(null); setSelectedDate(null); setShowSessionForm(true); }}
-          className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 shadow-lg shadow-emerald-500/25"
+          className="bg-gradient-to-r from-primary to-primary hover:from-primary hover:to-primary shadow-lg shadow-primary/25"
         >
           <Plus className="w-4 h-4 mr-2" />
           New Session
@@ -136,8 +136,8 @@ export default function Schedule() {
 
       {/* Week Navigation */}
       <div className="glass-card rounded-2xl p-4">
-        <div className="flex items-center justify-between mb-4 sm:mb-6">
-          <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between mb-4 sm:mb-6 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap">
             <Button variant="outline" size="icon" className="h-8 w-8 sm:h-10 sm:w-10" onClick={() => setCurrentWeek(subWeeks(currentWeek, 1))}>
               <ChevronLeft className="w-4 h-4" />
             </Button>
@@ -158,10 +158,10 @@ export default function Schedule() {
           {weekDays.map((day) => {
             const daySessions = getSessionsForDay(day);
             return (
-              <div key={day.toISOString()} className={cn("rounded-xl overflow-hidden", isToday(day) ? "ring-1 ring-emerald-500/40" : "")}>
-                <div className={cn("flex items-center justify-between px-3 py-2", isToday(day) ? "bg-emerald-500/15" : "bg-secondary")}>
+              <div key={day.toISOString()} className={cn("rounded-xl overflow-hidden", isToday(day) ? "ring-1 ring-primary/40" : "")}>
+                <div className={cn("flex items-center justify-between px-3 py-2", isToday(day) ? "bg-primary/15" : "bg-secondary")}>
                   <div className="flex items-center gap-3">
-                    <p className={cn("text-base font-bold", isToday(day) ? "text-emerald-400" : "text-foreground")}>{format(day, "d")}</p>
+                    <p className={cn("text-base font-bold", isToday(day) ? "text-primary" : "text-foreground")}>{format(day, "d")}</p>
                     <p className="text-sm text-muted-foreground">{format(day, "EEEE")}</p>
                   </div>
                   <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground hover:text-foreground" onClick={() => { setSelectedDate(format(day, "yyyy-MM-dd")); setShowSessionForm(true); }}>
@@ -186,7 +186,7 @@ export default function Schedule() {
                                 <Button variant="ghost" size="icon" className="h-6 w-6"><MoreVertical className="w-3 h-3" /></Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleStatusChange(session, "completed"); }}><Check className="w-4 h-4 mr-2 text-emerald-600" /> Complete</DropdownMenuItem>
+                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleStatusChange(session, "completed"); }}><Check className="w-4 h-4 mr-2 text-primary" /> Complete</DropdownMenuItem>
                                 <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleStatusChange(session, "cancelled"); }}><X className="w-4 h-4 mr-2 text-slate-500" /> Cancel</DropdownMenuItem>
                                 <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleStatusChange(session, "no_show"); }}><AlertCircle className="w-4 h-4 mr-2 text-red-500" /> No Show</DropdownMenuItem>
                               </DropdownMenuContent>
@@ -209,13 +209,13 @@ export default function Schedule() {
           {weekDays.map((day) => (
             <div key={day.toISOString()} className="text-center pb-2 border-b border-border">
               <p className="text-xs font-medium text-muted-foreground">{format(day, "EEE")}</p>
-              <p className={cn("text-lg font-semibold mt-1", isToday(day) ? "text-emerald-400" : "text-foreground")}>{format(day, "d")}</p>
+              <p className={cn("text-lg font-semibold mt-1", isToday(day) ? "text-primary" : "text-foreground")}>{format(day, "d")}</p>
             </div>
           ))}
           {weekDays.map((day) => {
             const daySessions = getSessionsForDay(day);
             return (
-              <div key={day.toISOString()} className={cn("min-h-[300px] p-2 rounded-xl transition-colors", isToday(day) ? "bg-emerald-500/10" : "bg-secondary", "hover:bg-accent")}>
+              <div key={day.toISOString()} className={cn("min-h-[300px] p-2 rounded-xl transition-colors", isToday(day) ? "bg-primary/10" : "bg-secondary", "hover:bg-accent")}>
                 {daySessions.map((session) => {
                   const client = getClientById(session.client_id);
                   return (
@@ -231,7 +231,7 @@ export default function Schedule() {
                             <Button variant="ghost" size="icon" className="h-6 w-6 -mr-1 -mt-1"><MoreVertical className="w-3 h-3" /></Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleStatusChange(session, "completed"); }}><Check className="w-4 h-4 mr-2 text-emerald-600" /> Complete</DropdownMenuItem>
+                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleStatusChange(session, "completed"); }}><Check className="w-4 h-4 mr-2 text-primary" /> Complete</DropdownMenuItem>
                             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleStatusChange(session, "cancelled"); }}><X className="w-4 h-4 mr-2 text-slate-500" /> Cancel</DropdownMenuItem>
                             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleStatusChange(session, "no_show"); }}><AlertCircle className="w-4 h-4 mr-2 text-red-500" /> No Show</DropdownMenuItem>
                           </DropdownMenuContent>
@@ -240,14 +240,14 @@ export default function Schedule() {
                       <div className="mt-1.5 flex items-center justify-between">
                         <Badge className={cn("text-[10px]", statusStyles[session.status])}>{session.status}</Badge>
                         {session.type === 'video_call' && session.video_room_id && (
-                          <Button size="sm" variant="ghost" className="h-5 px-1.5 text-[10px] bg-yellow-600 hover:bg-yellow-700 text-foreground"
+                          <Button size="sm" variant="ghost" className="h-5 px-1.5 text-[10px] bg-primary hover:bg-primary text-foreground"
                             onClick={(e) => { e.stopPropagation(); setActiveRoomId(session.video_room_id); setVideoCallOpen(true); }}>Join</Button>
                         )}
                       </div>
                     </div>
                   );
                 })}
-                <Button variant="ghost" size="sm" className="w-full mt-1 text-xs text-muted-foreground hover:text-emerald-600 hover:bg-emerald-50"
+                <Button variant="ghost" size="sm" className="w-full mt-1 text-xs text-muted-foreground hover:text-primary hover:bg-primary/10"
                   onClick={() => { setSelectedDate(format(day, "yyyy-MM-dd")); setShowSessionForm(true); }}>
                   <Plus className="w-3 h-3 mr-1" /> Add
                 </Button>
@@ -261,15 +261,15 @@ export default function Schedule() {
       <div className="flex flex-wrap items-center gap-4 text-sm">
         <span className="text-muted-foreground">Session types:</span>
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded bg-emerald-500" />
+          <div className="w-3 h-3 rounded bg-primary" />
           <span className="text-muted-foreground">Personal Training</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded bg-blue-500" />
+          <div className="w-3 h-3 rounded bg-primary" />
           <span className="text-muted-foreground">Group Class</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded bg-purple-500" />
+          <div className="w-3 h-3 rounded bg-primary" />
           <span className="text-muted-foreground">Assessment</span>
         </div>
         <div className="flex items-center gap-2">
@@ -277,7 +277,7 @@ export default function Schedule() {
           <span className="text-muted-foreground">Consultation</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded bg-yellow-500" />
+          <div className="w-3 h-3 rounded bg-primary" />
           <span className="text-muted-foreground">Video Call</span>
         </div>
       </div>

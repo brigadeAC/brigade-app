@@ -48,8 +48,8 @@ const EXERCISES = [
 ];
 
 const difficultyColor = {
-  Beginner: "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-500/30",
-  Intermediate: "bg-yellow-500/20 text-yellow-700 dark:text-yellow-300 border-yellow-500/30",
+  Beginner: "bg-primary/20 text-primary dark:text-primary border-primary/30",
+  Intermediate: "bg-primary/20 text-primary dark:text-primary border-primary/30",
   Advanced: "bg-red-500/20 text-red-300 border-red-500/30",
 };
 
@@ -93,7 +93,7 @@ function CoachingCatalog({ exercises }) {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
-            <Dumbbell className="w-5 h-5 text-emerald-400" />
+            <Dumbbell className="w-5 h-5 text-primary" />
             Movement-Pattern Exercise Library
           </h2>
           <p className="text-sm text-muted-foreground mt-0.5">
@@ -139,19 +139,19 @@ function CoachingCatalog({ exercises }) {
         {filtered.map((ex) => (
           <div
             key={ex.id || ex.name}
-            className="glass-card rounded-xl border border-border p-4 space-y-3 hover:border-emerald-500/40 transition-all"
+            className="glass-card rounded-xl border border-border p-4 space-y-3 hover:border-primary/40 transition-all"
           >
             <div className="flex items-start justify-between gap-2">
               <p className="font-semibold text-foreground text-sm leading-tight">{ex.name}</p>
               {ex.unilateral && (
-                <Badge className="text-[10px] px-1.5 py-0 border bg-blue-500/20 text-blue-700 dark:text-blue-300 border-blue-500/30 whitespace-nowrap">
+                <Badge className="text-[10px] px-1.5 py-0 border bg-primary/20 text-primary dark:text-primary border-primary/30 whitespace-nowrap">
                   Unilateral
                 </Badge>
               )}
             </div>
 
             <div className="flex flex-wrap gap-1.5">
-              <Badge className="text-[10px] px-1.5 py-0 border bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-500/30">
+              <Badge className="text-[10px] px-1.5 py-0 border bg-primary/20 text-primary dark:text-primary border-primary/30">
                 {PATTERN_LABEL[ex.pattern] || ex.pattern}
               </Badge>
               {ex.equipment && (
@@ -171,7 +171,7 @@ function CoachingCatalog({ exercises }) {
               <ul className="space-y-1">
                 {ex.cues.map((cue, i) => (
                   <li key={i} className="text-xs text-foreground/80 flex gap-1.5">
-                    <span className="text-emerald-400 mt-0.5 flex-shrink-0">•</span>
+                    <span className="text-primary mt-0.5 flex-shrink-0">•</span>
                     <span>{cue}</span>
                   </li>
                 ))}
@@ -190,9 +190,9 @@ function CoachingCatalog({ exercises }) {
                 )}
                 {ex.progression && (
                   <div className="flex items-start gap-1.5 text-xs">
-                    <ArrowUpRight className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0 mt-0.5" />
+                    <ArrowUpRight className="w-3.5 h-3.5 text-primary flex-shrink-0 mt-0.5" />
                     <span className="text-muted-foreground">
-                      <span className="text-emerald-700 dark:text-emerald-300 font-medium">Progress:</span> {ex.progression}
+                      <span className="text-primary dark:text-primary font-medium">Progress:</span> {ex.progression}
                     </span>
                   </div>
                 )}
@@ -232,7 +232,7 @@ function NasmFallbackLibrary() {
           </h2>
           <p className="text-sm text-muted-foreground mt-0.5">
             Evidence-based exercise guidance from NASM.{" "}
-            <a href="https://www.nasm.org/workout-exercise-guidance" target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:text-emerald-300 inline-flex items-center gap-1">
+            <a href="https://www.nasm.org/workout-exercise-guidance" target="_blank" rel="noopener noreferrer" className="text-primary hover:text-primary inline-flex items-center gap-1">
               View full library <ExternalLink className="w-3 h-3" />
             </a>
           </p>
@@ -278,7 +278,7 @@ function NasmFallbackLibrary() {
             href={`https://www.nasm.org/workout-exercise-guidance/default?slug=${ex.slug}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="group glass-card rounded-xl overflow-hidden border border-border hover:border-emerald-500/40 transition-all hover:-translate-y-0.5"
+            className="group glass-card rounded-xl overflow-hidden border border-border hover:border-primary/40 transition-all hover:-translate-y-0.5"
           >
             <div className="aspect-video bg-card overflow-hidden">
               <img
@@ -294,10 +294,10 @@ function NasmFallbackLibrary() {
             </div>
             <div className="p-3 space-y-2">
               <div className="flex items-start justify-between gap-2">
-                <p className="font-semibold text-foreground text-sm leading-tight group-hover:text-emerald-300 transition-colors">
+                <p className="font-semibold text-foreground text-sm leading-tight group-hover:text-primary transition-colors">
                   {ex.name}
                 </p>
-                <ExternalLink className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0 mt-0.5 group-hover:text-emerald-400" />
+                <ExternalLink className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0 mt-0.5 group-hover:text-primary" />
               </div>
               <p className="text-xs text-muted-foreground">{ex.bodyPart.join(", ")}</p>
               <div className="flex items-center justify-between">

@@ -143,17 +143,17 @@ export default function PlanCalendar({ workoutPlans = [], mealPlans = [], sessio
                     className={cn(
                       "aspect-square p-1.5 rounded-lg border transition-all flex flex-col items-center justify-start relative overflow-hidden",
                       isCurrentMonth ? "cursor-pointer hover:bg-accent" : "opacity-30",
-                      isSelected ? "bg-purple-500/20 border-purple-500/50" : "border-border bg-secondary",
+                      isSelected ? "bg-primary/20 border-primary/50" : "border-border bg-secondary",
                     )}
                   >
-                    <span className={cn("text-sm font-semibold z-10 mb-1", isSelected ? "text-purple-700 dark:text-purple-300" : "text-muted-foreground", isCurrentMonth && !isSelected && "text-foreground")}>
+                    <span className={cn("text-sm font-semibold z-10 mb-1", isSelected ? "text-primary dark:text-primary" : "text-muted-foreground", isCurrentMonth && !isSelected && "text-foreground")}>
                       {format(date, "d")}
                     </span>
                     {hasPlans && (
                       <div className="flex gap-1 flex-wrap justify-center mt-auto w-full z-10">
-                        {workouts.length > 0 && <div className="w-2 h-2 rounded-full bg-green-500" title="Workout" />}
-                        {meals.length > 0 && <div className="w-2 h-2 rounded-full bg-yellow-500" title="Meal Plan" />}
-                        {daySessions.length > 0 && <div className="w-2 h-2 rounded-full bg-purple-500" title="Session" />}
+                        {workouts.length > 0 && <div className="w-2 h-2 rounded-full bg-primary" title="Workout" />}
+                        {meals.length > 0 && <div className="w-2 h-2 rounded-full bg-primary" title="Meal Plan" />}
+                        {daySessions.length > 0 && <div className="w-2 h-2 rounded-full bg-primary" title="Session" />}
                         {holidays.length > 0 && <div className="w-2 h-2 rounded-full bg-red-500" title="Holiday" />}
                       </div>
                     )}
@@ -171,14 +171,14 @@ export default function PlanCalendar({ workoutPlans = [], mealPlans = [], sessio
           {/* Workouts */}
           <div className="rounded-xl overflow-hidden border border-border bg-card p-4">
             <h3 className="font-bold text-foreground flex items-center gap-2 mb-4 border-b border-border pb-3">
-              <Dumbbell className="w-4 h-4 text-green-400" />
+              <Dumbbell className="w-4 h-4 text-primary" />
               Workouts - {format(selectedDate, "MMM d")}
             </h3>
             {selectedWorkouts.length > 0 ? (
               <div className="space-y-3">
                 {selectedWorkouts.map(plan => (
-                  <div key={plan.id} className="p-3 rounded-lg border border-green-500/20 bg-green-500/5">
-                    <h4 className="font-bold text-sm text-green-700 dark:text-green-300">{plan.name}</h4>
+                  <div key={plan.id} className="p-3 rounded-lg border border-primary/20 bg-primary/5">
+                    <h4 className="font-bold text-sm text-primary dark:text-primary">{plan.name}</h4>
                     <p className="text-xs text-muted-foreground mt-1">{plan.difficulty} • {plan.duration_weeks}w</p>
                     <div className="mt-3 space-y-2 max-h-48 overflow-y-auto pr-1">
                       {plan.exercises?.filter(e => {
@@ -205,14 +205,14 @@ export default function PlanCalendar({ workoutPlans = [], mealPlans = [], sessio
           {/* Meals */}
           <div className="rounded-xl overflow-hidden border border-border bg-card p-4">
             <h3 className="font-bold text-foreground flex items-center gap-2 mb-4 border-b border-border pb-3">
-              <Apple className="w-4 h-4 text-yellow-500" />
+              <Apple className="w-4 h-4 text-primary" />
               Meals - {format(selectedDate, "MMM d")}
             </h3>
             {selectedMeals.length > 0 ? (
               <div className="space-y-3">
                 {selectedMeals.map(plan => (
-                  <div key={plan.id} className="p-3 rounded-lg border border-yellow-500/20 bg-yellow-500/5">
-                    <h4 className="font-bold text-sm text-yellow-700 dark:text-yellow-300">{plan.name}</h4>
+                  <div key={plan.id} className="p-3 rounded-lg border border-primary/20 bg-primary/5">
+                    <h4 className="font-bold text-sm text-primary dark:text-primary">{plan.name}</h4>
                     <p className="text-xs text-muted-foreground mt-1">{plan.calories_target} cal target</p>
                     <div className="mt-3 space-y-2 max-h-48 overflow-y-auto pr-1">
                       {plan.meals?.filter(m => {
@@ -241,15 +241,15 @@ export default function PlanCalendar({ workoutPlans = [], mealPlans = [], sessio
             <div className="grid md:grid-cols-2 gap-4">
               <div>
                 <h3 className="font-bold text-foreground flex items-center gap-2 mb-4 border-b border-border pb-3">
-                  <CalendarDays className="w-4 h-4 text-purple-400" />
+                  <CalendarDays className="w-4 h-4 text-primary" />
                   Sessions
                 </h3>
                 {selectedSessions.length > 0 ? (
                   <div className="space-y-2">
                     {selectedSessions.map(session => (
-                      <div key={session.id} className="p-3 rounded-lg border border-purple-500/20 bg-purple-500/5 flex justify-between items-center">
+                      <div key={session.id} className="p-3 rounded-lg border border-primary/20 bg-primary/5 flex justify-between items-center">
                         <div>
-                          <p className="font-semibold text-sm text-purple-700 dark:text-purple-300 capitalize">{session.type?.replace('_', ' ')}</p>
+                          <p className="font-semibold text-sm text-primary dark:text-primary capitalize">{session.type?.replace('_', ' ')}</p>
                           <p className="text-xs text-muted-foreground mt-0.5">{session.notes || "No notes"}</p>
                         </div>
                         <div className="text-right">

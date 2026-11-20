@@ -120,7 +120,7 @@ List every exercise for days 1, 3 and 5 (15 to 18 entries in total).`,
 
   const handleSavePlan = async (data) => {
     const created = await base44.entities.WorkoutPlan.create({ ...data, trainer_id: client.trainer_id || data.trainer_id });
-    toast.success("AI Workout Plan Saved! 🎯");
+    toast.success("AI Workout Plan Saved.");
     setShowEditForm(false);
     setGeneratedPlan(null);
     onPlanGenerated?.(created);
@@ -130,7 +130,7 @@ List every exercise for days 1, 3 and 5 (15 to 18 entries in total).`,
     <>
       <Button
         onClick={() => setOpen(true)}
-        className="bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700"
+        className="bg-gradient-to-r from-primary to-primary hover:from-primary hover:to-primary"
       >
         <Wand2 className="w-4 h-4 mr-2" />
         AI Workout Plan
@@ -141,7 +141,7 @@ List every exercise for days 1, 3 and 5 (15 to 18 entries in total).`,
         <DialogContent className="max-w-sm bg-card border-border text-foreground">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-foreground">
-              <Wand2 className="w-5 h-5 text-purple-400" />
+              <Wand2 className="w-5 h-5 text-primary" />
               AI Workout Generator
             </DialogTitle>
           </DialogHeader>
@@ -175,7 +175,7 @@ List every exercise for days 1, 3 and 5 (15 to 18 entries in total).`,
                 </SelectContent>
               </Select>
             </div>
-            <Button onClick={handleGenerateWorkout} disabled={loading} className="w-full bg-purple-600 hover:bg-purple-700">
+            <Button onClick={handleGenerateWorkout} disabled={loading} className="w-full bg-primary hover:bg-primary">
               {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Generating...</> : <><Wand2 className="w-4 h-4 mr-2" />Generate & Edit Plan</>}
             </Button>
           </div>

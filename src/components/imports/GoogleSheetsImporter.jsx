@@ -58,7 +58,7 @@ export default function GoogleSheetsImporter({ open, onOpenChange, onImported })
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Sheet className="w-5 h-5 text-green-500" />
+            <Sheet className="w-5 h-5 text-primary" />
             Import from Google Sheets
           </DialogTitle>
         </DialogHeader>
@@ -113,28 +113,28 @@ export default function GoogleSheetsImporter({ open, onOpenChange, onImported })
           </div>
 
           {/* Expected Format Guide */}
-          <Card className="p-4 bg-blue-50 border-blue-200">
+          <Card className="p-4 bg-primary/10 border-primary/20">
             <h4 className="font-semibold text-sm mb-2">Expected Format:</h4>
             {dataType === 'clients' ? (
               <div className="text-xs text-gray-700 space-y-1">
                 <p><strong>First row:</strong> Headers (name, email, phone, age, gender, goals, medical_notes, weight, height)</p>
                 <p><strong>Following rows:</strong> Client data</p>
-                <p className="text-blue-600 mt-2">Tip: Existing clients (matched by email) will be updated, new ones will be created</p>
+                <p className="text-primary mt-2">Tip: Existing clients (matched by email) will be updated, new ones will be created</p>
               </div>
             ) : (
               <div className="text-xs text-gray-700 space-y-1">
                 <p><strong>First row:</strong> Headers (name, description, category, difficulty, sets, reps, rest)</p>
                 <p><strong>Following rows:</strong> Exercise data</p>
-                <p className="text-blue-600 mt-2">Tip: Each row creates a new exercise template</p>
+                <p className="text-primary mt-2">Tip: Each row creates a new exercise template</p>
               </div>
             )}
           </Card>
 
           {/* Import Results */}
           {result && (
-            <Card className="p-4 bg-green-50 border-green-200">
+            <Card className="p-4 bg-primary/10 border-primary/20">
               <div className="flex items-start gap-3">
-                <CheckCircle className="w-5 h-5 text-green-600 mt-0.5" />
+                <CheckCircle className="w-5 h-5 text-primary mt-0.5" />
                 <div className="flex-1">
                   <p className="font-semibold text-sm">Import Complete</p>
                   <p className="text-xs text-gray-700 mt-1">
@@ -163,7 +163,7 @@ export default function GoogleSheetsImporter({ open, onOpenChange, onImported })
             <Button 
               onClick={handleImport} 
               disabled={importing}
-              className="bg-green-600 hover:bg-green-700"
+              className="bg-primary hover:bg-primary"
             >
               {importing ? (
                 <>

@@ -26,7 +26,7 @@ export default function AIRecoveryPlan({ clientId, clientProfile, workoutLogs })
 
       if (response.data?.success) {
         setRecovery(response.data.data);
-        toast.success("Recovery plan generated! 💪");
+        toast.success("Recovery plan generated.");
       }
     } catch (error) {
       console.error(error);
@@ -38,9 +38,9 @@ export default function AIRecoveryPlan({ clientId, clientProfile, workoutLogs })
 
   if (!recovery) {
     return (
-      <Card className="glass-card border-cyan-500/30">
+      <Card className="glass-card border-primary/30">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-cyan-400">
+          <CardTitle className="flex items-center gap-2 text-primary">
             <Zap className="w-5 h-5" />
             AI Recovery Plan
           </CardTitle>
@@ -49,7 +49,7 @@ export default function AIRecoveryPlan({ clientId, clientProfile, workoutLogs })
           <Button
             onClick={handleGenerateRecovery}
             disabled={loading}
-            className="w-full bg-cyan-600 hover:bg-cyan-700"
+            className="w-full bg-primary hover:bg-primary"
           >
             {loading ? (
               <>
@@ -78,15 +78,15 @@ export default function AIRecoveryPlan({ clientId, clientProfile, workoutLogs })
 
   return (
     <div className="space-y-4">
-      <Card className="glass-card border-cyan-500/30">
+      <Card className="glass-card border-primary/30">
         <CardHeader>
-          <CardTitle className="text-cyan-400">Recovery Protocol</CardTitle>
+          <CardTitle className="text-primary">Recovery Protocol</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           {sections.map((section) => (
             <div
               key={section.key}
-              className="border border-cyan-500/20 rounded-lg overflow-hidden"
+              className="border border-primary/20 rounded-lg overflow-hidden"
             >
               <button
                 onClick={() => setExpanded(expanded === section.key ? null : section.key)}
@@ -104,7 +104,7 @@ export default function AIRecoveryPlan({ clientId, clientProfile, workoutLogs })
               </button>
 
               {expanded === section.key && (
-                <div className="bg-cyan-500/10 p-4 border-t border-cyan-500/20">
+                <div className="bg-primary/10 p-4 border-t border-primary/20">
                   <p className="text-sm text-muted-foreground whitespace-pre-wrap">
                     {recovery[section.key]}
                   </p>
@@ -114,8 +114,8 @@ export default function AIRecoveryPlan({ clientId, clientProfile, workoutLogs })
           ))}
 
           {recovery.expected_outcomes && (
-            <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4 mt-4">
-              <p className="font-semibold text-emerald-400 mb-2">Expected Outcomes:</p>
+            <div className="bg-primary/10 border border-primary/30 rounded-lg p-4 mt-4">
+              <p className="font-semibold text-primary mb-2">Expected Outcomes:</p>
               <p className="text-sm text-muted-foreground">{recovery.expected_outcomes}</p>
             </div>
           )}
@@ -133,9 +133,9 @@ export default function AIRecoveryPlan({ clientId, clientProfile, workoutLogs })
       </Card>
 
       {recovery.mobility_routine && recovery.mobility_routine.length > 0 && (
-        <Card className="glass-card border-purple-500/30">
+        <Card className="glass-card border-primary/30">
           <CardHeader>
-            <CardTitle className="text-purple-400">Daily Mobility Routine</CardTitle>
+            <CardTitle className="text-primary">Daily Mobility Routine</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             {recovery.mobility_routine.map((exercise, idx) => (

@@ -86,7 +86,7 @@ export default function CRM() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["leads"] });
       setShowAddModal(false);
-      toast.success("Lead added successfully!");
+      toast.success("Lead added successfully.");
     }
   });
 
@@ -96,7 +96,7 @@ export default function CRM() {
       queryClient.invalidateQueries({ queryKey: ["leads"] });
       setShowAddModal(false);
       setEditingLead(null);
-      toast.success("Lead updated successfully!");
+      toast.success("Lead updated successfully.");
     }
   });
 
@@ -111,7 +111,7 @@ export default function CRM() {
     mutationFn: ({ id, notes }) => base44.entities.Lead.update(id, { notes }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["leads"] });
-      toast.success("Notes saved!");
+      toast.success("Notes saved.");
     }
   });
 
@@ -144,7 +144,7 @@ export default function CRM() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["leads"] });
       queryClient.invalidateQueries({ queryKey: ["clients"] });
-      toast.success("Lead converted to Client!");
+      toast.success("Lead converted to Client.");
     }
   });
 
@@ -204,7 +204,7 @@ export default function CRM() {
           <label className="text-sm text-muted-foreground">Notes</label>
           <Textarea value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})} className="bg-card border-border text-foreground h-24" />
         </div>
-        <div className="flex justify-end gap-2 pt-2">
+        <div className="flex justify-end gap-2 pt-2 flex-wrap">
           <Button type="button" variant="ghost" onClick={onCancel} className="text-foreground hover:bg-accent">Cancel</Button>
           <Button type="submit" className="bg-primary hover:bg-primary/90 text-primary-foreground border-none">Save Lead</Button>
         </div>
@@ -213,10 +213,10 @@ export default function CRM() {
   };
 
   const statusColors = {
-    new: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-    contacted: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-    in_progress: "bg-orange-500/20 text-orange-400 border-orange-500/30",
-    won: "bg-green-500/20 text-green-400 border-green-500/30",
+    new: "bg-primary/20 text-primary border-primary/30",
+    contacted: "bg-primary/20 text-primary border-primary/30",
+    in_progress: "bg-primary/20 text-primary border-primary/30",
+    won: "bg-primary/20 text-primary border-primary/30",
     lost: "bg-red-500/20 text-red-400 border-red-500/30"
   };
 

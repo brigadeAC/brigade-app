@@ -15,13 +15,13 @@ import { format, parseISO } from "date-fns";
 
 const CATEGORIES = [
   { id: "equipment", label: "Equipment", color: "#ef4444", bg: "rgba(239,68,68,0.1)" },
-  { id: "software", label: "Software & Apps", color: "#8b5cf6", bg: "rgba(139,92,246,0.1)" },
-  { id: "marketing", label: "Marketing", color: "#3b82f6", bg: "rgba(59,130,246,0.1)" },
+  { id: "software", label: "Software & Apps", color: "#4B91DD", bg: "rgba(75,145,221,0.1)" },
+  { id: "marketing", label: "Marketing", color: "#4B91DD", bg: "rgba(75,145,221,0.1)" },
   { id: "facility", label: "Facility Rent", color: "#f59e0b", bg: "rgba(245,158,11,0.1)" },
-  { id: "education", label: "Education & Certs", color: "#10b981", bg: "rgba(16,185,129,0.1)" },
-  { id: "supplies", label: "Supplies", color: "#ec4899", bg: "rgba(236,72,153,0.1)" },
-  { id: "taxes", label: "Taxes & Fees", color: "#6366f1", bg: "rgba(99,102,241,0.1)" },
-  { id: "other", label: "Other", color: "#6b7280", bg: "rgba(107,114,128,0.1)" },
+  { id: "education", label: "Education & Certs", color: "#4B91DD", bg: "rgba(75,145,221,0.1)" },
+  { id: "supplies", label: "Supplies", color: "#4B91DD", bg: "rgba(75,145,221,0.1)" },
+  { id: "taxes", label: "Taxes & Fees", color: "#4B91DD", bg: "rgba(99,102,241,0.1)" },
+  { id: "other", label: "Other", color: "#726B65", bg: "rgba(107,114,128,0.1)" },
 ];
 
 export default function TrainerExpenses() {
@@ -142,7 +142,7 @@ export default function TrainerExpenses() {
           <h1 className="text-3xl font-bold text-foreground tracking-tight">Business Expenses</h1>
           <p className="text-muted-foreground mt-1">Track and categorize all business costs.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Button variant="outline" className="border-border text-muted-foreground text-sm" onClick={handleExportCSV}>
             <Download className="w-4 h-4 mr-2" /> Export CSV
           </Button>
@@ -209,7 +209,7 @@ export default function TrainerExpenses() {
         </div>
         <div className="rounded-xl p-4" style={{ background: "rgba(99,102,241,0.08)", border: "1px solid rgba(99,102,241,0.2)" }}>
           <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Categories</p>
-          <p className="text-2xl font-black text-indigo-400">{byCategory.length}</p>
+          <p className="text-2xl font-black text-primary">{byCategory.length}</p>
         </div>
       </div>
 

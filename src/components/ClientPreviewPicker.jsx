@@ -61,7 +61,7 @@ export default function ClientPreviewPicker({ open, onOpenChange, trainerId, onS
             >
               <Avatar className="h-9 w-9 flex-shrink-0">
                 <AvatarImage src={client.avatar_url} />
-                <AvatarFallback className="text-sm font-bold text-foreground" style={{ background: 'linear-gradient(135deg, #22c55e, #15803d)' }}>
+                <AvatarFallback className="text-sm font-bold text-foreground" style={{ background: 'linear-gradient(135deg, #4B91DD, #4B91DD)' }}>
                   {client.full_name?.[0]?.toUpperCase()}
                 </AvatarFallback>
               </Avatar>

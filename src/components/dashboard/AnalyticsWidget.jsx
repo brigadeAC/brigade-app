@@ -2,7 +2,7 @@ import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 
-const COLORS = ['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444'];
+const COLORS = ['#4B91DD', '#4B91DD', '#4B91DD', '#f59e0b', '#ef4444'];
 
 export function ClientActivityChart({ sessions, clients }) {
   // Group sessions by week
@@ -35,13 +35,13 @@ export function ClientActivityChart({ sessions, clients }) {
       <CardContent>
         <ResponsiveContainer width="100%" height={200}>
           <LineChart data={last8Weeks}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-            <XAxis dataKey="week" stroke="#94a3b8" />
-            <YAxis stroke="#94a3b8" />
-            <Tooltip contentStyle={{ backgroundColor: '#121214', border: '1px solid rgba(255,255,255,0.1)', color: 'white' }} />
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(114,107,101,0.18)" />
+            <XAxis dataKey="week" stroke="#726B65" />
+            <YAxis stroke="#726B65" />
+            <Tooltip contentStyle={{ backgroundColor: '#191615', border: '1px solid hsl(var(--border))', color: 'white' }} />
             <Legend wrapperStyle={{ color: 'white' }} />
-            <Line type="monotone" dataKey="sessions" stroke="#10b981" name="Sessions" strokeWidth={2} />
-            <Line type="monotone" dataKey="clients" stroke="#3b82f6" name="Active Clients" strokeWidth={2} />
+            <Line type="monotone" dataKey="sessions" stroke="#4B91DD" name="Sessions" strokeWidth={2} />
+            <Line type="monotone" dataKey="clients" stroke="#4B91DD" name="Active Clients" strokeWidth={2} />
           </LineChart>
         </ResponsiveContainer>
       </CardContent>
@@ -75,7 +75,7 @@ export function SessionTypeChart({ sessions }) {
               labelLine={false}
               label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
               outerRadius={60}
-              fill="#8884d8"
+              fill="#4B91DD"
               dataKey="value"
             >
               {data.map((entry, index) => (
@@ -125,13 +125,13 @@ export function CompletionRateChart({ sessions }) {
       <CardContent>
         <ResponsiveContainer width="100%" height={200}>
           <BarChart data={last4Weeks}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-            <XAxis dataKey="week" stroke="#94a3b8" />
-            <YAxis stroke="#94a3b8" />
-            <Tooltip contentStyle={{ backgroundColor: '#121214', border: '1px solid rgba(255,255,255,0.1)', color: 'white' }} />
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(114,107,101,0.18)" />
+            <XAxis dataKey="week" stroke="#726B65" />
+            <YAxis stroke="#726B65" />
+            <Tooltip contentStyle={{ backgroundColor: '#191615', border: '1px solid hsl(var(--border))', color: 'white' }} />
             <Legend wrapperStyle={{ color: 'white' }} />
-            <Bar dataKey="completed" fill="#10b981" name="Completed" />
-            <Bar dataKey="cancelled" fill="#94a3b8" name="Cancelled" />
+            <Bar dataKey="completed" fill="#4B91DD" name="Completed" />
+            <Bar dataKey="cancelled" fill="#726B65" name="Cancelled" />
             <Bar dataKey="no_show" fill="#ef4444" name="No Show" />
           </BarChart>
         </ResponsiveContainer>

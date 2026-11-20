@@ -9,19 +9,19 @@ import { base44 } from "@/api/base44Client";
 const walkthroughSteps = {
   client: [
     {
-      title: "Welcome to Apex Coach!",
+      title: "Welcome to Brigade",
       description: "Your personalized fitness journey starts here. Let's take a quick tour of your new AI-powered training hub.",
-      icon: <Sparkles className="w-12 h-12 text-yellow-500" />
+      icon: <Sparkles className="w-12 h-12 text-primary" />
     },
     {
       title: "Your Progress, Tracked",
       description: "Log workouts, weight, measurements, and photos. Your charts build themselves so you can see exactly what is changing over time.",
-      icon: <Map className="w-12 h-12 text-green-500" />
+      icon: <Map className="w-12 h-12 text-primary" />
     },
     {
       title: "Habits & Consistency",
       description: "Tick off daily habits to build streaks, and use the focus timer for distraction-free training or meal prep.",
-      icon: <Target className="w-12 h-12 text-blue-500" />
+      icon: <Target className="w-12 h-12 text-primary" />
     },
     {
       title: "Smart Workouts",
@@ -31,41 +31,41 @@ const walkthroughSteps = {
     {
       title: "Adaptive Nutrition",
       description: "Get personalized meal suggestions, log your calories, and even generate recipes based on what's in your pantry.",
-      icon: <Utensils className="w-12 h-12 text-orange-500" />
+      icon: <Utensils className="w-12 h-12 text-primary" />
     }
   ],
   trainer: [
     {
-      title: "Welcome to Apex Coach HQ",
+      title: "Welcome to Brigade HQ",
       description: "Your command center for managing clients, crafting programs, and scaling your business with AI assistance.",
-      icon: <Sparkles className="w-12 h-12 text-yellow-500" />
+      icon: <Sparkles className="w-12 h-12 text-primary" />
     },
     {
       title: "Client CRM",
       description: "Manage all your clients in one place. See their progress, engagement levels, and AI-generated risk assessments at a glance.",
-      icon: <Target className="w-12 h-12 text-green-500" />
+      icon: <Target className="w-12 h-12 text-primary" />
     },
     {
       title: "AI Co-Pilot",
       description: "Let AI help you draft messages, create personalized meal plans, and generate custom workout templates.",
-      icon: <Map className="w-12 h-12 text-purple-500" />
+      icon: <Map className="w-12 h-12 text-primary" />
     }
   ],
   admin: [
     {
       title: "Welcome Admin",
       description: "Manage the entire platform, oversee trainers and users, and monitor system health.",
-      icon: <Target className="w-12 h-12 text-blue-500" />
+      icon: <Target className="w-12 h-12 text-primary" />
     },
     {
       title: "System Overview",
       description: "View high-level analytics, handle bug reports, and manage contact messages across the app.",
-      icon: <Sparkles className="w-12 h-12 text-yellow-500" />
+      icon: <Sparkles className="w-12 h-12 text-primary" />
     },
     {
       title: "Content Control",
       description: "Manage the shared resource library, publish forms and guides, and configure the experience for every user on the platform.",
-      icon: <Map className="w-12 h-12 text-green-500" />
+      icon: <Map className="w-12 h-12 text-primary" />
     }
   ],
   independent: [
@@ -77,12 +77,12 @@ const walkthroughSteps = {
     {
       title: "AI Coaching",
       description: "Use our intelligent assistant to get workout ideas, analyze form, and plan meals without needing a human trainer.",
-      icon: <Sparkles className="w-12 h-12 text-yellow-500" />
+      icon: <Sparkles className="w-12 h-12 text-primary" />
     },
     {
       title: "Recovery & Readiness",
       description: "Log sleep and stress each day and get an AI recovery protocol telling you whether to push hard or back off.",
-      icon: <Target className="w-12 h-12 text-green-500" />
+      icon: <Target className="w-12 h-12 text-primary" />
     }
   ]
 };
@@ -141,7 +141,7 @@ export default function OnboardingWalkthrough() {
       <Card className="w-full max-w-lg bg-card border-border shadow-2xl overflow-hidden relative">
         <div className="absolute top-0 left-0 w-full h-1 bg-secondary">
           <motion.div 
-            className="h-full bg-gradient-to-r from-yellow-500 to-green-500"
+            className="h-full bg-gradient-to-r from-primary to-primary"
             initial={{ width: 0 }}
             animate={{ width: `${((currentStep + 1) / steps.length) * 100}%` }}
             transition={{ duration: 0.3 }}
@@ -184,14 +184,14 @@ export default function OnboardingWalkthrough() {
               {steps.map((_, i) => (
                 <div 
                   key={i} 
-                  className={`w-2 h-2 rounded-full transition-all ${i === currentStep ? "bg-yellow-500 w-6" : "bg-border"}`} 
+                  className={`w-2 h-2 rounded-full transition-all ${i === currentStep ? "bg-primary w-6" : "bg-border"}`} 
                 />
               ))}
             </div>
 
             <Button 
               onClick={handleNext}
-              className="bg-yellow-500 text-black hover:bg-yellow-400 font-bold"
+              className="bg-primary text-primary-foreground hover:bg-primary/80 font-bold"
             >
               {currentStep === steps.length - 1 ? (
                 <>Get Started <Check className="w-4 h-4 ml-2" /></>

@@ -54,13 +54,13 @@ import { toast } from "sonner";
 
 const statusStyles = {
   draft: "bg-slate-100 text-slate-600",
-  active: "bg-emerald-100 text-emerald-700",
-  completed: "bg-blue-100 text-blue-700",
+  active: "bg-primary/10 text-primary",
+  completed: "bg-primary/10 text-primary",
   archived: "bg-amber-100 text-amber-700"
 };
 
 const difficultyStyles = {
-  beginner: "bg-green-100 text-green-700",
+  beginner: "bg-primary/10 text-primary",
   intermediate: "bg-amber-100 text-amber-700",
   advanced: "bg-red-100 text-red-700"
 };
@@ -235,7 +235,7 @@ export default function Workouts() {
         <div className="flex gap-3">
           <Button 
             onClick={() => { setEditingWorkout(urlClientId ? { client_id: urlClientId, status: "active" } : null); setShowWorkoutForm(true); }}
-            className="bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 shadow-lg shadow-purple-500/25"
+            className="bg-gradient-to-r from-primary to-primary hover:from-primary hover:to-primary shadow-lg shadow-primary/25"
           >
             <Plus className="w-4 h-4 mr-2" />
             {activeTab === "plans" ? "Create Plan" : "Create Template"}
@@ -300,7 +300,7 @@ export default function Workouts() {
               >
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center shadow-lg shadow-purple-500/25">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary flex items-center justify-center shadow-lg shadow-primary/25">
                       <Dumbbell className="w-5 h-5 text-foreground" />
                     </div>
                     <div>
@@ -385,7 +385,7 @@ export default function Workouts() {
                   </DropdownMenu>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm" className={`text-xs px-2 ${workout.status === 'active' ? 'border-emerald-300 text-emerald-700' : ''}`}>
+                      <Button variant="outline" size="sm" className={`text-xs px-2 ${workout.status === 'active' ? 'border-primary/40 text-primary' : ''}`}>
                         {workout.status || 'draft'}
                       </Button>
                     </DropdownMenuTrigger>
@@ -441,7 +441,7 @@ export default function Workouts() {
                 >
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg shadow-blue-500/25">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary flex items-center justify-center shadow-lg shadow-primary/25">
                         <LayoutTemplate className="w-5 h-5 text-foreground" />
                       </div>
                       <div>
@@ -451,7 +451,7 @@ export default function Workouts() {
                     </div>
                     <Button 
                       size="sm" 
-                      className="bg-gradient-to-r from-blue-500 to-purple-600"
+                      className="bg-gradient-to-r from-primary to-primary"
                       onClick={(e) => {
                         e.stopPropagation();
                         handleUseTemplate(template);

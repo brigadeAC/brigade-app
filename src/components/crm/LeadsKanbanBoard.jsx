@@ -90,7 +90,7 @@ export default function LeadsKanbanBoard({ leads, onUpdateStatus, onConvertToCli
                               className="mb-3"
                               style={{ ...provided.draggableProps.style }}
                             >
-                              <Card className={`bg-card border border-border rounded-xl transition-all ${snapshot.isDragging ? 'shadow-2xl shadow-[#00D084]/20 border-primary/50 rotate-2 scale-105' : 'hover:border-border hover:shadow-lg'}`}>
+                              <Card className={`bg-card border border-border rounded-xl transition-all ${snapshot.isDragging ? 'shadow-2xl shadow-[#4B91DD]/20 border-primary/50 rotate-2 scale-105' : 'hover:border-border hover:shadow-lg'}`}>
                                 <CardHeader className="p-4 pb-2">
                                   <div className="flex justify-between items-start">
                                     <div 
@@ -119,7 +119,7 @@ export default function LeadsKanbanBoard({ leads, onUpdateStatus, onConvertToCli
                                           <BookOpen className="w-4 h-4 mr-2" /> Open Notebook
                                         </DropdownMenuItem>
                                         {lead.status !== "won" && (
-                                          <DropdownMenuItem className="text-emerald-400 hover:bg-accent focus:bg-secondary cursor-pointer" onClick={() => onConvertToClient(lead)}>
+                                          <DropdownMenuItem className="text-primary hover:bg-accent focus:bg-secondary cursor-pointer" onClick={() => onConvertToClient(lead)}>
                                             <UserPlus className="w-4 h-4 mr-2" /> Convert to Client
                                           </DropdownMenuItem>
                                         )}
@@ -149,7 +149,7 @@ export default function LeadsKanbanBoard({ leads, onUpdateStatus, onConvertToCli
                                     <Button 
                                       variant="ghost" 
                                       size="sm" 
-                                      className="w-full text-muted-foreground hover:text-emerald-400 hover:bg-emerald-500/10 justify-start"
+                                      className="w-full text-muted-foreground hover:text-primary hover:bg-primary/10 justify-start"
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         navigate(createPageUrl("ClientNotebooks") + "?leadId=" + lead.id);
@@ -197,7 +197,7 @@ export default function LeadsKanbanBoard({ leads, onUpdateStatus, onConvertToCli
             {notesLead?.status !== "won" ? (
               <Button 
                 variant="outline" 
-                className="bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
+                className="bg-primary/10 hover:bg-primary/20 text-primary border-primary/30"
                 onClick={() => {
                   onConvertToClient(notesLead);
                   setNotesLead(null);

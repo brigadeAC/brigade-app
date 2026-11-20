@@ -17,11 +17,11 @@ import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 
 const categoryColors = {
-  workout: "bg-blue-900/40 text-blue-700 dark:text-blue-300 border-blue-700",
-  nutrition: "bg-orange-900/40 text-orange-300 border-orange-700",
+  workout: "bg-primary/40 text-primary dark:text-primary border-primary",
+  nutrition: "bg-primary/40 text-primary border-primary",
   medical: "bg-red-900/40 text-red-300 border-red-700",
   general: "bg-gray-700/40 text-muted-foreground border-gray-600",
-  motivation: "bg-purple-900/40 text-purple-700 dark:text-purple-300 border-purple-700"
+  motivation: "bg-primary/40 text-primary dark:text-primary border-primary"
 };
 
 export default function ClientResources() {
@@ -124,13 +124,13 @@ export default function ClientResources() {
             <RecipeImporter
               onImportComplete={() => {
                 queryClient.invalidateQueries({ queryKey: ["clientRecipes"] });
-                toast.success("Recipe imported and list updated!");
+                toast.success("Recipe imported and list updated.");
               }} />
           </div>
 
-          <div className="glass-card rounded-2xl p-6 border-green-500/20">
+          <div className="glass-card rounded-2xl p-6 border-primary/20">
             <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
-              <div className="w-1.5 h-4 bg-green-500 rounded-full"></div>
+              <div className="w-1.5 h-4 bg-primary rounded-full"></div>
               Professional Development Resources
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
@@ -146,8 +146,8 @@ export default function ClientResources() {
                 href={resource.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="bg-gray-800/50 p-4 rounded-xl hover:bg-gray-700/50 transition-all border border-gray-700 hover:border-green-500/30 group text-foreground">
-                  <p className="font-medium text-sm text-foreground mb-2 group-hover:text-green-400 transition-colors">{resource.title}</p>
+                className="bg-gray-800/50 p-4 rounded-xl hover:bg-gray-700/50 transition-all border border-gray-700 hover:border-primary/30 group text-foreground">
+                  <p className="font-medium text-sm text-foreground mb-2 group-hover:text-primary transition-colors">{resource.title}</p>
                   <Button size="sm" variant="outline" className="w-full text-xs gap-1 pointer-events-none">
                     <Download className="w-3 h-3" />
                     Download
@@ -197,7 +197,7 @@ export default function ClientResources() {
             {filteredResources.map((resource) => (
               <Card
                 key={resource.id}
-                className="bg-secondary border-gray-700 hover:border-green-600 transition-all cursor-pointer hover:shadow-lg hover:shadow-green-900/20"
+                className="bg-secondary border-gray-700 hover:border-primary transition-all cursor-pointer hover:shadow-lg hover:shadow-primary/20"
                 onClick={() => setViewingResource(resource)}
               >
                 <CardHeader className="pb-2">
@@ -236,12 +236,12 @@ export default function ClientResources() {
           <h2 className="text-lg font-semibold text-foreground">Recipes</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredRecipes.map((recipe, idx) => (
-              <Card key={recipe.id || idx} className="bg-secondary border-gray-700 hover:border-green-600 transition-all cursor-pointer" onClick={() => setViewingRecipe(recipe)}>
+              <Card key={recipe.id || idx} className="bg-secondary border-gray-700 hover:border-primary transition-all cursor-pointer" onClick={() => setViewingRecipe(recipe)}>
                 {recipe.photo_url && (
                   <img src={recipe.photo_url} alt={recipe.name} className="w-full h-40 object-cover rounded-t-lg" />
                 )}
                 <CardHeader className="pb-2">
-                  <Badge className="w-fit text-xs border bg-orange-900/40 text-orange-300 border-orange-700 mb-2 capitalize">
+                  <Badge className="w-fit text-xs border bg-primary/40 text-primary border-primary mb-2 capitalize">
                     {recipe.category || "nutrition"}
                   </Badge>
                   <CardTitle className="text-base text-foreground">{recipe.name}</CardTitle>
@@ -282,7 +282,7 @@ export default function ClientResources() {
           </DialogHeader>
           <div className="space-y-6 mt-4">
             <div className="flex flex-wrap gap-3">
-              <Badge className="bg-orange-500/20 text-orange-400 border border-orange-500/30 capitalize text-base py-1 px-3">
+              <Badge className="bg-primary/20 text-primary border border-primary/30 capitalize text-base py-1 px-3">
                 {viewingRecipe?.category || "nutrition"}
               </Badge>
               {viewingRecipe?.tags?.length > 0 && viewingRecipe.tags.map((tag, i) =>
@@ -315,12 +315,12 @@ export default function ClientResources() {
               )}
               {viewingRecipe?.servings && (
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-yellow-500/10 border border-yellow-500/20 flex items-center justify-center">
-                    <Users className="w-4 h-4 text-yellow-500" />
+                  <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center">
+                    <Users className="w-4 h-4 text-primary" />
                   </div>
                   <div>
                     <div className="font-medium text-muted-foreground text-xs">Servings</div>
-                    <div className="font-bold text-yellow-400">{viewingRecipe.servings}</div>
+                    <div className="font-bold text-primary">{viewingRecipe.servings}</div>
                   </div>
                 </div>
               )}
@@ -340,21 +340,21 @@ export default function ClientResources() {
             {(viewingRecipe?.protein_per_serving || viewingRecipe?.carbs_per_serving || viewingRecipe?.fat_per_serving) && (
               <div className="grid grid-cols-3 gap-4">
                 {viewingRecipe.protein_per_serving && (
-                  <div className="text-center p-4 bg-green-500/10 border border-green-500/20 rounded-xl">
-                    <div className="text-xs text-green-400/80 mb-1 uppercase tracking-wider font-bold">Protein</div>
-                    <div className="text-2xl font-black text-green-400">{viewingRecipe.protein_per_serving}g</div>
+                  <div className="text-center p-4 bg-primary/10 border border-primary/20 rounded-xl">
+                    <div className="text-xs text-primary/80 mb-1 uppercase tracking-wider font-bold">Protein</div>
+                    <div className="text-2xl font-black text-primary">{viewingRecipe.protein_per_serving}g</div>
                   </div>
                 )}
                 {viewingRecipe.carbs_per_serving && (
-                  <div className="text-center p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-xl">
-                    <div className="text-xs text-yellow-400/80 mb-1 uppercase tracking-wider font-bold">Carbs</div>
-                    <div className="text-2xl font-black text-yellow-400">{viewingRecipe.carbs_per_serving}g</div>
+                  <div className="text-center p-4 bg-primary/10 border border-primary/20 rounded-xl">
+                    <div className="text-xs text-primary/80 mb-1 uppercase tracking-wider font-bold">Carbs</div>
+                    <div className="text-2xl font-black text-primary">{viewingRecipe.carbs_per_serving}g</div>
                   </div>
                 )}
                 {viewingRecipe.fat_per_serving && (
-                  <div className="text-center p-4 bg-purple-500/10 border border-purple-500/20 rounded-xl">
-                    <div className="text-xs text-purple-400/80 mb-1 uppercase tracking-wider font-bold">Fat</div>
-                    <div className="text-2xl font-black text-purple-400">{viewingRecipe.fat_per_serving}g</div>
+                  <div className="text-center p-4 bg-primary/10 border border-primary/20 rounded-xl">
+                    <div className="text-xs text-primary/80 mb-1 uppercase tracking-wider font-bold">Fat</div>
+                    <div className="text-2xl font-black text-primary">{viewingRecipe.fat_per_serving}g</div>
                   </div>
                 )}
               </div>
@@ -363,13 +363,13 @@ export default function ClientResources() {
             {viewingRecipe?.ingredients?.length > 0 && (
               <div className="bg-secondary p-6 rounded-xl border border-border">
                 <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
-                  <div className="w-1.5 h-4 bg-green-500 rounded-full"></div>
+                  <div className="w-1.5 h-4 bg-primary rounded-full"></div>
                   Ingredients
                 </h3>
                 <ul className="space-y-3">
                   {viewingRecipe.ingredients.map((ing, i) => (
                     <li key={i} className="flex items-start gap-3 text-muted-foreground">
-                      <div className="w-1.5 h-1.5 rounded-full bg-green-500 mt-2"></div>
+                      <div className="w-1.5 h-1.5 rounded-full bg-primary mt-2"></div>
                       <span><strong className="text-foreground">{ing.amount} {ing.unit}</strong> {ing.name}</span>
                     </li>
                   ))}
@@ -380,7 +380,7 @@ export default function ClientResources() {
             {viewingRecipe?.instructions && (
               <div className="bg-secondary p-6 rounded-xl border border-border">
                 <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
-                  <div className="w-1.5 h-4 bg-purple-500 rounded-full"></div>
+                  <div className="w-1.5 h-4 bg-primary rounded-full"></div>
                   Instructions
                 </h3>
                 <div className="text-muted-foreground whitespace-pre-line leading-relaxed">
@@ -436,7 +436,7 @@ export default function ClientResources() {
                     href={url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-2 p-3 bg-secondary rounded-lg hover:bg-gray-700 transition-colors text-green-400 text-sm"
+                    className="flex items-center gap-2 p-3 bg-secondary rounded-lg hover:bg-gray-700 transition-colors text-primary text-sm"
                   >
                     <FileText className="w-4 h-4" />
                     <span className="truncate">{url.split('/').pop()}</span>
@@ -451,7 +451,7 @@ export default function ClientResources() {
                 href={viewingResource.source_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-1 text-sm text-green-400 hover:text-green-300"
+                className="flex items-center gap-1 text-sm text-primary hover:text-primary"
               >
                 Source: {viewingResource.source_name}
                 <ExternalLink className="w-3 h-3" />

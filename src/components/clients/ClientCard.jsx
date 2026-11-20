@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 import { createPageUrl } from "@/utils";
 
 const statusStyles = {
-  active: "bg-emerald-100 text-emerald-700 border-emerald-200",
+  active: "bg-primary/10 text-primary border-primary/20",
   inactive: "bg-slate-100 text-slate-600 border-slate-200",
   paused: "bg-amber-100 text-amber-700 border-amber-200"
 };
@@ -24,12 +24,12 @@ export default function ClientCard({ client, onEdit, onDelete, onSchedule, onWor
   return (
     <div 
       onClick={() => navigate(createPageUrl("ClientProfile") + "?id=" + client.id)}
-      className="glass-card rounded-2xl p-5 hover:shadow-lg hover:border-emerald-500/50 transition-all duration-300 group cursor-pointer relative"
+      className="glass-card rounded-2xl p-5 hover:shadow-lg hover:border-primary/50 transition-all duration-300 group cursor-pointer relative"
     >
       <div className="flex items-start gap-4">
         <Avatar className="h-14 w-14 ring-2 ring-border shadow-md">
           <AvatarImage src={client.avatar_url} />
-          <AvatarFallback className="bg-gradient-to-br from-emerald-400 to-teal-500 text-foreground text-lg font-semibold">
+          <AvatarFallback className="bg-gradient-to-br from-primary to-primary text-foreground text-lg font-semibold">
             {client.full_name?.[0]?.toUpperCase()}
           </AvatarFallback>
         </Avatar>
@@ -44,13 +44,13 @@ export default function ClientCard({ client, onEdit, onDelete, onSchedule, onWor
           
           <div className="mt-2 space-y-1">
             {client.email && (
-              <a href={`mailto:${client.email}`} onClick={e => e.stopPropagation()} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-emerald-400 transition-colors">
+              <a href={`mailto:${client.email}`} onClick={e => e.stopPropagation()} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors">
                 <Mail className="w-3.5 h-3.5" />
                 <span className="truncate">{client.email}</span>
               </a>
             )}
             {client.phone && (
-              <a href={`tel:${client.phone}`} onClick={e => e.stopPropagation()} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-emerald-400 transition-colors">
+              <a href={`tel:${client.phone}`} onClick={e => e.stopPropagation()} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors">
                 <Phone className="w-3.5 h-3.5" />
                 <span>{client.phone}</span>
               </a>

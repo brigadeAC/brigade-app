@@ -5,7 +5,7 @@ const UPDATED = "July 23, 2026";
 
 const body = `
 ## 1. Introduction
-This Privacy Policy explains how ApexCoach ("we", "us", "our") collects, uses, shares, and protects your personal information when you use the website and application at **https://apextraining.dev** (the "Service"). By using the Service, you agree to the practices described here. If you do not agree, please do not use the Service.
+This Privacy Policy explains how Brigade Athletic Club ("we", "us", "our") collects, uses, shares, and protects your personal information when you use the website and application at **https://brigade-app.pages.dev** (the "Service"). By using the Service, you agree to the practices described here. If you do not agree, please do not use the Service.
 
 We are the data controller for the personal information processed through the Service.
 
@@ -44,8 +44,8 @@ We do **not** sell your personal information, and we do **not** use your health 
 - **With your trainer or clients:** if you are a client, the trainer who coaches you can access the training, nutrition, progress, habit, and messaging data associated with your coaching relationship. If you are a trainer, your clients can see the plans and messages you share with them. Trainers cannot access other trainers' clients.
 - **Administrators:** platform administrators may access data as needed to operate, support, and secure the Service.
 - **Service providers (sub-processors):** we share limited data with the vendors listed in our [Data Policy](/DataPolicy) strictly to run the Service.
-- **Legal & safety:** we may disclose information if required by law, or to protect the rights, property, or safety of ApexCoach, our users, or the public.
-- **Business transfers:** if ApexCoach is involved in a merger, acquisition, or asset sale, your information may be transferred subject to this Policy.
+- **Legal & safety:** we may disclose information if required by law, or to protect the rights, property, or safety of Brigade Athletic Club, our users, or the public.
+- **Business transfers:** if Brigade Athletic Club is involved in a merger, acquisition, or asset sale, your information may be transferred subject to this Policy.
 
 ---
 
@@ -74,7 +74,7 @@ Much of what the Service holds is sensitive health information: injuries, medica
 **HIPAA does not apply to everyone who uses the Service.** The federal Health Insurance Portability and Accountability Act applies to "covered entities" — health plans, healthcare clearinghouses, and healthcare providers who transmit health information electronically in connection with certain transactions — and to their "business associates."
 
 - **Most personal trainers are not covered entities.** If you are an independent trainer who does not bill insurance or transmit HIPAA-covered transactions, HIPAA generally does not govern your use of the Service. Your obligations come from your contracts, your certifying body's ethics code, and state law.
-- **If you are a covered entity** — for example a clinic, physical therapy practice, or a trainer working under one — and you use the Service to hold protected health information, then ApexCoach may act as your **business associate**, and a **Business Associate Agreement (BAA) must be executed before you place PHI in the Service.** Contact **privacy@apextraining.dev** to request one. Using the Service for PHI without an executed BAA is a breach of these terms and is done at your own risk.
+- **If you are a covered entity** — for example a clinic, physical therapy practice, or a trainer working under one — and you use the Service to hold protected health information, then Brigade Athletic Club may act as your **business associate**, and a **Business Associate Agreement (BAA) must be executed before you place PHI in the Service.** Contact **privacy@brigade-app.pages.dev** to request one. Using the Service for PHI without an executed BAA is a breach of these terms and is done at your own risk.
 - **Solo athletes** hold their own data. Information you record about yourself is generally not PHI in your hands.
 
 We build to HIPAA's technical safeguards for every account regardless of status, because it is the right standard for health data. That is a design commitment, not a representation that any particular user's use is HIPAA-compliant — administrative and physical safeguards, workforce training, and your own agreements remain your responsibility.
@@ -95,7 +95,7 @@ Depending on where you live (for example, under the EU/UK GDPR or the California
 - **Object to or restrict** certain processing; and
 - **Withdraw consent** where processing is based on consent.
 
-To exercise any right not available in the app, email **privacy@apextraining.dev**. We will respond within the time your law requires. **We will not discriminate against you for exercising these rights.** We do not sell your personal information, and we do not share it for cross-context behavioural advertising.
+To exercise any right not available in the app, email **privacy@brigade-app.pages.dev**. We will respond within the time your law requires. **We will not discriminate against you for exercising these rights.** We do not sell your personal information, and we do not share it for cross-context behavioural advertising.
 
 ---
 
@@ -104,7 +104,7 @@ If we discover a breach of the security of the system that compromises unencrypt
 
 For residents of **Louisiana**, the **Louisiana Database Security Breach Notification Law (La. R.S. 51:3071 et seq.)** governs. We will notify affected Louisiana residents in the most expedient time possible and without unreasonable delay, and **no later than 60 days from discovery** of the breach, unless a law-enforcement agency determines that notification would impede a criminal investigation. Where that law requires it, we will also notify the **Louisiana Attorney General's Consumer Protection Section**, in writing, within the period the statute prescribes. Notice will describe what happened, the categories of information involved, and the steps you can take.
 
-Residents of other states and countries will be notified in accordance with the breach-notification law that applies to them. Where ApexCoach acts as a **business associate** under a BAA, we will notify the covered entity in accordance with the HIPAA Breach Notification Rule (45 C.F.R. §§ 164.400–414) and the terms of that agreement.
+Residents of other states and countries will be notified in accordance with the breach-notification law that applies to them. Where Brigade Athletic Club acts as a **business associate** under a BAA, we will notify the covered entity in accordance with the HIPAA Breach Notification Rule (45 C.F.R. §§ 164.400–414) and the terms of that agreement.
 
 ---
 
@@ -121,7 +121,7 @@ Content shared into a coaching relationship (such as a message you sent your tra
 ---
 
 ## 11. Children's Privacy
-The Service is not directed to, and is not intended for, individuals under **18 years of age**. We do not knowingly collect personal information from children. If you believe a minor has provided us information, contact **privacy@apextraining.dev** and we will delete it.
+The Service is not directed to, and is not intended for, individuals under **18 years of age**. We do not knowingly collect personal information from children. If you believe a minor has provided us information, contact **privacy@brigade-app.pages.dev** and we will delete it.
 
 ---
 
@@ -138,8 +138,8 @@ We may update this Privacy Policy from time to time. We will revise the "Last up
 ## 14. Contact
 For privacy questions or to exercise your rights:
 
-- **Email:** privacy@apextraining.dev
-- **Website:** https://apextraining.dev
+- **Email:** privacy@brigade-app.pages.dev
+- **Website:** https://brigade-app.pages.dev
 `;
 
 export default function PrivacyPolicy() {
@@ -147,7 +147,7 @@ export default function PrivacyPolicy() {
     <LegalLayout
       title="Privacy Policy"
       updated={UPDATED}
-      intro="How ApexCoach collects, uses, and protects your personal and health information."
+      intro="How Brigade Athletic Club collects, uses, and protects your personal and health information."
       body={body}
     />
   );

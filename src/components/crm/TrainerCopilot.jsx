@@ -55,7 +55,7 @@ export default function TrainerCopilot({ trainerId }) {
       });
       
       setInsights(res.insights || []);
-      toast.success("AI insights generated successfully!");
+      toast.success("AI insights generated successfully.");
     } catch (err) {
       console.error(err);
       toast.error("Failed to generate AI insights.");
@@ -66,15 +66,15 @@ export default function TrainerCopilot({ trainerId }) {
 
   const getStatusIcon = (status) => {
     if (status === 'needs_attention') return <AlertTriangle className="w-5 h-5 text-red-500" />;
-    if (status === 'doing_great') return <TrendingUp className="w-5 h-5 text-green-500" />;
-    return <CheckCircle className="w-5 h-5 text-blue-500" />;
+    if (status === 'doing_great') return <TrendingUp className="w-5 h-5 text-primary" />;
+    return <CheckCircle className="w-5 h-5 text-primary" />;
   };
 
   return (
-    <Card className="glass-card border-purple-500/30">
+    <Card className="glass-card border-primary/30">
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <div>
-          <CardTitle className="text-xl text-purple-400 flex items-center gap-2">
+          <CardTitle className="text-xl text-primary flex items-center gap-2">
             <Brain className="w-6 h-6" /> AI Trainer Copilot
           </CardTitle>
           <p className="text-sm text-muted-foreground mt-1">Get automated insights on which clients need attention.</p>
@@ -82,7 +82,7 @@ export default function TrainerCopilot({ trainerId }) {
         <Button 
           onClick={generateInsights} 
           disabled={isAnalyzing || clients.length === 0}
-          className="bg-purple-600 hover:bg-purple-700"
+          className="bg-primary hover:bg-primary"
         >
           {isAnalyzing ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Analyzing...</> : "Generate Insights"}
         </Button>

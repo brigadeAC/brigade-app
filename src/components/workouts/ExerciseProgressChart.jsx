@@ -55,8 +55,8 @@ export default function ExerciseProgressChart({ exerciseName, logs = [] }) {
             fontSize: 12,
           }}
         />
-        <Line type="monotone" dataKey="weight" name="Top weight" stroke="#059669" strokeWidth={2} dot={{ r: 3 }} />
-        <Line type="monotone" dataKey="volume" name="Volume" stroke="#38BDF8" strokeWidth={2} dot={false} />
+        <Line type="monotone" dataKey="weight" name="Top weight" stroke="#4B91DD" strokeWidth={2} dot={{ r: 3 }} />
+        <Line type="monotone" dataKey="volume" name="Volume" stroke="#4B91DD" strokeWidth={2} dot={false} />
       </LineChart>
     </ResponsiveContainer>
   );

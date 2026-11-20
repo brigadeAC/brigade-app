@@ -38,7 +38,7 @@ export default function Contact() {
     setIsLoading(true);
     try {
       await base44.functions.invoke('submitContact', formData);
-      toast.success("Message sent! We'll get back to you soon.");
+      toast.success("Message sent. We'll get back to you soon.");
       setFormData({ name: "", email: "", subject: "", message: "" });
     } catch (error) {
       toast.error("Failed to send message. Please try again.");
@@ -97,7 +97,7 @@ export default function Contact() {
               CONTACT US
             </h1>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto font-sans">
-              Have questions about Apex Coach? We're here to help. Reach out to our team and we'll get back to you as soon as possible.
+              Have questions about Brigade? We're here to help. Reach out to our team and we'll get back to you as soon as possible.
             </p>
           </div>
 

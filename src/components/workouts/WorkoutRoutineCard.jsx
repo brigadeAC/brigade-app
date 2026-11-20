@@ -27,17 +27,17 @@ export default function WorkoutRoutineCard({ day, exercises, onComplete, clientI
         onClick={() => setExpanded(e => !e)}
         className="w-full flex items-center gap-3 p-4 text-left hover:bg-accent transition-colors"
       >
-        <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(0,255,157,0.1)', border: '1px solid rgba(0,255,157,0.2)' }}>
-          <span className="text-sm font-black text-green-400">D{day}</span>
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(75,145,221,0.1)', border: '1px solid rgba(75,145,221,0.2)' }}>
+          <span className="text-sm font-black text-primary">D{day}</span>
         </div>
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-foreground text-sm">Day {day}</p>
           <p className="text-xs text-muted-foreground">{exercises.length} exercise{exercises.length !== 1 ? 's' : ''} · {totalSets} sets total</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          {allDone && <Badge style={{ background: 'rgba(0,255,157,0.15)', color: '#00ff9d', border: '1px solid rgba(0,255,157,0.3)' }} className="hidden sm:inline-flex">Done ✓</Badge>}
+          {allDone && <Badge style={{ background: 'rgba(75,145,221,0.15)', color: '#4B91DD', border: '1px solid rgba(75,145,221,0.3)' }} className="hidden sm:inline-flex">Done ✓</Badge>}
           {completedSetCount > 0 && !allDone && (
-            <span className="text-xs text-yellow-400 font-medium">{completedSetCount}/{totalSets}</span>
+            <span className="text-xs text-primary font-medium">{completedSetCount}/{totalSets}</span>
           )}
           {expanded ? <ChevronUp className="w-4 h-4 text-muted-foreground shrink-0" /> : <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />}
         </div>
@@ -48,8 +48,8 @@ export default function WorkoutRoutineCard({ day, exercises, onComplete, clientI
           {exercises.map((exercise, eIdx) => (
             <div key={eIdx} className="p-4 bg-secondary">
               <div className="flex items-start gap-3 mb-3">
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(159,122,234,0.1)', border: '1px solid rgba(159,122,234,0.2)' }}>
-                  <Dumbbell className="w-4 h-4 text-purple-400" />
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(75,145,221,0.1)', border: '1px solid rgba(75,145,221,0.2)' }}>
+                  <Dumbbell className="w-4 h-4 text-primary" />
                 </div>
                 <div className="flex-1">
                   <div className="flex items-center justify-between">
@@ -72,7 +72,7 @@ export default function WorkoutRoutineCard({ day, exercises, onComplete, clientI
                       </span>
                     )}
                     {exercise.target_rir !== undefined && (
-                      <span className="text-xs text-purple-400 flex items-center gap-1 font-medium bg-purple-500/10 px-2 py-0.5 rounded-full border border-purple-500/20">
+                      <span className="text-xs text-primary flex items-center gap-1 font-medium bg-primary/10 px-2 py-0.5 rounded-full border border-primary/20">
                         Target RIR: {exercise.target_rir}
                       </span>
                     )}
@@ -92,7 +92,7 @@ export default function WorkoutRoutineCard({ day, exercises, onComplete, clientI
                       onClick={() => toggleSet(eIdx, sIdx)}
                       className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-all font-medium"
                       style={done ? {
-                        background: 'rgba(0,255,157,0.15)', color: '#00c278', border: '1px solid rgba(0,255,157,0.35)', boxShadow: '0 0 10px rgba(0,255,157,0.1)'
+                        background: 'rgba(75,145,221,0.15)', color: '#4B91DD', border: '1px solid rgba(75,145,221,0.35)', boxShadow: '0 0 10px rgba(75,145,221,0.1)'
                       } : {
                         background: 'hsl(var(--secondary))', color: 'hsl(var(--muted-foreground))', border: '1px solid hsl(var(--border))'
                       }}
@@ -109,8 +109,8 @@ export default function WorkoutRoutineCard({ day, exercises, onComplete, clientI
           {allDone && (
             <div className="p-4 bg-card">
               <Button
-                className="w-full font-bold text-emerald-950 border-none transition-all"
-                style={{ background: 'linear-gradient(135deg, #00ff9d, #059669)' }}
+                className="w-full font-bold text-primary border-none transition-all"
+                style={{ background: 'linear-gradient(135deg, #4B91DD, #4B91DD)' }}
                 onClick={() => onComplete?.({ day, exercises })}
               >
                 <CheckCircle2 className="w-4 h-4 mr-2" /> Log Day {day} Complete

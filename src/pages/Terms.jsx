@@ -5,7 +5,7 @@ const UPDATED = "July 23, 2026";
 
 const body = `
 ## 1. Agreement to These Terms
-These Terms of Service ("Terms") form a binding agreement between you and ApexCoach ("ApexCoach", "we", "us", or "our"), operator of the website and application at **https://apextraining.dev** (the "Service"). By creating an account, accessing, or using the Service, you confirm that you have read, understood, and agree to be bound by these Terms and by our [Privacy Policy](/PrivacyPolicy) and [Data Policy](/DataPolicy), which are incorporated by reference. **If you do not agree, do not use the Service.**
+These Terms of Service ("Terms") form a binding agreement between you and Brigade Athletic Club ("Brigade Athletic Club", "we", "us", or "our"), operator of the website and application at **https://brigade-app.pages.dev** (the "Service"). By creating an account, accessing, or using the Service, you confirm that you have read, understood, and agree to be bound by these Terms and by our [Privacy Policy](/PrivacyPolicy) and [Data Policy](/DataPolicy), which are incorporated by reference. **If you do not agree, do not use the Service.**
 
 ---
 
@@ -19,9 +19,9 @@ The Service offers three account types:
 
 - **Solo athlete** — an individual who self-directs their own training. Open registration.
 - **Client** — an individual invited by a trainer. Client accounts are **invite-only** and may only be created using the email address a trainer used to add you.
-- **Trainer** — a coaching professional. Trainer accounts require a valid **beta access key** issued by ApexCoach.
+- **Trainer** — a coaching professional. Trainer accounts require a valid **beta access key** issued by Brigade Athletic Club.
 
-You are responsible for safeguarding your login credentials and for all activity that occurs under your account. Notify us immediately at **support@apextraining.dev** of any unauthorized use. We may refuse, suspend, or terminate accounts at our discretion, including for violation of these Terms.
+You are responsible for safeguarding your login credentials and for all activity that occurs under your account. Notify us immediately at **support@brigade-app.pages.dev** of any unauthorized use. We may refuse, suspend, or terminate accounts at our discretion, including for violation of these Terms.
 
 ---
 
@@ -33,16 +33,16 @@ The Service is currently offered on a **beta ("early access") basis**. It is pro
 ## 5. Health, Fitness & Medical Disclaimer — Assumption of Risk
 **Please read this section carefully. Physical exercise carries inherent risks.**
 
-- ApexCoach is a software platform for organizing training, nutrition, and habit information. **We are not a medical provider, and nothing in the Service is medical, healthcare, nutritional, or professional advice.**
+- Brigade Athletic Club is a software platform for organizing training, nutrition, and habit information. **We are not a medical provider, and nothing in the Service is medical, healthcare, nutritional, or professional advice.**
 - **Consult a licensed physician before beginning any exercise or nutrition program**, especially if you have a medical condition, injury, are pregnant, or take medication.
 - Content, workout plans, meal plans, exercise data, and AI-generated suggestions are for general informational and educational purposes only and are **not a substitute for professional judgment**.
-- **You voluntarily assume all risks** associated with physical activity undertaken in connection with the Service, including risk of injury, disability, or death. To the fullest extent permitted by law, you release ApexCoach from any liability arising from such activity.
+- **You voluntarily assume all risks** associated with physical activity undertaken in connection with the Service, including risk of injury, disability, or death. To the fullest extent permitted by law, you release Brigade Athletic Club from any liability arising from such activity.
 - If you experience pain, dizziness, or discomfort, **stop immediately and seek medical attention.**
 
 ---
 
 ## 6. Trainer–Client Relationships
-Where the Service connects trainers and clients, ApexCoach acts only as a **neutral technology platform**. We are not a party to, and are not responsible for, any coaching, advice, plan, agreement, or transaction between a trainer and a client. Trainers are independent and solely responsible for the services, programming, and guidance they provide. Clients should independently evaluate any trainer's qualifications. Any waivers, contracts, or forms exchanged through the Service are agreements **between those users**, not with ApexCoach.
+Where the Service connects trainers and clients, Brigade Athletic Club acts only as a **neutral technology platform**. We are not a party to, and are not responsible for, any coaching, advice, plan, agreement, or transaction between a trainer and a client. Trainers are independent and solely responsible for the services, programming, and guidance they provide. Clients should independently evaluate any trainer's qualifications. Any waivers, contracts, or forms exchanged through the Service are agreements **between those users**, not with Brigade Athletic Club.
 
 ---
 
@@ -57,19 +57,19 @@ Trainers using the Service agree to practise within the boundaries of their cert
 - **Misrepresent your credentials.** Do not claim certifications, licences, degrees, or specialisations you do not hold or that have lapsed.
 - **Exceed the boundaries of the professional relationship.** Maintain appropriate professional conduct and confidentiality with every client at all times.
 
-You further agree to obtain **informed consent** and appropriate health screening before programming for a client, to maintain current **CPR/AED certification** where your certifying body requires it, and to carry any professional liability insurance required in your jurisdiction. **You alone are responsible for your compliance.** ApexCoach does not verify certifications or licensure and provides the meal-planning, exercise, and AI features as general tools, not as a determination that any particular use is lawful for you.
+You further agree to obtain **informed consent** and appropriate health screening before programming for a client, to maintain current **CPR/AED certification** where your certifying body requires it, and to carry any professional liability insurance required in your jurisdiction. **You alone are responsible for your compliance.** Brigade Athletic Club does not verify certifications or licensure and provides the meal-planning, exercise, and AI features as general tools, not as a determination that any particular use is lawful for you.
 
 ---
 
 ## 8. Electronic Signatures & Records
 The Service lets users complete and sign documents electronically (for example, service agreements, liability waivers, PAR-Q questionnaires, and medical release forms). By using these features you consent to transact electronically and agree that your typed name, acceptance action, and the associated audit record constitute a valid **electronic signature** with the same legal force as a handwritten signature under the federal **E-SIGN Act (15 U.S.C. § 7001 et seq.)** and the **Louisiana Uniform Electronic Transactions Act (La. R.S. 9:2601 et seq.)**.
 
-You may withdraw consent to transact electronically by contacting **support@apextraining.dev**, though doing so may prevent you from using parts of the Service. You are responsible for retaining copies of documents you sign; you may download them at any time from your account. ApexCoach provides the signing mechanism only and makes **no representation that any particular document is legally sufficient** for your purposes — have your own counsel review your agreements.
+You may withdraw consent to transact electronically by contacting **support@brigade-app.pages.dev**, though doing so may prevent you from using parts of the Service. You are responsible for retaining copies of documents you sign; you may download them at any time from your account. Brigade Athletic Club provides the signing mechanism only and makes **no representation that any particular document is legally sufficient** for your purposes — have your own counsel review your agreements.
 
 ---
 
 ## 9. Your Content
-You retain ownership of the content you submit — including profiles, messages, journal entries, progress photos, logs, plans, and other materials ("User Content"). You grant ApexCoach a worldwide, non-exclusive, royalty-free license to host, store, process, display, and transmit your User Content **solely to operate and provide the Service to you and the users you share it with**. You represent that you own or have the necessary rights to your User Content and that it does not violate any law or third-party right. You are solely responsible for your User Content.
+You retain ownership of the content you submit — including profiles, messages, journal entries, progress photos, logs, plans, and other materials ("User Content"). You grant Brigade Athletic Club a worldwide, non-exclusive, royalty-free license to host, store, process, display, and transmit your User Content **solely to operate and provide the Service to you and the users you share it with**. You represent that you own or have the necessary rights to your User Content and that it does not violate any law or third-party right. You are solely responsible for your User Content.
 
 ---
 
@@ -92,7 +92,7 @@ You agree not to:
 ---
 
 ## 12. Intellectual Property
-The Service and all associated software, design, text, graphics, logos, and trademarks (excluding User Content) are the exclusive property of ApexCoach and its licensors, and are protected by intellectual-property laws. We grant you a limited, non-exclusive, non-transferable, revocable license to use the Service for its intended purpose. No other rights are granted.
+The Service and all associated software, design, text, graphics, logos, and trademarks (excluding User Content) are the exclusive property of Brigade Athletic Club and its licensors, and are protected by intellectual-property laws. We grant you a limited, non-exclusive, non-transferable, revocable license to use the Service for its intended purpose. No other rights are granted.
 
 ---
 
@@ -112,7 +112,7 @@ TO THE FULLEST EXTENT PERMITTED BY LAW, APEXCOACH AND ITS OWNERS, OPERATORS, AND
 ---
 
 ## 16. Indemnification
-You agree to indemnify and hold harmless ApexCoach from any claims, damages, liabilities, and expenses (including reasonable legal fees) arising from your User Content, your use of the Service, your violation of these Terms, or your violation of any law or third-party right.
+You agree to indemnify and hold harmless Brigade Athletic Club from any claims, damages, liabilities, and expenses (including reasonable legal fees) arising from your User Content, your use of the Service, your violation of these Terms, or your violation of any law or third-party right.
 
 ---
 
@@ -134,8 +134,8 @@ These Terms are governed by the laws of the **State of Louisiana, United States*
 ## 20. Contact
 Questions about these Terms? Contact us:
 
-- **Email:** support@apextraining.dev
-- **Website:** https://apextraining.dev
+- **Email:** support@brigade-app.pages.dev
+- **Website:** https://brigade-app.pages.dev
 `;
 
 export default function Terms() {
@@ -143,7 +143,7 @@ export default function Terms() {
     <LegalLayout
       title="Terms of Service"
       updated={UPDATED}
-      intro="The rules for using ApexCoach. Please read them carefully — they include important health, liability, and dispute provisions."
+      intro="The rules for using Brigade Athletic Club. Please read them carefully — they include important health, liability, and dispute provisions."
       body={body}
     />
   );

@@ -242,7 +242,7 @@ export default function TrainerClientOnboarding({ open, onOpenChange, client, on
           console.error('Failed to send invite email:', e);
         }
         
-        showSuccess("Client Onboarded!", `Invitation sent to ${formData.email}`);
+        showSuccess("Client Onboarded.", `Invitation sent to ${formData.email}`);
       } else {
         showSuccess("Profile Saved", "Client profile updated successfully");
       }
@@ -268,7 +268,7 @@ export default function TrainerClientOnboarding({ open, onOpenChange, client, on
       <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto bg-background border-border text-foreground" aria-describedby="onboarding-description">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl text-foreground font-bold tracking-wide">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#d4a017] to-[#f5c842] flex items-center justify-center">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#4B91DD] to-[#4B91DD] flex items-center justify-center">
               <User className="w-5 h-5 text-black" />
             </div>
             {client ? "EDIT CLIENT PROFILE" : "ONBOARD NEW CLIENT"}
@@ -289,7 +289,7 @@ export default function TrainerClientOnboarding({ open, onOpenChange, client, on
                   onClick={() => setCurrentStep(idx)}
                   className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
                     currentStep === idx
-                      ? "bg-gradient-to-r from-[#00ff9d] to-[#059669] text-black"
+                      ? "bg-gradient-to-r from-[#4B91DD] to-[#4B91DD] text-black"
                       : "bg-secondary text-muted-foreground hover:bg-accent hover:text-foreground border border-border"
                   }`}
                 >
@@ -307,24 +307,24 @@ export default function TrainerClientOnboarding({ open, onOpenChange, client, on
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <div className="space-y-2">
                     <Label htmlFor="full_name" className="text-muted-foreground">Full Name *</Label>
-                    <Input id="full_name" className="bg-card border-border text-foreground focus:border-[#00ff9d]" placeholder="John Doe" value={formData.full_name} onChange={(e) => handleChange("full_name", e.target.value)} required />
+                    <Input id="full_name" className="bg-card border-border text-foreground focus:border-[#4B91DD]" placeholder="John Doe" value={formData.full_name} onChange={(e) => handleChange("full_name", e.target.value)} required />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="email" className="text-muted-foreground">Email *</Label>
-                    <Input id="email" type="email" className="bg-card border-border text-foreground focus:border-[#00ff9d]" placeholder="john@example.com" value={formData.email} onChange={(e) => handleChange("email", e.target.value)} required />
+                    <Input id="email" type="email" className="bg-card border-border text-foreground focus:border-[#4B91DD]" placeholder="john@example.com" value={formData.email} onChange={(e) => handleChange("email", e.target.value)} required />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="phone" className="text-muted-foreground">Phone</Label>
-                    <Input id="phone" className="bg-card border-border text-foreground focus:border-[#00ff9d]" placeholder="+1 234 567 890" value={formData.phone} onChange={(e) => handleChange("phone", e.target.value)} />
+                    <Input id="phone" className="bg-card border-border text-foreground focus:border-[#4B91DD]" placeholder="+1 234 567 890" value={formData.phone} onChange={(e) => handleChange("phone", e.target.value)} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="age" className="text-muted-foreground">Age</Label>
-                    <Input id="age" type="number" min="1" max="120" className="bg-card border-border text-foreground focus:border-[#00ff9d]" placeholder="30" value={formData.age || ""} onChange={(e) => handleChange("age", e.target.value)} />
+                    <Input id="age" type="number" min="1" max="120" className="bg-card border-border text-foreground focus:border-[#4B91DD]" placeholder="30" value={formData.age || ""} onChange={(e) => handleChange("age", e.target.value)} />
                   </div>
                   <div className="space-y-2">
                     <Label className="text-muted-foreground">Gender</Label>
                     <Select value={formData.gender} onValueChange={(v) => handleChange("gender", v)}>
-                      <SelectTrigger className="bg-card border-border text-foreground focus:ring-[#00ff9d]"><SelectValue placeholder="Not specified" /></SelectTrigger>
+                      <SelectTrigger className="bg-card border-border text-foreground focus:ring-[#4B91DD]"><SelectValue placeholder="Not specified" /></SelectTrigger>
                       <SelectContent className="bg-card border-border text-foreground">
                         <SelectItem className="focus:bg-secondary" value="male">Male</SelectItem>
                         <SelectItem className="focus:bg-secondary" value="female">Female</SelectItem>
@@ -335,7 +335,7 @@ export default function TrainerClientOnboarding({ open, onOpenChange, client, on
                   <div className="space-y-2">
                     <Label className="text-muted-foreground">Status</Label>
                     <Select value={formData.status} onValueChange={(v) => handleChange("status", v)}>
-                      <SelectTrigger className="bg-card border-border text-foreground focus:ring-[#00ff9d]"><SelectValue /></SelectTrigger>
+                      <SelectTrigger className="bg-card border-border text-foreground focus:ring-[#4B91DD]"><SelectValue /></SelectTrigger>
                       <SelectContent className="bg-card border-border text-foreground">
                         <SelectItem className="focus:bg-secondary" value="active">Active</SelectItem>
                         <SelectItem className="focus:bg-secondary" value="inactive">Inactive</SelectItem>
@@ -359,7 +359,7 @@ export default function TrainerClientOnboarding({ open, onOpenChange, client, on
                           <Input 
                             type="number" 
                             min="0" 
-                            className="bg-card border-border text-foreground focus:border-[#d4a017] pr-8" 
+                            className="bg-card border-border text-foreground focus:border-[#4B91DD] pr-8" 
                             placeholder="5" 
                             value={formData.height_cm !== "" && formData.height_cm !== undefined ? Math.floor(parseFloat(formData.height_cm || "0") / 12).toString() : ""} 
                             onChange={(e) => {
@@ -379,7 +379,7 @@ export default function TrainerClientOnboarding({ open, onOpenChange, client, on
                             type="number" 
                             min="0" 
                             max="11" 
-                            className="bg-card border-border text-foreground focus:border-[#d4a017] pr-8" 
+                            className="bg-card border-border text-foreground focus:border-[#4B91DD] pr-8" 
                             placeholder="9" 
                             value={formData.height_cm !== "" && formData.height_cm !== undefined ? (parseFloat(formData.height_cm || "0") % 12).toString() : ""} 
                             onChange={(e) => {
@@ -396,24 +396,24 @@ export default function TrainerClientOnboarding({ open, onOpenChange, client, on
                         </div>
                       </div>
                     ) : (
-                      <Input id="height_cm" type="number" step="0.1" className="bg-card border-border text-foreground focus:border-[#d4a017]" placeholder="180" value={formData.height_cm} onChange={(e) => handleChange("height_cm", e.target.value)} />
+                      <Input id="height_cm" type="number" step="0.1" className="bg-card border-border text-foreground focus:border-[#4B91DD]" placeholder="180" value={formData.height_cm} onChange={(e) => handleChange("height_cm", e.target.value)} />
                     )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="weight_kg" className="text-muted-foreground">Weight ({weightUnit})</Label>
-                    <Input id="weight_kg" type="number" step="0.1" className="bg-card border-border text-foreground focus:border-[#d4a017]" placeholder={system === 'imperial' ? "165" : "75"} value={formData.weight_kg} onChange={(e) => handleChange("weight_kg", e.target.value)} />
+                    <Input id="weight_kg" type="number" step="0.1" className="bg-card border-border text-foreground focus:border-[#4B91DD]" placeholder={system === 'imperial' ? "165" : "75"} value={formData.weight_kg} onChange={(e) => handleChange("weight_kg", e.target.value)} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="body_fat_percentage" className="text-muted-foreground">Body Fat %</Label>
-                    <Input id="body_fat_percentage" type="number" step="0.1" className="bg-card border-border text-foreground focus:border-[#d4a017]" placeholder="15" value={formData.body_fat_percentage} onChange={(e) => handleChange("body_fat_percentage", e.target.value)} />
+                    <Input id="body_fat_percentage" type="number" step="0.1" className="bg-card border-border text-foreground focus:border-[#4B91DD]" placeholder="15" value={formData.body_fat_percentage} onChange={(e) => handleChange("body_fat_percentage", e.target.value)} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="resting_heart_rate" className="text-muted-foreground">Resting Heart Rate (bpm)</Label>
-                    <Input id="resting_heart_rate" type="number" className="bg-card border-border text-foreground focus:border-[#d4a017]" placeholder="60" value={formData.resting_heart_rate} onChange={(e) => handleChange("resting_heart_rate", e.target.value)} />
+                    <Input id="resting_heart_rate" type="number" className="bg-card border-border text-foreground focus:border-[#4B91DD]" placeholder="60" value={formData.resting_heart_rate} onChange={(e) => handleChange("resting_heart_rate", e.target.value)} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="blood_pressure" className="text-muted-foreground">Blood Pressure</Label>
-                    <Input id="blood_pressure" className="bg-card border-border text-foreground focus:border-[#d4a017]" placeholder="120/80" value={formData.blood_pressure} onChange={(e) => handleChange("blood_pressure", e.target.value)} />
+                    <Input id="blood_pressure" className="bg-card border-border text-foreground focus:border-[#4B91DD]" placeholder="120/80" value={formData.blood_pressure} onChange={(e) => handleChange("blood_pressure", e.target.value)} />
                   </div>
                 </div>
 
@@ -433,7 +433,7 @@ export default function TrainerClientOnboarding({ open, onOpenChange, client, on
                         <Label htmlFor={key} className="text-muted-foreground text-xs uppercase">{label}</Label>
                         <Input
                           id={key} type="number" step="0.1"
-                          className="bg-card border-border text-foreground focus:border-[#d4a017] text-sm"
+                          className="bg-card border-border text-foreground focus:border-[#4B91DD] text-sm"
                           value={formData.measurements[key]}
                           onChange={(e) => handleMeasurementChange(key, e.target.value)}
                         />
@@ -451,7 +451,7 @@ export default function TrainerClientOnboarding({ open, onOpenChange, client, on
                   <div className="space-y-2">
                     <Label className="text-muted-foreground">Fitness Level</Label>
                     <Select value={formData.fitness_level} onValueChange={(v) => handleChange("fitness_level", v)}>
-                      <SelectTrigger className="bg-card border-border text-foreground focus:ring-[#8b5cf6]"><SelectValue /></SelectTrigger>
+                      <SelectTrigger className="bg-card border-border text-foreground focus:ring-[#4B91DD]"><SelectValue /></SelectTrigger>
                       <SelectContent className="bg-card border-border text-foreground">
                         <SelectItem className="focus:bg-secondary" value="beginner">Beginner</SelectItem>
                         <SelectItem className="focus:bg-secondary" value="intermediate">Intermediate</SelectItem>
@@ -462,7 +462,7 @@ export default function TrainerClientOnboarding({ open, onOpenChange, client, on
                   <div className="space-y-2">
                     <Label className="text-muted-foreground">Activity Level</Label>
                     <Select value={formData.activity_level} onValueChange={(v) => handleChange("activity_level", v)}>
-                      <SelectTrigger className="bg-card border-border text-foreground focus:ring-[#8b5cf6]"><SelectValue /></SelectTrigger>
+                      <SelectTrigger className="bg-card border-border text-foreground focus:ring-[#4B91DD]"><SelectValue /></SelectTrigger>
                       <SelectContent className="bg-card border-border text-foreground">
                         {ACTIVITY_LEVELS.map(level => (
                           <SelectItem className="focus:bg-secondary" key={level.value} value={level.value}>{level.label}</SelectItem>
@@ -473,7 +473,7 @@ export default function TrainerClientOnboarding({ open, onOpenChange, client, on
                   <div className="space-y-2">
                     <Label className="text-muted-foreground">Equipment Access</Label>
                     <Select value={formData.equipment_access} onValueChange={(v) => handleChange("equipment_access", v)}>
-                      <SelectTrigger className="bg-card border-border text-foreground focus:ring-[#8b5cf6]"><SelectValue /></SelectTrigger>
+                      <SelectTrigger className="bg-card border-border text-foreground focus:ring-[#4B91DD]"><SelectValue /></SelectTrigger>
                       <SelectContent className="bg-card border-border text-foreground">
                         {EQUIPMENT_ACCESS.map(level => (
                           <SelectItem className="focus:bg-secondary" key={level.value} value={level.value}>{level.label}</SelectItem>
@@ -492,7 +492,7 @@ export default function TrainerClientOnboarding({ open, onOpenChange, client, on
                   <div className="space-y-2 sm:col-span-2">
                     <Label className="text-muted-foreground">Dietary Preferences</Label>
                     <Select value={formData.dietary_preference} onValueChange={(v) => handleChange("dietary_preference", v)}>
-                      <SelectTrigger className="bg-card border-border text-foreground focus:ring-[#22c55e]"><SelectValue /></SelectTrigger>
+                      <SelectTrigger className="bg-card border-border text-foreground focus:ring-[#4B91DD]"><SelectValue /></SelectTrigger>
                       <SelectContent className="bg-card border-border text-foreground">
                         {DIETARY_PREFERENCES.map(pref => (
                           <SelectItem className="focus:bg-secondary" key={pref.value} value={pref.value}>{pref.label}</SelectItem>
@@ -507,7 +507,7 @@ export default function TrainerClientOnboarding({ open, onOpenChange, client, on
                   <div className="space-y-2">
                     <Label className="text-muted-foreground">Stress Level</Label>
                     <Select value={formData.stress_level?.toString() || ""} onValueChange={(v) => handleChange("stress_level", v)}>
-                      <SelectTrigger className="bg-card border-border text-foreground focus:ring-[#22c55e]"><SelectValue placeholder="Select stress level" /></SelectTrigger>
+                      <SelectTrigger className="bg-card border-border text-foreground focus:ring-[#4B91DD]"><SelectValue placeholder="Select stress level" /></SelectTrigger>
                       <SelectContent className="bg-card border-border text-foreground">
                         <SelectItem className="focus:bg-secondary" value="2">Low</SelectItem>
                         <SelectItem className="focus:bg-secondary" value="5">Moderate</SelectItem>
@@ -554,7 +554,7 @@ export default function TrainerClientOnboarding({ open, onOpenChange, client, on
                   Next Step
                 </Button>
               ) : (
-                <Button type="submit" className="bg-gradient-to-r from-[#d4a017] to-[#f5c842] text-black hover:opacity-90 font-bold border-none" disabled={isLoading}>
+                <Button type="submit" className="bg-gradient-to-r from-[#4B91DD] to-[#4B91DD] text-black hover:opacity-90 font-bold border-none" disabled={isLoading}>
                   {isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                   {client ? "Save Profile" : "Complete Onboarding"}
                 </Button>

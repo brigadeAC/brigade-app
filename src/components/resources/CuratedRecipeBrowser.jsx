@@ -24,10 +24,10 @@ export default function CuratedRecipeBrowser({ onImportComplete }) {
       setRecipes(data.recipes || []);
       setSelectedRecipes([]);
       setShowDialog(true);
-      toast.success(`Found ${data.recipes?.length || 0} curated recipes!`);
+      toast.success(`Found ${data.recipes?.length || 0} curated recipes.`);
     } catch (error) {
       console.error('Failed to fetch recipes:', error);
-      toast.error('Failed to fetch recipes: ' + error.message);
+      toast.error('Failed to fetch recipes:' + error.message);
     }
     setFetching(false);
   };
@@ -46,14 +46,14 @@ export default function CuratedRecipeBrowser({ onImportComplete }) {
         await base44.entities.Recipe.create(recipe);
       }
 
-      toast.success(`Imported ${recipesToImport.length} recipes!`);
+      toast.success(`Imported ${recipesToImport.length} recipes.`);
       setShowDialog(false);
       setRecipes([]);
       setSelectedRecipes([]);
       if (onImportComplete) onImportComplete();
     } catch (error) {
       console.error('Failed to import recipes:', error);
-      toast.error('Failed to import recipes: ' + error.message);
+      toast.error('Failed to import recipes:' + error.message);
     }
     setImporting(false);
   };
@@ -97,7 +97,7 @@ export default function CuratedRecipeBrowser({ onImportComplete }) {
       <Button 
         onClick={handleFetch}
         disabled={fetching}
-        className="w-full bg-gradient-to-r from-emerald-500 to-teal-600"
+        className="w-full bg-gradient-to-r from-primary to-primary"
       >
         {fetching ? (
           <>
@@ -138,7 +138,7 @@ export default function CuratedRecipeBrowser({ onImportComplete }) {
               <Button 
                 onClick={handleImport}
                 disabled={selectedRecipes.length === 0 || importing}
-                className="bg-gradient-to-r from-emerald-500 to-teal-600 ml-auto"
+                className="bg-gradient-to-r from-primary to-primary ml-auto"
                 size="sm"
               >
                 {importing ? (
@@ -164,7 +164,7 @@ export default function CuratedRecipeBrowser({ onImportComplete }) {
                   key={idx}
                   className={`cursor-pointer transition-all ${
                     selectedRecipes.includes(idx) 
-                      ? 'border-emerald-500 bg-emerald-50' 
+                      ? 'border-primary bg-primary/10' 
                       : 'hover:border-slate-300'
                   }`}
                   onClick={() => toggleRecipe(idx)}
@@ -179,7 +179,7 @@ export default function CuratedRecipeBrowser({ onImportComplete }) {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2 mb-1">
                           <h4 className="font-semibold text-sm text-slate-900">{recipe.name}</h4>
-                          <Badge className="bg-orange-100 text-orange-700 shrink-0 text-xs">
+                          <Badge className="bg-primary/10 text-primary shrink-0 text-xs">
                             {recipe.category}
                           </Badge>
                         </div>

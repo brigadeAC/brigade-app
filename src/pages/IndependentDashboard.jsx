@@ -126,7 +126,7 @@ export default function IndependentDashboard() {
         </div>
 
         <Link to={createPageUrl("ClientWorkouts")}>
-          <div className="bg-[#00E676] rounded-2xl px-8 py-4 flex flex-col justify-center items-center shadow-[0_10px_30px_rgba(0,230,118,0.4)] cursor-pointer hover:scale-105 transition-transform h-full">
+          <div className="bg-[#4B91DD] rounded-2xl px-8 py-4 flex flex-col justify-center items-center shadow-[0_10px_30px_rgba(75,145,221,0.4)] cursor-pointer hover:scale-105 transition-transform h-full">
             <p className="text-xs text-black font-bold uppercase tracking-wide mb-1">Start</p>
             <p className="text-xl font-black text-black">Workout</p>
           </div>
@@ -206,7 +206,7 @@ export default function IndependentDashboard() {
                 {allPhotos.length === 0 && (
                   <div className="col-span-2 flex flex-col items-center justify-center py-8 text-muted-foreground">
                     <Camera className="w-8 h-8 mb-2 opacity-50" />
-                    <p className="text-xs text-center">No photos yet<br/>Upload your first!</p>
+                    <p className="text-xs text-center">No photos yet<br/>Upload your first.</p>
                   </div>
                 )}
               </div>
@@ -224,8 +224,8 @@ export default function IndependentDashboard() {
                 <p className="text-xs text-muted-foreground">Reflect and get AI-powered insights.</p>
               </Link>
               
-              <Link to={createPageUrl("ClientCommunity")} className="bg-card rounded-2xl p-6 border border-border shadow-sm hover:border-purple-500/30 transition-all hover:-translate-y-1">
-                <Users2 className="w-8 h-8 text-purple-400 mb-4" />
+              <Link to={createPageUrl("ClientCommunity")} className="bg-card rounded-2xl p-6 border border-border shadow-sm hover:border-primary/30 transition-all hover:-translate-y-1">
+                <Users2 className="w-8 h-8 text-primary mb-4" />
                 <h4 className="text-lg font-bold text-foreground mb-2">Community</h4>
                 <p className="text-xs text-muted-foreground">Connect with other solo users.</p>
               </Link>
@@ -257,7 +257,7 @@ export default function IndependentDashboard() {
                       return (
                         <div key={`${row}-${col}`} className="flex justify-center">
                           <div className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full border-2 flex items-center justify-center transition-all
-                            ${isCompleted ? 'border-[#00E676] bg-primary/20' : 
+                            ${isCompleted ? 'border-[#4B91DD] bg-primary/20' : 
                               isCurrent ? 'border-white/30 bg-transparent animate-pulse' : 
                               'border-border bg-secondary'}`}>
                             {isCompleted && <CheckCircle2 className="w-4 h-4 text-primary" />}

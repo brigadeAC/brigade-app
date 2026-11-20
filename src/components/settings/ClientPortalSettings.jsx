@@ -78,7 +78,7 @@ export default function ClientPortalSettings() {
         <Button
           onClick={handleSave}
           disabled={isSaving}
-          className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700"
+          className="bg-gradient-to-r from-primary to-primary hover:from-primary hover:to-primary"
         >
           <Save className="w-4 h-4 mr-2" />
           {isSaving ? "Saving..." : "Save Portal Settings"}

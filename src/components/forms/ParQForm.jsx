@@ -102,14 +102,14 @@ export default function ParQForm({ clientId, clientUserId, clientName, onComplet
           )}
 
           {!anyYes && (
-            <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-              <p className="text-sm text-green-800">
+            <div className="p-4 bg-primary/10 border border-primary/20 rounded-lg">
+              <p className="text-sm text-primary">
                 You answered "No" to all questions. You have reasonable assurance of your suitability for a graduated exercise program.
               </p>
             </div>
           )}
 
-          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-800">
+          <div className="p-3 bg-primary/10 border border-primary/20 rounded-lg text-xs text-primary">
             <strong>HIPAA Notice:</strong> The health information you provide on this form is confidential and will only be used to design a safe and effective exercise program. It will not be shared with third parties without your written consent, except as required by law.
           </div>
 
@@ -129,7 +129,7 @@ export default function ParQForm({ clientId, clientUserId, clientName, onComplet
       </Card>
 
       <div className="flex justify-end gap-3">
-        <Button onClick={handleSubmit} disabled={isSubmitting} className="bg-gradient-to-r from-emerald-500 to-teal-600">
+        <Button onClick={handleSubmit} disabled={isSubmitting} className="bg-gradient-to-r from-primary to-primary">
           {isSubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
           Submit PAR-Q Form
         </Button>

@@ -16,25 +16,25 @@ export default function ReadinessAnalyzer({ client, progressLogs }) {
   };
 
   const getReadinessColor = (score) => {
-    if (score >= 80) return "text-emerald-500";
-    if (score >= 60) return "text-yellow-500";
+    if (score >= 80) return "text-primary";
+    if (score >= 60) return "text-primary";
     return "text-red-500";
   };
 
   const getProgressColor = (score) => {
-    if (score >= 80) return "[&>div]:bg-emerald-500";
-    if (score >= 60) return "[&>div]:bg-yellow-500";
+    if (score >= 80) return "[&>div]:bg-primary";
+    if (score >= 60) return "[&>div]:bg-primary";
     return "[&>div]:bg-red-500";
   };
 
   return (
     <Card className="glass-card border-border relative overflow-hidden">
-      <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
       <CardHeader>
         <div className="flex justify-between items-start">
           <div>
             <CardTitle className="text-xl text-foreground flex items-center gap-2">
-              <BrainCircuit className="w-5 h-5 text-blue-400" />
+              <BrainCircuit className="w-5 h-5 text-primary" />
               AI Predictive Readiness
             </CardTitle>
             <CardDescription className="text-muted-foreground mt-1">
@@ -46,7 +46,7 @@ export default function ReadinessAnalyzer({ client, progressLogs }) {
               <AlertTriangle className="w-3 h-3 mr-1" /> High Injury Risk
             </Badge>
           ) : (
-            <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30">
+            <Badge className="bg-primary/20 text-primary border-primary/30">
               <Activity className="w-3 h-3 mr-1" /> Cleared for Max Effort
             </Badge>
           )}
@@ -75,7 +75,7 @@ export default function ReadinessAnalyzer({ client, progressLogs }) {
             <div className="text-2xl font-bold text-foreground flex items-center gap-2">
               {recentLog.hrv_ms} <span className="text-xs text-muted-foreground font-normal">ms</span>
             </div>
-            <HeartPulse className="w-4 h-4 text-blue-400 mt-1 opacity-50" />
+            <HeartPulse className="w-4 h-4 text-primary mt-1 opacity-50" />
           </div>
 
           <div className="bg-secondary p-4 rounded-xl border border-border">
@@ -83,7 +83,7 @@ export default function ReadinessAnalyzer({ client, progressLogs }) {
             <div className="text-sm font-medium text-foreground mt-1">
               {recentLog.injury_risk_flag ? "Volume reduced by 30%" : "No adaptation needed"}
             </div>
-            <RefreshCw className="w-4 h-4 text-purple-400 mt-2 opacity-50" />
+            <RefreshCw className="w-4 h-4 text-primary mt-2 opacity-50" />
           </div>
 
           {/* New Metrics */}
@@ -92,7 +92,7 @@ export default function ReadinessAnalyzer({ client, progressLogs }) {
             <div className="text-2xl font-bold text-foreground flex items-center gap-2">
               {recentLog.core_temperature || 36.8}°C
             </div>
-            <Thermometer className="w-4 h-4 text-orange-400 mt-1 opacity-50" />
+            <Thermometer className="w-4 h-4 text-primary mt-1 opacity-50" />
           </div>
 
           <div className="bg-secondary p-4 rounded-xl border border-border">
@@ -100,7 +100,7 @@ export default function ReadinessAnalyzer({ client, progressLogs }) {
             <div className="text-2xl font-bold text-foreground flex items-center gap-2">
               {recentLog.respiratory_rate || 14} <span className="text-xs text-muted-foreground font-normal">bpm</span>
             </div>
-            <Wind className="w-4 h-4 text-cyan-400 mt-1 opacity-50" />
+            <Wind className="w-4 h-4 text-primary mt-1 opacity-50" />
           </div>
         </div>
 

@@ -56,7 +56,7 @@ export default function ScheduleVideoModal({ open, onOpenChange, clientId, clien
         read: false
       });
 
-      toast.success("Video session scheduled!");
+      toast.success("Video session scheduled.");
       onSuccess?.(newSession);
       onOpenChange(false);
     } catch (error) {
@@ -69,10 +69,10 @@ export default function ScheduleVideoModal({ open, onOpenChange, clientId, clien
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md bg-background text-foreground border-yellow-500/20">
+      <DialogContent className="max-w-md bg-background text-foreground border-primary/20">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl">
-            <Video className="w-5 h-5 text-yellow-500" />
+            <Video className="w-5 h-5 text-primary" />
             Schedule Live Coaching
           </DialogTitle>
         </DialogHeader>
@@ -124,7 +124,7 @@ export default function ScheduleVideoModal({ open, onOpenChange, clientId, clien
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} className="text-muted-foreground hover:text-foreground">
               Cancel
             </Button>
-            <Button type="submit" disabled={isLoading} className="bg-yellow-600 hover:bg-yellow-700 text-foreground font-bold">
+            <Button type="submit" disabled={isLoading} className="bg-primary hover:bg-primary text-foreground font-bold">
               {isLoading ? "Scheduling..." : "Schedule Session"}
             </Button>
           </div>

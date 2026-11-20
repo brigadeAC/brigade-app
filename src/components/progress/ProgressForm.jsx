@@ -178,7 +178,7 @@ export default function ProgressForm({ open, onOpenChange, client, log, onSubmit
       <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary flex items-center justify-center">
               <TrendingUp className="w-5 h-5 text-foreground" />
             </div>
             {log ? "Edit Progress Log" : "Log Progress"}
@@ -468,7 +468,7 @@ export default function ProgressForm({ open, onOpenChange, client, log, onSubmit
             </Button>
             <Button 
               type="submit" 
-              className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700"
+              className="bg-gradient-to-r from-primary to-primary hover:from-primary hover:to-primary"
               disabled={isLoading}
             >
               {isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}

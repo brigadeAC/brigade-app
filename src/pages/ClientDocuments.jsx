@@ -11,7 +11,7 @@ import ESignDialog from "@/components/contracts/ESignDialog";
 
 const STATUS_BADGE = {
   sent: { label: "Awaiting your signature", className: "bg-amber-500/15 text-amber-600 border-amber-500/30" },
-  signed: { label: "Signed", className: "bg-emerald-500/15 text-emerald-600 border-emerald-500/30" },
+  signed: { label: "Signed", className: "bg-primary/15 text-primary border-primary/30" },
   draft: { label: "Draft", className: "bg-secondary text-muted-foreground border-border" },
 };
 
@@ -50,8 +50,8 @@ export default function ClientDocuments() {
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <div className="flex items-center gap-3 mb-8">
-        <div className="p-3 bg-emerald-500/15 rounded-xl">
-          <FileText className="w-8 h-8 text-emerald-600" />
+        <div className="p-3 bg-primary/15 rounded-xl">
+          <FileText className="w-8 h-8 text-primary" />
         </div>
         <div>
           <h1 className="text-3xl font-black text-foreground">My Documents</h1>
@@ -93,7 +93,7 @@ export default function ClientDocuments() {
                   <div key={c.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl border border-border bg-secondary/40">
                     <div className="flex items-start gap-3 min-w-0">
                       {c.status === "signed"
-                        ? <CheckCircle2 className="w-5 h-5 text-emerald-600 mt-0.5 shrink-0" />
+                        ? <CheckCircle2 className="w-5 h-5 text-primary mt-0.5 shrink-0" />
                         : <Clock className="w-5 h-5 text-amber-500 mt-0.5 shrink-0" />}
                       <div className="min-w-0">
                         <p className="font-medium text-foreground truncate">{c.title}</p>
@@ -113,7 +113,7 @@ export default function ClientDocuments() {
                         </a>
                       )}
                       {c.status === "sent" && c.content && !c.content.startsWith("[Uploaded Document") && (
-                        <Button size="sm" onClick={() => setSigningContract(c)} className="bg-emerald-600 hover:bg-emerald-500 text-white">
+                        <Button size="sm" onClick={() => setSigningContract(c)} className="bg-primary hover:bg-primary text-white">
                           <PenLine className="w-4 h-4 mr-1" /> Review & sign
                         </Button>
                       )}

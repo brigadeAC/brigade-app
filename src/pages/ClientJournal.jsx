@@ -33,7 +33,7 @@ export default function ClientJournal() {
     },
     onSuccess: (created) => {
       queryClient.invalidateQueries(["journalEntries"]);
-      toast.success("Journal entry saved!");
+      toast.success("Journal entry saved.");
       setContent("");
 
       // Fire off background summarization (AI summary + sentiment for the trainer)
@@ -72,8 +72,8 @@ export default function ClientJournal() {
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <div className="flex items-center gap-3 mb-8">
-        <div className="p-3 bg-indigo-500/20 rounded-xl">
-          <BookOpen className="w-8 h-8 text-indigo-400" />
+        <div className="p-3 bg-primary/20 rounded-xl">
+          <BookOpen className="w-8 h-8 text-primary" />
         </div>
         <div>
           <h1 className="text-3xl font-black text-foreground">Daily Reflection</h1>
@@ -85,7 +85,7 @@ export default function ClientJournal() {
         <CardHeader>
           <div className="flex justify-between items-center">
             <CardTitle className="text-lg text-foreground flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-yellow-500" />
+              <Sparkles className="w-5 h-5 text-primary" />
               Today's Prompt
             </CardTitle>
             <Button variant="ghost" size="sm" onClick={generateNewPrompt} disabled={isGeneratingPrompt} className="text-muted-foreground hover:text-foreground">
@@ -93,7 +93,7 @@ export default function ClientJournal() {
               New Prompt
             </Button>
           </div>
-          <p className="text-xl font-medium text-foreground mt-2 italic border-l-2 border-indigo-500 pl-4 py-2 bg-indigo-500/5 rounded-r-lg">
+          <p className="text-xl font-medium text-foreground mt-2 italic border-l-2 border-primary pl-4 py-2 bg-primary/5 rounded-r-lg">
             "{prompt}"
           </p>
         </CardHeader>
@@ -102,13 +102,13 @@ export default function ClientJournal() {
             value={content}
             onChange={(e) => setContent(e.target.value)}
             placeholder="Write your thoughts here..."
-            className="min-h-[200px] bg-background border-border text-foreground placeholder:text-muted-foreground focus-visible:ring-indigo-500 text-lg p-4"
+            className="min-h-[200px] bg-background border-border text-foreground placeholder:text-muted-foreground focus-visible:ring-primary text-lg p-4"
           />
           <div className="mt-4 flex justify-end">
             <Button 
               onClick={handleSave} 
               disabled={!content.trim() || saveEntryMutation.isPending}
-              className="bg-indigo-600 hover:bg-indigo-500 text-white"
+              className="bg-primary hover:bg-primary text-white"
             >
               {saveEntryMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Send className="w-4 h-4 mr-2" />}
               Save Entry
@@ -122,12 +122,12 @@ export default function ClientJournal() {
         {isLoading ? (
           <div className="text-muted-foreground">Loading entries...</div>
         ) : entries?.length === 0 ? (
-          <div className="text-muted-foreground italic p-8 text-center bg-secondary/50 rounded-xl border border-border">No past entries yet. Start writing!</div>
+          <div className="text-muted-foreground italic p-8 text-center bg-secondary/50 rounded-xl border border-border">No past entries yet. Start writing.</div>
         ) : (
           <AnimatePresence>
             {entries?.map(entry => (
-              <motion.div key={entry.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="p-6 glass-card hover:border-indigo-300 transition-colors">
-                <div className="text-sm text-indigo-400 font-semibold mb-2">{format(parseISO(entry.date), 'MMMM d, yyyy')}</div>
+              <motion.div key={entry.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="p-6 glass-card hover:border-primary/40 transition-colors">
+                <div className="text-sm text-primary font-semibold mb-2">{format(parseISO(entry.date), 'MMMM d, yyyy')}</div>
                 {entry.ai_prompt_used && (
                   <div className="text-sm text-muted-foreground mb-3 italic">Q: {entry.ai_prompt_used}</div>
                 )}

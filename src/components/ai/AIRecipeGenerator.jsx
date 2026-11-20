@@ -78,7 +78,7 @@ Return ONLY valid JSON (no markdown):
         tags: response.tags || []
       });
 
-      toast.success(`AI generated "${response.name}"! 🍽️`);
+      toast.success(`AI generated "${response.name}"!`);
       onRecipeGenerated?.(saved);
       setOpen(false);
       setPrompt("");
@@ -94,7 +94,7 @@ Return ONLY valid JSON (no markdown):
     <>
       <Button
         onClick={() => setOpen(true)}
-        className="bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700"
+        className="bg-gradient-to-r from-primary to-primary hover:from-primary hover:to-primary"
       >
         <Wand2 className="w-4 h-4 mr-2" />
         AI Generate Recipe
@@ -104,7 +104,7 @@ Return ONLY valid JSON (no markdown):
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <ChefHat className="w-5 h-5 text-purple-500" />
+              <ChefHat className="w-5 h-5 text-primary" />
               AI Recipe Generator
             </DialogTitle>
           </DialogHeader>
@@ -167,7 +167,7 @@ Return ONLY valid JSON (no markdown):
             <Button
               onClick={handleGenerate}
               disabled={loading}
-              className="w-full bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700"
+              className="w-full bg-gradient-to-r from-primary to-primary hover:from-primary hover:to-primary"
             >
               {loading ? (
                 <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Generating Recipe...</>

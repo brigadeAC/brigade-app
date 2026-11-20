@@ -10,15 +10,15 @@ export function showSuccess(message, description) {
     description,
     duration: 3000,
     style: {
-      background: "linear-gradient(135deg, #0a2e1a, #0d3d22)",
-      border: "1px solid rgba(34,197,94,0.4)",
-      color: "#4ade80",
-      boxShadow: "0 0 20px rgba(34,197,94,0.2)",
+      background: "linear-gradient(135deg, #191615, #191615)",
+      border: "1px solid rgba(75,145,221,0.4)",
+      color: "#4B91DD",
+      boxShadow: "0 0 20px rgba(75,145,221,0.2)",
     },
     classNames: {
-      title: "text-green-400 font-bold",
-      description: "text-green-300/70",
-      icon: "text-green-400",
+      title: "text-primary font-bold",
+      description: "text-primary/70",
+      icon: "text-primary",
     },
   });
 }

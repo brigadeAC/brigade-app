@@ -16,7 +16,7 @@ export default function LiveWorkoutMode({ workoutSession, setWorkoutSession, onC
         setRestTimer((prev) => {
           if (prev <= 1) {
             setIsResting(false);
-            toast.success("Rest time is over! Ready for the next set?");
+            toast.success("Rest time is over. Ready for the next set?");
             return 0;
           }
           return prev - 1;
@@ -56,9 +56,9 @@ export default function LiveWorkoutMode({ workoutSession, setWorkoutSession, onC
               key={idx}
               className={`w-2 h-2 rounded-full ${
                 idx === currentExerciseIndex
-                  ? "bg-green-500 scale-125"
+                  ? "bg-primary scale-125"
                   : idx < currentExerciseIndex
-                  ? "bg-green-500/40"
+                  ? "bg-primary/40"
                   : "bg-white/20"
               } transition-all`}
             />
@@ -118,7 +118,7 @@ export default function LiveWorkoutMode({ workoutSession, setWorkoutSession, onC
               <div
                 key={setIdx}
                 className={`grid grid-cols-5 gap-2 items-center p-3 rounded-xl transition-colors ${
-                  isCompleted ? "bg-green-500/10 border border-green-500/20" : "bg-secondary border border-transparent"
+                  isCompleted ? "bg-primary/10 border border-primary/20" : "bg-secondary border border-transparent"
                 }`}
               >
                 <div className="text-sm font-bold text-muted-foreground pl-2">{setIdx + 1}</div>
@@ -149,7 +149,7 @@ export default function LiveWorkoutMode({ workoutSession, setWorkoutSession, onC
                   size="icon"
                   className={`h-10 w-full rounded-lg ${
                     isCompleted
-                      ? "bg-green-500 hover:bg-green-600 text-black"
+                      ? "bg-primary hover:bg-primary text-primary-foreground"
                       : "bg-secondary hover:bg-accent text-foreground"
                   }`}
                   onClick={() => {
@@ -187,7 +187,7 @@ export default function LiveWorkoutMode({ workoutSession, setWorkoutSession, onC
         {currentExerciseIndex === workoutSession.exercises.length - 1 ? (
           <Button
             onClick={() => onComplete()}
-            className="bg-gradient-to-r from-green-400 to-emerald-500 hover:from-green-500 hover:to-emerald-600 text-black font-black w-40"
+            className="bg-gradient-to-r from-primary to-primary hover:from-primary hover:to-primary text-black font-black w-40"
           >
             Finish Workout
           </Button>

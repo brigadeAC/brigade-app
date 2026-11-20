@@ -64,7 +64,7 @@ export default function About() {
     },
     {
       icon: Bell, title: "Installable & Connected",
-      description: "Install ApexCoach to your phone like a native app and get push notifications for messages, plans, and reminders.",
+      description: "Install Brigade to your phone like a native app and get push notifications for messages, plans, and reminders.",
     },
     {
       icon: Library, title: "Resource Library",
@@ -87,7 +87,7 @@ export default function About() {
             <div className="w-11 h-11 rounded-xl flex items-center justify-center bg-primary/10">
               <Sparkles className="w-6 h-6 text-primary" />
             </div>
-            <h1 className="text-3xl lg:text-5xl font-bold text-foreground tracking-tight">About ApexCoach</h1>
+            <h1 className="text-3xl lg:text-5xl font-bold text-foreground tracking-tight">About Brigade</h1>
           </div>
           <p className="text-lg text-muted-foreground max-w-2xl">
             One clean, modern platform for training, nutrition, and habits — built for solo athletes,

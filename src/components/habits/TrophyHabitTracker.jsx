@@ -51,7 +51,7 @@ function WeekStrip({ selectedDate, onSelect }) {
               }`}
             >
               <span className="text-[10px] uppercase">{format(day, "EEE")}</span>
-              <span className={`text-sm font-bold mt-0.5 ${isToday && !isSelected ? "text-yellow-400" : ""}`}>
+              <span className={`text-sm font-bold mt-0.5 ${isToday && !isSelected ? "text-primary" : ""}`}>
                 {format(day, "d")}
               </span>
             </button>
@@ -174,7 +174,7 @@ function HabitCard({ habit, dateKey, isCompleted, logNotes, onToggle, onDelete, 
           {habit.name}
         </p>
         {isCompleted && logNotes && (
-          <p className="text-[10px] text-emerald-400 mt-1.5 font-medium text-center leading-tight bg-emerald-500/10 px-1.5 py-0.5 rounded">
+          <p className="text-[10px] text-primary mt-1.5 font-medium text-center leading-tight bg-primary/10 px-1.5 py-0.5 rounded">
             {logNotes}
           </p>
         )}
@@ -183,8 +183,8 @@ function HabitCard({ habit, dateKey, isCompleted, logNotes, onToggle, onDelete, 
       {/* Streak badge */}
       {streak > 0 && (
         <div className="flex items-center gap-0.5 mt-2">
-          <Flame className="w-3 h-3 text-orange-400" />
-          <span className="text-[10px] text-orange-400 font-bold">{streak}</span>
+          <Flame className="w-3 h-3 text-primary" />
+          <span className="text-[10px] text-primary font-bold">{streak}</span>
         </div>
       )}
 
@@ -195,9 +195,9 @@ function HabitCard({ habit, dateKey, isCompleted, logNotes, onToggle, onDelete, 
             initial={{ opacity: 0, scale: 0.5 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.5 }}
-            className="absolute top-2 left-2 w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center"
+            className="absolute top-2 left-2 w-5 h-5 rounded-full bg-primary flex items-center justify-center"
           >
-            <Check className="w-3 h-3 text-emerald-950" />
+            <Check className="w-3 h-3 text-primary" />
           </motion.div>
         )}
       </AnimatePresence>
@@ -430,7 +430,7 @@ export default function TrophyHabitTracker({ clientId, trainerId, readOnly = fal
                   });
                 }
               }}
-              className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-foreground border-none"
+              className="bg-gradient-to-r from-primary to-primary hover:from-primary hover:to-primary text-foreground border-none"
             >
               <Plus className="w-4 h-4 mr-1" /> Add Core Pillars (Sleep, Nutrition, Gym)
             </Button>
@@ -473,7 +473,7 @@ export default function TrophyHabitTracker({ clientId, trainerId, readOnly = fal
                     <label key={meal} className="flex items-center gap-2 text-sm text-foreground">
                       <input 
                         type="checkbox" 
-                        className="rounded border-border bg-secondary text-emerald-500 focus:ring-emerald-500 w-4 h-4"
+                        className="rounded border-border bg-secondary text-primary focus:ring-primary w-4 h-4"
                         checked={completionData.meals.includes(meal)}
                         onChange={(e) => {
                           if (e.target.checked) {
@@ -490,7 +490,7 @@ export default function TrophyHabitTracker({ clientId, trainerId, readOnly = fal
               </div>
             )}
             <Button 
-              className="w-full bg-emerald-600 hover:bg-emerald-700 text-foreground border-none mt-2"
+              className="w-full bg-primary hover:bg-primary text-foreground border-none mt-2"
               onClick={() => {
                 const existing = habitLogs.find(l => l.habit_id === completionHabit.id && l.date === dateKey);
                 executeToggleLog(completionHabit, existing, completionData);

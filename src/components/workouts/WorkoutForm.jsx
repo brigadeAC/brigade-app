@@ -119,7 +119,7 @@ export default function WorkoutForm({ open, onOpenChange, workout, clients, onSu
         exercises,
         daily_exercises: undefined
       });
-      showSuccess(workout ? "Workout Updated!" : "Workout Created!", workout ? "Changes saved successfully" : "New workout plan is ready");
+      showSuccess(workout ? "Workout Updated." : "Workout Created.", workout ? "Changes saved successfully" : "New workout plan is ready");
       onOpenChange(false);
     } finally {
       setIsLoading(false);
@@ -267,7 +267,7 @@ export default function WorkoutForm({ open, onOpenChange, workout, clients, onSu
       <DialogContent className="sm:max-w-5xl h-[95vh] flex flex-col bg-card border-border text-foreground p-0 overflow-hidden" aria-describedby="workout-form-description">
         <DialogHeader className="p-6 pb-4 border-b border-border shrink-0">
           <DialogTitle className="flex items-center gap-2 text-xl text-foreground" id="workout-form-description">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary flex items-center justify-center">
               <Dumbbell className="w-5 h-5 text-foreground" />
             </div>
             {workout ? "Edit Workout Plan" : "Create Workout Plan"}
@@ -401,15 +401,15 @@ export default function WorkoutForm({ open, onOpenChange, workout, clients, onSu
 
             {!simpleMode && (
             <div className="space-y-2 sm:col-span-2 pt-2 pb-2">
-              <div className="flex items-center justify-between p-4 bg-purple-500/10 border border-purple-500/20 rounded-xl">
+              <div className="flex items-center justify-between p-4 bg-primary/10 border border-primary/20 rounded-xl">
                 <div>
-                  <Label className="text-purple-500 font-bold block mb-1">Predictive Dynamic Adaptation</Label>
+                  <Label className="text-primary font-bold block mb-1">Predictive Dynamic Adaptation</Label>
                   <p className="text-xs text-muted-foreground">Automatically scales volume, adjusts exercise selection, and suggests specific mobility drills based on AI injury risk flags from morning readiness, HRV, and sleep metrics.</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => handleChange("dynamic_adaptation", !formData.dynamic_adaptation)}
-                  className={`w-12 h-6 rounded-full transition-colors relative ${formData.dynamic_adaptation ? 'bg-purple-500' : 'bg-gray-400'}`}
+                  className={`w-12 h-6 rounded-full transition-colors relative ${formData.dynamic_adaptation ? 'bg-primary' : 'bg-gray-400'}`}
                 >
                   <div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-transform ${formData.dynamic_adaptation ? 'translate-x-7' : 'translate-x-1'}`} />
                 </button>
@@ -448,12 +448,12 @@ export default function WorkoutForm({ open, onOpenChange, workout, clients, onSu
                           <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${isOpen ? "rotate-180" : ""}`} />
                           <span className="font-semibold text-foreground">Day {dayNum}</span>
                           {dayExercises.length > 0 && (
-                            <span className="text-xs bg-purple-500/20 text-purple-700 dark:text-purple-300 px-2 py-0.5 rounded-full border border-purple-500/30">{dayExercises.length} exercise{dayExercises.length !== 1 ? "s" : ""}</span>
+                            <span className="text-xs bg-primary/20 text-primary dark:text-primary px-2 py-0.5 rounded-full border border-primary/30">{dayExercises.length} exercise{dayExercises.length !== 1 ? "s" : ""}</span>
                           )}
                         </div>
                         <div className="flex items-center gap-2">
                           {dayExercises.length > 0 && (
-                            <Button type="button" variant="ghost" size="sm" onClick={(e) => duplicateDay(dayNum, e)} className="h-7 px-2 text-xs text-purple-400 hover:text-purple-300 hover:bg-purple-400/10">
+                            <Button type="button" variant="ghost" size="sm" onClick={(e) => duplicateDay(dayNum, e)} className="h-7 px-2 text-xs text-primary hover:text-primary hover:bg-primary/10">
                               Duplicate Day
                             </Button>
                           )}
@@ -477,7 +477,7 @@ export default function WorkoutForm({ open, onOpenChange, workout, clients, onSu
                                      <div 
                                        ref={provided.innerRef} 
                                        {...provided.draggableProps} 
-                                       className={`p-3 bg-secondary rounded-lg border border-border space-y-2 relative transition-colors ${snapshot.isDragging ? 'bg-secondary border-purple-500/50 shadow-lg' : ''}`}
+                                       className={`p-3 bg-secondary rounded-lg border border-border space-y-2 relative transition-colors ${snapshot.isDragging ? 'bg-secondary border-primary/50 shadow-lg' : ''}`}
                                      >
                                        <div className="flex items-center justify-between">
                                          <div className="flex items-center gap-2">
@@ -486,7 +486,7 @@ export default function WorkoutForm({ open, onOpenChange, workout, clients, onSu
                                            </div>
                                            <span className="text-xs font-medium text-muted-foreground">Exercise {index + 1}</span>
                                            {exercise.is_superset && (
-                                              <span className="text-[10px] bg-orange-500/20 text-orange-300 px-1.5 py-0.5 rounded border border-orange-500/30">Superset ↓</span>
+                                              <span className="text-[10px] bg-primary/20 text-primary px-1.5 py-0.5 rounded border border-primary/30">Superset ↓</span>
                                            )}
                                          </div>
                                          <div className="flex items-center gap-2">
@@ -495,7 +495,7 @@ export default function WorkoutForm({ open, onOpenChange, workout, clients, onSu
                                              variant="ghost"
                                              size="sm"
                                              onClick={() => handleExerciseChange(dayNum, index, "is_superset", !exercise.is_superset)}
-                                             className={`h-6 text-xs px-2 ${exercise.is_superset ? 'text-orange-400 bg-orange-500/10' : 'text-muted-foreground hover:text-orange-400 hover:bg-orange-500/10'}`}
+                                             className={`h-6 text-xs px-2 ${exercise.is_superset ? 'text-primary bg-primary/10' : 'text-muted-foreground hover:text-primary hover:bg-primary/10'}`}
                                            >
                                              Link Superset
                                            </Button>
@@ -626,7 +626,7 @@ export default function WorkoutForm({ open, onOpenChange, workout, clients, onSu
             </Button>
             <Button 
               type="submit" 
-              className="bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-foreground border-0"
+              className="bg-gradient-to-r from-primary to-primary hover:from-primary hover:to-primary text-foreground border-0"
               disabled={isLoading}
             >
               {isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}

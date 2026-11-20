@@ -42,10 +42,10 @@ export default function ClientOnboardingForms({ clientId, clientUserId, clientNa
   }
 
   return (
-    <div className="glass-card p-5 rounded-2xl space-y-4 border border-green-500/20">
+    <div className="glass-card p-5 rounded-2xl space-y-4 border border-primary/20">
       <div className="flex items-center gap-2 mb-4">
-        <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-green-500/10 border border-green-500/20">
-          <FileText className="w-4 h-4 text-green-400" />
+        <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-primary/10 border border-primary/20">
+          <FileText className="w-4 h-4 text-primary" />
         </div>
         <h3 className="font-bold text-foreground">Forms & Documents from Trainer</h3>
       </div>
@@ -113,7 +113,7 @@ export default function ClientOnboardingForms({ clientId, clientUserId, clientNa
                 {activeForm?.contract?.content}
               </div>
               <div className="flex justify-end">
-                <Button onClick={() => window.print()} className="bg-emerald-600 hover:bg-emerald-700 text-foreground">Print Document</Button>
+                <Button onClick={() => window.print()} className="bg-primary hover:bg-primary text-foreground">Print Document</Button>
               </div>
             </div>
           )}

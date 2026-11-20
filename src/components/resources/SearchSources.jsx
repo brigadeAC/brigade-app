@@ -10,11 +10,11 @@ import { Search, Loader2, Plus, ExternalLink, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const categoryColors = {
-  workout: "bg-blue-100 text-blue-700",
-  nutrition: "bg-orange-100 text-orange-700",
+  workout: "bg-primary/10 text-primary",
+  nutrition: "bg-primary/10 text-primary",
   medical: "bg-red-100 text-red-700",
   general: "bg-slate-100 text-slate-700",
-  motivation: "bg-purple-100 text-purple-700"
+  motivation: "bg-primary/10 text-primary"
 };
 
 export default function SearchSources({ onAdd, trainerId }) {
@@ -71,7 +71,7 @@ export default function SearchSources({ onAdd, trainerId }) {
       <Card className="glass-card border-border h-full flex flex-col">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg text-foreground">
-            <Search className="w-5 h-5 text-green-400" />
+            <Search className="w-5 h-5 text-primary" />
             Search Database
           </CardTitle>
           <p className="text-sm text-muted-foreground">
@@ -90,7 +90,7 @@ export default function SearchSources({ onAdd, trainerId }) {
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-emerald-600" />
+              <Sparkles className="w-5 h-5 text-primary" />
               Search Trusted Health & Fitness Sources
             </DialogTitle>
           </DialogHeader>
@@ -119,7 +119,7 @@ export default function SearchSources({ onAdd, trainerId }) {
               <Button 
                 type="submit" 
                 disabled={searching || query.length < 2}
-                className="bg-gradient-to-r from-emerald-500 to-teal-600"
+                className="bg-gradient-to-r from-primary to-primary"
               >
                 {searching ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -133,13 +133,13 @@ export default function SearchSources({ onAdd, trainerId }) {
             </div>
           </form>
 
-          <div className="p-3 bg-blue-50 rounded-lg border border-blue-200 text-sm text-blue-900">
+          <div className="p-3 bg-primary/10 rounded-lg border border-primary/20 text-sm text-primary">
             <strong>Sources:</strong> Exercemus, MedlinePlus Medical Encyclopedia, NASM Blog, MMFit, and evidence-based nutrition resources
           </div>
 
           {searching && (
             <div className="flex flex-col items-center justify-center py-12">
-              <Loader2 className="w-8 h-8 animate-spin text-emerald-600 mb-3" />
+              <Loader2 className="w-8 h-8 animate-spin text-primary mb-3" />
               <p className="text-slate-600">Searching trusted sources...</p>
             </div>
           )}
@@ -161,7 +161,7 @@ export default function SearchSources({ onAdd, trainerId }) {
                             href={resource.source_url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-xs text-emerald-600 hover:text-emerald-700 flex items-center gap-1 mt-1"
+                            className="text-xs text-primary hover:text-primary flex items-center gap-1 mt-1"
                           >
                             {resource.source_name}
                             <ExternalLink className="w-3 h-3" />
@@ -172,7 +172,7 @@ export default function SearchSources({ onAdd, trainerId }) {
                         size="sm"
                         onClick={() => handleAdd(resource)}
                         disabled={adding === resource.title}
-                        className="bg-gradient-to-r from-emerald-500 to-teal-600"
+                        className="bg-gradient-to-r from-primary to-primary"
                       >
                         {adding === resource.title ? (
                           <Loader2 className="w-4 h-4 animate-spin" />

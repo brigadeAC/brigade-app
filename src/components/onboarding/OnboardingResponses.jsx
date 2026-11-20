@@ -30,14 +30,14 @@ export default function OnboardingResponses({ onboarding }) {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+            <CheckCircle2 className="w-5 h-5 text-primary" />
             Onboarding Summary
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
             <span className="text-sm text-slate-500">Status</span>
-            <Badge className="bg-emerald-100 text-emerald-700">
+            <Badge className="bg-primary/10 text-primary">
               {onboarding.status}
             </Badge>
           </div>
@@ -56,7 +56,7 @@ export default function OnboardingResponses({ onboarding }) {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <User className="w-5 h-5 text-blue-600" />
+            <User className="w-5 h-5 text-primary" />
             Personal Information
           </CardTitle>
         </CardHeader>
@@ -98,7 +98,7 @@ export default function OnboardingResponses({ onboarding }) {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <Activity className="w-5 h-5 text-emerald-600" />
+            <Activity className="w-5 h-5 text-primary" />
             Fitness Background
           </CardTitle>
         </CardHeader>
@@ -128,7 +128,7 @@ export default function OnboardingResponses({ onboarding }) {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <Target className="w-5 h-5 text-purple-600" />
+            <Target className="w-5 h-5 text-primary" />
             Goals & Motivation
           </CardTitle>
         </CardHeader>
@@ -164,7 +164,7 @@ export default function OnboardingResponses({ onboarding }) {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <Calendar className="w-5 w-5 text-orange-600" />
+            <Calendar className="w-5 w-5 text-primary" />
             Lifestyle & Availability
           </CardTitle>
         </CardHeader>

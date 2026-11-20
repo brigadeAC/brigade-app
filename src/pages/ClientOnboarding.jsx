@@ -167,50 +167,50 @@ export default function ClientOnboarding() {
         return (
           <div className="space-y-6 text-center py-8">
             {/* Unit System Toggle */}
-            <div className="flex justify-center gap-2 mb-6">
+            <div className="flex justify-center gap-2 mb-6 flex-wrap">
               <Button
                 variant={unitSystem === UNIT_SYSTEMS.METRIC ? "default" : "outline"}
                 onClick={() => setUnitSystem(UNIT_SYSTEMS.METRIC)}
-                className={unitSystem === UNIT_SYSTEMS.METRIC ? "bg-emerald-500" : ""}
+                className={unitSystem === UNIT_SYSTEMS.METRIC ? "bg-primary" : ""}
               >
                 Metric
               </Button>
               <Button
                 variant={unitSystem === UNIT_SYSTEMS.IMPERIAL ? "default" : "outline"}
                 onClick={() => setUnitSystem(UNIT_SYSTEMS.IMPERIAL)}
-                className={unitSystem === UNIT_SYSTEMS.IMPERIAL ? "bg-emerald-500" : ""}
+                className={unitSystem === UNIT_SYSTEMS.IMPERIAL ? "bg-primary" : ""}
               >
                 Imperial
               </Button>
             </div>
-            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center mx-auto">
+            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary to-primary flex items-center justify-center mx-auto">
               <Sparkles className="w-10 h-10 text-foreground" />
             </div>
             <div>
-              <h2 className="text-3xl font-bold text-slate-900 mb-3">Welcome to Your Fitness Journey!</h2>
+              <h2 className="text-3xl font-bold text-slate-900 mb-3">Welcome to Your Fitness Journey.</h2>
               <p className="text-lg text-slate-600 max-w-2xl mx-auto">
-                We're excited to help you achieve your fitness goals! Let's start by getting to know you better.
+                We're excited to help you achieve your fitness goals. Let's start by getting to know you better.
                 This should take about 5 minutes.
               </p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-3xl mx-auto mt-8">
-              <Card className="border-emerald-200 bg-emerald-50">
+              <Card className="border-primary/20 bg-primary/10">
                 <CardContent className="pt-6 text-center">
-                  <Target className="w-8 h-8 text-emerald-600 mx-auto mb-2" />
+                  <Target className="w-8 h-8 text-primary mx-auto mb-2" />
                   <h3 className="font-semibold text-slate-900">Set Goals</h3>
                   <p className="text-sm text-slate-600 mt-1">Define what success looks like</p>
                 </CardContent>
               </Card>
-              <Card className="border-blue-200 bg-blue-50">
+              <Card className="border-primary/20 bg-primary/10">
                 <CardContent className="pt-6 text-center">
-                  <Activity className="w-8 h-8 text-blue-600 mx-auto mb-2" />
+                  <Activity className="w-8 h-8 text-primary mx-auto mb-2" />
                   <h3 className="font-semibold text-slate-900">Get Personal</h3>
                   <p className="text-sm text-slate-600 mt-1">Custom plans for your needs</p>
                 </CardContent>
               </Card>
-              <Card className="border-purple-200 bg-purple-50">
+              <Card className="border-primary/20 bg-primary/10">
                 <CardContent className="pt-6 text-center">
-                  <Heart className="w-8 h-8 text-purple-600 mx-auto mb-2" />
+                  <Heart className="w-8 h-8 text-primary mx-auto mb-2" />
                   <h3 className="font-semibold text-slate-900">Stay Motivated</h3>
                   <p className="text-sm text-slate-600 mt-1">Track progress and celebrate wins</p>
                 </CardContent>
@@ -316,7 +316,7 @@ export default function ClientOnboarding() {
               <div className="space-y-2">
                 <Label>Current Fitness Level *</Label>
                 <RadioGroup value={formData.fitness_level} onValueChange={(value) => updateField('fitness_level', value)}>
-                  <Card className={formData.fitness_level === 'beginner' ? 'border-emerald-500' : ''}>
+                  <Card className={formData.fitness_level === 'beginner' ? 'border-primary' : ''}>
                     <CardContent className="flex items-center space-x-3 pt-4">
                       <RadioGroupItem value="beginner" id="beginner" />
                       <div>
@@ -325,7 +325,7 @@ export default function ClientOnboarding() {
                       </div>
                     </CardContent>
                   </Card>
-                  <Card className={formData.fitness_level === 'intermediate' ? 'border-emerald-500' : ''}>
+                  <Card className={formData.fitness_level === 'intermediate' ? 'border-primary' : ''}>
                     <CardContent className="flex items-center space-x-3 pt-4">
                       <RadioGroupItem value="intermediate" id="intermediate" />
                       <div>
@@ -334,7 +334,7 @@ export default function ClientOnboarding() {
                       </div>
                     </CardContent>
                   </Card>
-                  <Card className={formData.fitness_level === 'advanced' ? 'border-emerald-500' : ''}>
+                  <Card className={formData.fitness_level === 'advanced' ? 'border-primary' : ''}>
                     <CardContent className="flex items-center space-x-3 pt-4">
                       <RadioGroupItem value="advanced" id="advanced" />
                       <div>
@@ -395,31 +395,31 @@ export default function ClientOnboarding() {
               <div className="space-y-2">
                 <Label>Primary Goal *</Label>
                 <RadioGroup value={formData.primary_goal} onValueChange={(value) => updateField('primary_goal', value)}>
-                  <Card className={formData.primary_goal === 'lose_weight' ? 'border-emerald-500' : ''}>
+                  <Card className={formData.primary_goal === 'lose_weight' ? 'border-primary' : ''}>
                     <CardContent className="flex items-center space-x-3 pt-4">
                       <RadioGroupItem value="lose_weight" id="lose_weight" />
                       <Label htmlFor="lose_weight" className="font-medium cursor-pointer">Lose Weight</Label>
                     </CardContent>
                   </Card>
-                  <Card className={formData.primary_goal === 'build_muscle' ? 'border-emerald-500' : ''}>
+                  <Card className={formData.primary_goal === 'build_muscle' ? 'border-primary' : ''}>
                     <CardContent className="flex items-center space-x-3 pt-4">
                       <RadioGroupItem value="build_muscle" id="build_muscle" />
                       <Label htmlFor="build_muscle" className="font-medium cursor-pointer">Build Muscle</Label>
                     </CardContent>
                   </Card>
-                  <Card className={formData.primary_goal === 'improve_fitness' ? 'border-emerald-500' : ''}>
+                  <Card className={formData.primary_goal === 'improve_fitness' ? 'border-primary' : ''}>
                     <CardContent className="flex items-center space-x-3 pt-4">
                       <RadioGroupItem value="improve_fitness" id="improve_fitness" />
                       <Label htmlFor="improve_fitness" className="font-medium cursor-pointer">Improve Overall Fitness</Label>
                     </CardContent>
                   </Card>
-                  <Card className={formData.primary_goal === 'athletic_performance' ? 'border-emerald-500' : ''}>
+                  <Card className={formData.primary_goal === 'athletic_performance' ? 'border-primary' : ''}>
                     <CardContent className="flex items-center space-x-3 pt-4">
                       <RadioGroupItem value="athletic_performance" id="athletic_performance" />
                       <Label htmlFor="athletic_performance" className="font-medium cursor-pointer">Athletic Performance</Label>
                     </CardContent>
                   </Card>
-                  <Card className={formData.primary_goal === 'health_wellness' ? 'border-emerald-500' : ''}>
+                  <Card className={formData.primary_goal === 'health_wellness' ? 'border-primary' : ''}>
                     <CardContent className="flex items-center space-x-3 pt-4">
                       <RadioGroupItem value="health_wellness" id="health_wellness" />
                       <Label htmlFor="health_wellness" className="font-medium cursor-pointer">Health & Wellness</Label>
@@ -479,7 +479,7 @@ export default function ClientOnboarding() {
                 <RadioGroup value={formData.workout_days_per_week} onValueChange={(value) => updateField('workout_days_per_week', value)}>
                   <div className="grid grid-cols-4 gap-2">
                     {['2', '3', '4', '5', '6', '7'].map(days => (
-                      <Card key={days} className={formData.workout_days_per_week === days ? 'border-emerald-500 bg-emerald-50' : ''}>
+                      <Card key={days} className={formData.workout_days_per_week === days ? 'border-primary bg-primary/10' : ''}>
                         <CardContent className="pt-4 text-center">
                           <RadioGroupItem value={days} id={`days-${days}`} className="mx-auto mb-2" />
                           <Label htmlFor={`days-${days}`} className="font-medium cursor-pointer">{days} days</Label>
@@ -571,8 +571,8 @@ export default function ClientOnboarding() {
                 <div key={step.id} className="flex flex-col items-center">
                   <div className={`
                     w-10 h-10 rounded-full flex items-center justify-center mb-2 transition-all
-                    ${isComplete ? 'bg-emerald-500 text-foreground' : 
-                      isCurrent ? 'bg-emerald-100 text-emerald-600 ring-2 ring-emerald-500' : 
+                    ${isComplete ? 'bg-primary text-foreground' : 
+                      isCurrent ? 'bg-primary/10 text-primary ring-2 ring-primary' : 
                       'bg-slate-200 text-muted-foreground'}
                   `}>
                     {isComplete ? <CheckCircle2 className="w-5 h-5" /> : <Icon className="w-5 h-5" />}
@@ -594,7 +594,7 @@ export default function ClientOnboarding() {
         </Card>
 
         {/* Navigation Buttons */}
-        <div className="flex items-center justify-between mt-6">
+        <div className="flex items-center justify-between mt-6 flex-wrap">
           <Button
             variant="outline"
             onClick={handleBack}
@@ -608,7 +608,7 @@ export default function ClientOnboarding() {
           <Button
             onClick={handleNext}
             disabled={createProfileMutation.isPending}
-            className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 gap-2"
+            className="bg-gradient-to-r from-primary to-primary hover:from-primary hover:to-primary gap-2"
           >
             {currentStep === STEPS.length ? (
               createProfileMutation.isPending ? 'Creating Profile...' : 'Complete Onboarding'

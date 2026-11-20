@@ -127,7 +127,7 @@ const GUIDES = {
 
   /* ---------------- Client portal ---------------- */
   ClientDashboard: {
-    title: "Welcome to ApexCoach!",
+    title: "Welcome to Brigade",
     steps: [
       "This is your Today screen — today's workout, habit checklist, and next session at a glance.",
       "Tap “Start” on your workout card to begin training.",
@@ -197,7 +197,7 @@ const GUIDES = {
 
   /* ---------------- Solo portal ---------------- */
   IndependentDashboard: {
-    title: "Welcome, solo athlete!",
+    title: "Welcome, solo athlete.",
     steps: [
       "This is your home base — workouts, meals, and progress in one view.",
       "Tap “Start Workout” to train. Build plans in the Workouts tab.",

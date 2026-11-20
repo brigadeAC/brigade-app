@@ -36,22 +36,22 @@ export default function ClientMetrics({ clients, sessions, progressLogs }) {
       value: activeClients,
       total: totalClients,
       icon: Users,
-      textColor: "text-green-400",
-      iconColor: "text-green-500"
+      textColor: "text-primary",
+      iconColor: "text-primary"
     },
     {
       label: "Client Retention",
       value: `${retentionRate}%`,
       icon: TrendingUp,
-      textColor: "text-yellow-400",
-      iconColor: "text-yellow-500"
+      textColor: "text-primary",
+      iconColor: "text-primary"
     },
     {
       label: "Session Completion",
       value: `${completionRate}%`,
       icon: Calendar,
-      textColor: "text-purple-400",
-      iconColor: "text-purple-500"
+      textColor: "text-primary",
+      iconColor: "text-primary"
     },
     {
       label: "Tracking Progress",

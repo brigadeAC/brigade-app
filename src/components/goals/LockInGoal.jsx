@@ -122,7 +122,7 @@ export default function LockInGoal({ goals = [], clientId, trainerId, readOnly =
             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">Milestones (War Path)</label>
             <div className="space-y-2 mb-2">
               {newGoal.milestones.map((m, i) => (
-                <div key={i} className="flex items-center gap-2 p-2 rounded-lg" style={{ background: 'rgba(255,255,255,0.04)' }}>
+                <div key={i} className="flex items-center gap-2 p-2 rounded-lg" style={{ background: 'hsl(var(--secondary))' }}>
                   <ChevronRight className="w-3 h-3 text-red-400 flex-shrink-0" />
                   <span className="flex-1 text-sm text-muted-foreground">{m.title}</span>
                   <button onClick={() => removeMilestone(i)} className="text-gray-600 hover:text-red-400">
@@ -218,10 +218,10 @@ export default function LockInGoal({ goals = [], clientId, trainerId, readOnly =
                 <span>{achievedCount} of {totalMilestones} milestones</span>
                 {lockedGoal.target_date && <span>Target: {format(new Date(lockedGoal.target_date), 'MMM d, yyyy')}</span>}
               </div>
-              <div className="h-2 rounded-full" style={{ background: 'rgba(255,255,255,0.06)' }}>
+              <div className="h-2 rounded-full" style={{ background: 'hsl(var(--secondary))' }}>
                 <div
                   className="h-2 rounded-full transition-all duration-700"
-                  style={{ width: `${progress}%`, background: progress === 100 ? 'linear-gradient(90deg, #22c55e, #4ade80)' : 'linear-gradient(90deg, #ef4444, #f97316)' }}
+                  style={{ width: `${progress}%`, background: progress === 100 ? 'linear-gradient(90deg, #4B91DD, #4B91DD)' : 'linear-gradient(90deg, #ef4444, #4B91DD)' }}
                 />
               </div>
             </div>
@@ -238,17 +238,17 @@ export default function LockInGoal({ goals = [], clientId, trainerId, readOnly =
                   disabled={readOnly}
                   className="w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all hover:opacity-80"
                   style={{
-                    background: m.achieved ? 'rgba(34,197,94,0.08)' : 'rgba(255,255,255,0.03)',
-                    border: `1px solid ${m.achieved ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.06)'}`
+                    background: m.achieved ? 'rgba(75,145,221,0.08)' : 'rgba(114,107,101,0.15)',
+                    border: `1px solid ${m.achieved ? 'rgba(75,145,221,0.2)' : 'rgba(114,107,101,0.15)'}`
                   }}
                 >
                   {m.achieved
-                    ? <CheckCircle2 className="w-4 h-4 text-green-400 flex-shrink-0" />
+                    ? <CheckCircle2 className="w-4 h-4 text-primary flex-shrink-0" />
                     : <Circle className="w-4 h-4 text-gray-600 flex-shrink-0" />
                   }
                   <span className={`text-sm flex-1 ${m.achieved ? 'line-through text-muted-foreground' : 'text-muted-foreground'}`}>{m.title}</span>
                   {m.achieved && m.achieved_date && (
-                    <span className="text-xs text-green-500">{format(new Date(m.achieved_date), 'MMM d')}</span>
+                    <span className="text-xs text-primary">{format(new Date(m.achieved_date), 'MMM d')}</span>
                   )}
                 </button>
               ))}
@@ -256,9 +256,9 @@ export default function LockInGoal({ goals = [], clientId, trainerId, readOnly =
           )}
 
           {progress === 100 && (
-            <div className="mt-4 p-3 rounded-xl text-center" style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)' }}>
-              <Trophy className="w-6 h-6 text-yellow-400 mx-auto mb-1" />
-              <p className="text-green-400 font-bold text-sm">Goal Crushed! 🎉</p>
+            <div className="mt-4 p-3 rounded-xl text-center" style={{ background: 'rgba(75,145,221,0.1)', border: '1px solid rgba(75,145,221,0.2)' }}>
+              <Trophy className="w-6 h-6 text-primary mx-auto mb-1" />
+              <p className="text-primary font-bold text-sm">Goal Crushed. 🎉</p>
             </div>
           )}
         </div>

@@ -51,7 +51,7 @@ export default function InstallGuide() {
     <Card className="glass-card rounded-2xl">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-foreground">
-          <MonitorSmartphone className="w-5 h-5 text-emerald-400" />
+          <MonitorSmartphone className="w-5 h-5 text-primary" />
           App Installation
         </CardTitle>
       </CardHeader>
@@ -62,11 +62,11 @@ export default function InstallGuide() {
             <p className="text-xs text-muted-foreground mt-1">Once installed, your app feels more native and loads faster.</p>
           </div>
           {isInstalled ? (
-            <span className="flex items-center gap-1 text-emerald-400 font-medium px-3 py-1 bg-emerald-500/10 rounded-full border border-emerald-500/20">
+            <span className="flex items-center gap-1 text-primary font-medium px-3 py-1 bg-primary/10 rounded-full border border-primary/20">
               <CheckCircle2 className="w-4 h-4" /> Installed
             </span>
           ) : (
-            <span className="flex items-center gap-1 text-yellow-400 font-medium px-3 py-1 bg-yellow-500/10 rounded-full border border-yellow-500/20">
+            <span className="flex items-center gap-1 text-primary font-medium px-3 py-1 bg-primary/10 rounded-full border border-primary/20">
               <AlertCircle className="w-4 h-4" /> Not Installed
             </span>
           )}
@@ -75,24 +75,24 @@ export default function InstallGuide() {
         {!isInstalled && (
           <div className="space-y-4 mt-4">
             {isIos ? (
-              <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 space-y-3">
-                <div className="flex items-center gap-2 text-blue-400 font-semibold mb-2">
+              <div className="p-4 rounded-xl bg-primary/10 border border-primary/20 space-y-3">
+                <div className="flex items-center gap-2 text-primary font-semibold mb-2">
                   <Apple className="w-5 h-5" /> iOS (Safari)
                 </div>
                 <p>1. Tap the <strong>Share</strong> icon (square with upward arrow at bottom).</p>
                 <p>2. Scroll down and select <strong>Add to Home Screen</strong>.</p>
                 <p>3. Tap <strong>Add</strong> in the top right.</p>
-                <div className="p-2 bg-blue-900/40 rounded border border-blue-500/20 mt-2">
-                  <p className="text-xs text-blue-700 dark:text-blue-300 font-medium">Important: Push features only work after adding to home screen, not in the browser tab.</p>
+                <div className="p-2 bg-primary/40 rounded border border-primary/20 mt-2">
+                  <p className="text-xs text-primary dark:text-primary font-medium">Important: Push features only work after adding to home screen, not in the browser tab.</p>
                 </div>
               </div>
             ) : (
-              <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 space-y-3">
-                <div className="flex items-center gap-2 text-emerald-400 font-semibold">
+              <div className="p-4 rounded-xl bg-primary/10 border border-primary/20 space-y-3">
+                <div className="flex items-center gap-2 text-primary font-semibold">
                   <MonitorSmartphone className="w-5 h-5" /> Android / Chrome
                 </div>
                 {deferredPrompt ? (
-                  <Button onClick={handleInstall} className="w-full bg-emerald-600 hover:bg-emerald-700 text-foreground shadow-lg shadow-emerald-900/20">
+                  <Button onClick={handleInstall} className="w-full bg-primary hover:bg-primary text-foreground shadow-lg shadow-primary/20">
                     <Download className="w-4 h-4 mr-2" />
                     Install App Now
                   </Button>

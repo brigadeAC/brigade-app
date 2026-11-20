@@ -57,23 +57,23 @@ export default function DailyCompletionTracker({ clientId, trainerId, type, date
   });
 
   return (
-    <div className="flex items-center gap-3 p-4 rounded-xl glass-card" style={{ background: isCompleted ? 'rgba(16, 185, 129, 0.1)' : 'rgba(255, 255, 255, 0.05)', border: isCompleted ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(255, 255, 255, 0.1)' }}>
+    <div className="flex items-center gap-3 p-4 rounded-xl glass-card" style={{ background: isCompleted ? 'rgba(75,145,221, 0.1)' : 'rgba(114,107,101,0.15)', border: isCompleted ? '1px solid rgba(75,145,221, 0.3)' : '1px solid hsl(var(--border))' }}>
       <button
         onClick={() => toggleMutation.mutate(!isCompleted)}
         className="flex items-center justify-center w-6 h-6 rounded-md transition-colors focus:outline-none"
         style={{ 
-          background: isCompleted ? '#10b981' : 'transparent',
+          background: isCompleted ? '#4B91DD' : 'transparent',
           border: isCompleted ? 'none' : '2px solid rgba(255,255,255,0.3)'
         }}
       >
         {isCompleted && <CheckCircle2 className="w-4 h-4 text-black" />}
       </button>
       <div className="flex flex-col">
-        <Label className={`text-sm font-semibold cursor-pointer ${isCompleted ? 'text-emerald-400' : 'text-foreground'}`} onClick={() => toggleMutation.mutate(!isCompleted)}>
+        <Label className={`text-sm font-semibold cursor-pointer ${isCompleted ? 'text-primary' : 'text-foreground'}`} onClick={() => toggleMutation.mutate(!isCompleted)}>
           {isTrainer ? `${type === 'workout' ? 'Workout' : 'Meal'} Completed on ${date}` : `Mark ${type} as completed for today`}
         </Label>
         <span className="text-xs text-muted-foreground">
-          {isCompleted ? "Great job! You've marked this as completed." : "Don't forget to check this off when you're done!"}
+          {isCompleted ? "Great job. You've marked this as completed." : "Don't forget to check this off when you're done."}
         </span>
       </div>
     </div>

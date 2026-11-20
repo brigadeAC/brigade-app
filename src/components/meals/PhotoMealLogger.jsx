@@ -41,7 +41,7 @@ export default function PhotoMealLogger({ onMealAnalyzed }) {
 
       const hasData = aiRes && typeof aiRes.calories === "number" && !aiRes.__stub;
       if (hasData) {
-        toast.success("Meal analyzed!");
+        toast.success("Meal analyzed.");
         if (onMealAnalyzed) onMealAnalyzed({ ...aiRes, fileUrl });
       } else {
         toast.error("Couldn't read that photo — try a clearer shot, or add the meal manually.");
@@ -56,11 +56,11 @@ export default function PhotoMealLogger({ onMealAnalyzed }) {
   };
 
   return (
-    <Card className="glass-card mb-6 border-orange-500/30 bg-orange-500/5">
+    <Card className="glass-card mb-6 border-primary/30 bg-primary/5">
       <CardContent className="p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
         <div>
           <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
-            <Camera className="text-orange-400" /> AI Meal Scanner
+            <Camera className="text-primary" /> AI Meal Scanner
           </h3>
           <p className="text-sm text-muted-foreground mt-1">
             Snap a photo of your food, and our AI will estimate the calories and macros instantly.
@@ -75,7 +75,7 @@ export default function PhotoMealLogger({ onMealAnalyzed }) {
             disabled={isUploading || isAnalyzing}
           />
           <Button 
-            className="bg-gradient-to-r from-orange-500 to-red-600 pointer-events-none"
+            className="bg-gradient-to-r from-primary to-red-600 pointer-events-none"
             disabled={isUploading || isAnalyzing}
           >
             {isUploading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Uploading...</> :

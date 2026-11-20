@@ -147,8 +147,8 @@ Output JSON exactly matching these properties:
   if (step === 0 || step === 2) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center">
-        <div className="w-20 h-20 rounded-full mx-auto flex items-center justify-center mb-6" style={{ background: 'linear-gradient(135deg, #00E676, #008f49)' }}>
-          <Flame className="w-10 h-10 text-[#0A0A0A] animate-pulse" />
+        <div className="w-20 h-20 rounded-full mx-auto flex items-center justify-center mb-6" style={{ background: 'linear-gradient(135deg, #4B91DD, #4B91DD)' }}>
+          <Flame className="w-10 h-10 text-[#191615] animate-pulse" />
         </div>
         <h2 className="text-2xl font-black text-foreground mb-2 tracking-wide drop-">
           {step === 0 ? "AUTHENTICATING" : "AI IS CRAFTING YOUR PLAN..."}
@@ -223,7 +223,7 @@ Output JSON exactly matching these properties:
                 }
                 handleComplete();
               }}
-              className="group flex items-center gap-2 px-8 py-3 bg-[#00E676] text-black font-bold rounded-xl hover:bg-primary/90 transition-all hover:"
+              className="group flex items-center gap-2 px-8 py-3 bg-[#4B91DD] text-black font-bold rounded-xl hover:bg-primary/90 transition-all hover:"
             >
               GENERATE PLAN <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </button>

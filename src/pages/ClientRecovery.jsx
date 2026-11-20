@@ -60,8 +60,8 @@ export default function ClientRecovery() {
   return (
     <div className="max-w-5xl mx-auto space-y-8">
       <div className="flex items-center gap-3 mb-8">
-        <div className="p-3 bg-blue-500/20 rounded-xl">
-          <HeartPulse className="w-8 h-8 text-blue-500" />
+        <div className="p-3 bg-primary/20 rounded-xl">
+          <HeartPulse className="w-8 h-8 text-primary" />
         </div>
         <div>
           <h1 className="text-3xl font-black text-foreground">Recovery & Readiness</h1>
@@ -74,10 +74,10 @@ export default function ClientRecovery() {
           {clientId && <SleepStressLogger userId={clientId} />}
 
           {/* Today's AI recovery protocol (generated after logging readiness) */}
-          <Card className="glass-card border-blue-500/20">
+          <Card className="glass-card border-primary/20">
             <CardHeader className="pb-3">
               <CardTitle className="text-lg text-foreground flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-blue-500" />
+                <Sparkles className="w-5 h-5 text-primary" />
                 Today's Recovery Protocol
               </CardTitle>
             </CardHeader>

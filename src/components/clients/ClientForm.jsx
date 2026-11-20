@@ -133,7 +133,7 @@ export default function ClientForm({ open, onOpenChange, client, onSubmit }) {
       <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto" aria-describedby="client-form-description">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary flex items-center justify-center">
               <User className="w-5 h-5 text-foreground" />
             </div>
             {client ? "Edit Client" : "Add New Client"}
@@ -245,7 +245,7 @@ export default function ClientForm({ open, onOpenChange, client, onSubmit }) {
             </Button>
             <Button 
               type="submit" 
-              className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700"
+              className="bg-gradient-to-r from-primary to-primary hover:from-primary hover:to-primary"
               disabled={isLoading}
             >
               {isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}

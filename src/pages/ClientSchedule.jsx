@@ -20,16 +20,16 @@ import VideoCallRoom from "@/components/video/VideoCallRoom";
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, isToday, isPast } from "date-fns";
 
 const sessionTypeColors = {
-  personal_training: "bg-blue-100 text-blue-700 border-blue-200",
-  group_class: "bg-purple-100 text-purple-700 border-purple-200",
-  assessment: "bg-orange-100 text-orange-700 border-orange-200",
-  consultation: "bg-teal-100 text-teal-700 border-teal-200",
-  video_call: "bg-yellow-100 text-yellow-700 border-yellow-200"
+  personal_training: "bg-primary/10 text-primary border-primary/20",
+  group_class: "bg-primary/10 text-primary border-primary/20",
+  assessment: "bg-primary/10 text-primary border-primary/20",
+  consultation: "bg-primary/10 text-primary border-primary/20",
+  video_call: "bg-primary/10 text-primary border-primary/20"
 };
 
 const statusColors = {
-  scheduled: "bg-blue-100 text-blue-700",
-  completed: "bg-emerald-100 text-emerald-700",
+  scheduled: "bg-primary/10 text-primary",
+  completed: "bg-primary/10 text-primary",
   cancelled: "bg-red-100 text-red-700",
   no_show: "bg-amber-100 text-amber-700"
 };
@@ -119,7 +119,7 @@ export default function ClientSchedule() {
         </div>
         <div className="text-right">
           <p className="text-sm text-slate-500">Total Sessions</p>
-          <p className="text-2xl font-bold text-blue-600">{sessions.length}</p>
+          <p className="text-2xl font-bold text-primary">{sessions.length}</p>
         </div>
       </div>
 
@@ -128,9 +128,9 @@ export default function ClientSchedule() {
         <div className="lg:col-span-2">
           <Card className="glass-card border-border">
             <CardHeader>
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between flex-wrap">
                 <CardTitle className="text-foreground">{format(currentMonth, 'MMMM yyyy')}</CardTitle>
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                   <Button variant="outline" size="icon" onClick={previousMonth} className="border-border text-foreground hover:bg-accent">
                     <ChevronLeft className="h-4 w-4" />
                   </Button>
@@ -159,8 +159,8 @@ export default function ClientSchedule() {
                       className={`
                         aspect-square p-2 rounded-lg text-sm transition-all relative
                         ${!isSameMonth(day, currentMonth) ? 'text-gray-600' : 'text-foreground'}
-                        ${isSelected ? 'bg-blue-600 text-foreground' : 'hover:bg-accent'}
-                        ${isCurrentDay && !isSelected ? 'ring-2 ring-blue-500 ring-offset-2 ring-offset-transparent' : ''}
+                        ${isSelected ? 'bg-primary text-foreground' : 'hover:bg-accent'}
+                        ${isCurrentDay && !isSelected ? 'ring-2 ring-primary ring-offset-2 ring-offset-transparent' : ''}
                       `}>
 
                       <span className="font-medium">{format(day, 'd')}</span>
@@ -170,7 +170,7 @@ export default function ClientSchedule() {
                         <div
                           key={idx}
                           className={`h-1 w-1 rounded-full ${
-                          isSelected ? 'bg-white' : 'bg-blue-400'}`
+                          isSelected ? 'bg-white' : 'bg-primary/80'}`
                           } />
 
                         )}
@@ -216,7 +216,7 @@ export default function ClientSchedule() {
                             <Button 
                               size="sm" 
                               onClick={() => handleJoinCall(session.video_room_id)}
-                              className="mt-2 h-7 text-xs bg-yellow-600 hover:bg-yellow-700 text-foreground w-full"
+                              className="mt-2 h-7 text-xs bg-primary hover:bg-primary text-foreground w-full"
                             >
                               <Video className="w-3 h-3 mr-1" /> Join Call
                             </Button>
@@ -283,7 +283,7 @@ export default function ClientSchedule() {
                             <Button 
                               size="sm" 
                               onClick={() => handleJoinCall(session.video_room_id)}
-                              className="h-8 text-xs bg-yellow-600 hover:bg-yellow-700 text-foreground"
+                              className="h-8 text-xs bg-primary hover:bg-primary text-foreground"
                             >
                               <Video className="w-3 h-3 mr-1" /> Join Call
                             </Button>

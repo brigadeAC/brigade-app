@@ -6,9 +6,9 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
 const typeColors = {
-  personal_training: "bg-green-500/10 text-green-400 border-green-500/20",
-  group_class: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
-  assessment: "bg-purple-500/10 text-purple-400 border-purple-500/20",
+  personal_training: "bg-primary/10 text-primary border-primary/20",
+  group_class: "bg-primary/10 text-primary border-primary/20",
+  assessment: "bg-primary/10 text-primary border-primary/20",
   consultation: "bg-red-500/10 text-red-400 border-red-500/20"
 };
 
@@ -18,7 +18,7 @@ import { Video } from "lucide-react";
 export default function UpcomingSession({ session, client, onJoinVideo }) {
   return (
     <div className="flex items-center gap-4 p-4 bg-card border border-border rounded-2xl hover:border-primary/30 transition-all group">
-      <Avatar className="h-12 w-12 ring-2 ring-[#00D084]/20 shadow-sm">
+      <Avatar className="h-12 w-12 ring-2 ring-[#4B91DD]/20 shadow-sm">
         <AvatarImage src={client?.avatar_url} />
         <AvatarFallback className="bg-primary/20 text-primary font-medium">
           {client?.full_name?.[0] || "?"}
