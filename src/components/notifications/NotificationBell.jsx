@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
+import { enablePush, pushIsOn, pushResultMessage } from "@/lib/push";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Bell, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -47,41 +48,12 @@ export default function NotificationBell({ user }) {
   );
 
   const requestPermission = async () => {
-    if (!('Notification' in window) || !('PushManager' in window)) {
-      alert("Push notifications are not supported on this browser or device.");
-      return;
-    }
     try {
-      const perm = await Notification.requestPermission();
-      setPermission(perm);
-      if (perm !== 'granted') return;
-
-      // Also do the full push subscription
-      if (!('serviceWorker' in navigator)) return;
-      const registration = await navigator.serviceWorker.ready;
-      const existing = await registration.pushManager.getSubscription();
-      if (existing) return;
-
-      const res = await base44.functions.invoke('webPush', { action: 'getPublicKey' });
-      const publicKey = res.data?.publicKey;
-      if (!publicKey) return;
-
-      const base64ToUint8 = (base64String) => {
-        const padding = '='.repeat((4 - base64String.length % 4) % 4);
-        const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-        const rawData = window.atob(base64);
-        const arr = new Uint8Array(rawData.length);
-        for (let i = 0; i < rawData.length; i++) arr[i] = rawData.charCodeAt(i);
-        return arr;
-      };
-
-      const subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: base64ToUint8(publicKey)
-      });
-      await base44.functions.invoke('webPush', { action: 'subscribe', subscription: subscription.toJSON() });
+      const result = await enablePush();
+      setPermission('Notification' in window ? Notification.permission : 'denied');
+      if (result !== "on") alert(pushResultMessage[result]);
     } catch (e) {
-      console.error("Error requesting permission / subscribing", e);
+      console.error("Error turning on notifications", e);
     }
   };
 
@@ -93,7 +65,7 @@ export default function NotificationBell({ user }) {
 
     if (newNotifications.length > 0) {
       // Show system notifications for new unread notifications
-      if ('Notification' in window && Notification.permission === 'granted') {
+      if ('Notification' in window && Notification.permission === 'granted' && !pushIsOn()) {
         newNotifications.forEach(notification => {
           try {
             if (navigator.serviceWorker && navigator.serviceWorker.controller) {

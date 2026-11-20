@@ -49,6 +49,8 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import NotificationBell from "@/components/notifications/NotificationBell";
+import { toast } from "sonner";
+import { enablePush, refreshPushSubscription, pushSupported, pushResultMessage } from "@/lib/push";
 import PWAInstallPrompt from "@/components/PWAInstallPrompt";
 import OfflineMessage from "@/components/OfflineMessage";
 import { Badge } from "@/components/ui/badge";
@@ -66,6 +68,7 @@ const navGroups = [
     title: "Clients & CRM",
     items: [
       { name: "Clients", icon: Users, page: "Clients" },
+      { name: "Messages", icon: MessageCircle, page: "Messages" },
       { name: "CRM", icon: Target, page: "CRM" },
       { name: "Notebooks", icon: BookOpen, page: "ClientNotebooks" },
       { name: "Contracts", icon: FileText, page: "Contracts" },
@@ -181,12 +184,41 @@ export default function Layout({ children, currentPageName }) {
     queryKey: ["unreadMessages", user?.id],
     queryFn: () => base44.entities.Message.filter({ receiver_id: user?.id, read: false }),
     enabled: !!user?.id,
-    refetchInterval: 60000
+    refetchInterval: 20000
   });
 
   const handleRefresh = async () => {
     await queryClient.invalidateQueries();
   };
+
+  // Coaches: keep this device's push subscription current, and offer once to
+  // turn on notifications so new client messages reach their phone.
+  const isStaffUser = !!user && (user.role === 'admin' || user.user_type === 'trainer');
+  useEffect(() => {
+    if (!isStaffUser || !pushSupported()) return;
+    refreshPushSubscription();
+    if (Notification.permission !== 'default') return;
+    try { if (localStorage.getItem('push_prompted') === '1') return; } catch { /* ignore */ }
+    const timer = setTimeout(async () => {
+      // Only offer once the server can actually send pushes.
+      const res = await base44.functions.invoke('webPush', { action: 'getPublicKey' }).catch(() => null);
+      if (!res?.data?.publicKey) return;
+      try { localStorage.setItem('push_prompted', '1'); } catch { /* ignore */ }
+      toast('Turn on notifications?', {
+        description: 'Get alerted on this device when a client sends you a message.',
+        action: {
+          label: 'Turn on',
+          onClick: async () => {
+            const result = await enablePush();
+            if (result === 'on') toast.success(pushResultMessage.on);
+            else if (result !== 'denied') toast.error(pushResultMessage[result]);
+          },
+        },
+        duration: 12000,
+      });
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, [isStaffUser]);
 
   const { data: isClientUserCheck, isLoading: isClientCheckLoading } = useQuery({
     queryKey: ["userRoleCheck", user?.id, adminViewMode],

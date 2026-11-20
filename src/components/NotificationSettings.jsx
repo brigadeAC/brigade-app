@@ -49,46 +49,14 @@ export default function NotificationSettings() {
   };
 
   const subscribeToPush = async () => {
-    if (!('Notification' in window) || !('serviceWorker' in navigator)) {
-      toast.error('Push notifications are not supported in this browser.');
-      return;
-    }
-
     setIsLoading(true);
     try {
-      let currentPermission = Notification.permission;
-      if (currentPermission !== 'granted') {
-        currentPermission = await Notification.requestPermission();
-        setPermission(currentPermission);
-        if (currentPermission !== 'granted') {
-          toast.error('Permission denied. Please enable notifications in your browser settings.');
-          setIsLoading(false);
-          return;
-        }
-      }
-
-      const registration = await navigator.serviceWorker.ready;
-      
-      // Get VAPID public key from backend
-      const res = await base44.functions.invoke('webPush', { action: 'getPublicKey' });
-      const publicKey = res.data.publicKey;
-      
-      const subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(publicKey)
-      });
-      
-      // Save subscription to database
-      await base44.functions.invoke('webPush', { 
-        action: 'subscribe', 
-        subscription: subscription.toJSON() 
-      });
-      
-      setIsSubscribed(true);
-      toast.success('Successfully subscribed to push notifications.');
+      const result = await enablePush();
+      if (result === "on") { setIsSubscribed(true); setPermission("granted"); toast.success(pushResultMessage.on); }
+      else { if (result === "denied") setPermission(Notification.permission); toast.error(pushResultMessage[result]); }
     } catch (e) {
       console.error('Subscription error:', e);
-      toast.error('Failed to subscribe. Are you in a supported browser context? iOS requires "Add to Home Screen".');
+      toast.error('Could not turn on notifications. On iPhone, add the app to your Home Screen first.');
     } finally {
       setIsLoading(false);
     }
@@ -97,24 +65,11 @@ export default function NotificationSettings() {
   const unsubscribeFromPush = async () => {
     setIsLoading(true);
     try {
-      const registration = await navigator.serviceWorker.ready;
-      const subscription = await registration.pushManager.getSubscription();
-      
-      if (subscription) {
-        // Remove from backend
-        await base44.functions.invoke('webPush', { 
-          action: 'unsubscribe', 
-          subscription: subscription.toJSON() 
-        });
-        
-        // Unsubscribe locally
-        await subscription.unsubscribe();
-        setIsSubscribed(false);
-        toast.success('Successfully unsubscribed.');
-      }
+      await disablePush();
+      setIsSubscribed(false);
+      toast.success('Notifications are off for this device.');
     } catch (e) {
-      console.error('Unsubscribe error:', e);
-      toast.error('Failed to unsubscribe.');
+      toast.error('Could not turn off notifications.');
     } finally {
       setIsLoading(false);
     }
@@ -123,21 +78,11 @@ export default function NotificationSettings() {
   const sendTestNotification = async () => {
     setIsSendingTest(true);
     try {
-      const res = await base44.functions.invoke('webPush', {
-        action: 'send',
-        title: 'Test Notification 🚀',
-        message: 'Your push notifications are working perfectly.',
-        url: '/'
-      });
-      
-      if (res.data.success) {
-        toast.success(`Test notification sent successfully to ${res.data.sentTo} devices.`);
-      } else {
-        toast.error(res.data.message || 'Failed to send test notification.');
-      }
+      const res = await base44.functions.invoke('webPush', { action: 'test' });
+      if (res.data?.success) toast.success('Test sent. It should appear in a few seconds.');
+      else toast.error(res.data?.error || 'Could not send a test notification.');
     } catch (e) {
-      console.error('Send test error:', e);
-      toast.error('Failed to send test notification.');
+      toast.error('Could not send a test notification.');
     } finally {
       setIsSendingTest(false);
     }

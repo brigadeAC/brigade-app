@@ -3,6 +3,7 @@ import { BrandIcon, BrandWordmark, BrandLockup, BrandWordmarkImage } from "@/com
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { base44 } from "@/api/base44Client";
+import { enablePush, refreshPushSubscription, pushResultMessage } from "@/lib/push";
 import PullToRefresh from "react-simple-pull-to-refresh";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
@@ -132,56 +133,24 @@ export default function ClientLayout({ children, currentPageName }) {
 
   const subscribeToPush = async () => {
     try {
-      if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
-      const perm = await Notification.requestPermission();
-      if (perm !== 'granted') return;
-
-      // Register service worker if not already registered
-      let registration;
-      try {
-        registration = await navigator.serviceWorker.register('/serviceWorker.js');
-        await navigator.serviceWorker.ready;
-        registration = await navigator.serviceWorker.ready;
-      } catch (e) {
-        registration = await navigator.serviceWorker.ready;
-      }
-
-      // Get VAPID key first
-      const res = await base44.functions.invoke('webPush', { action: 'getPublicKey' });
-      const publicKey = res.data?.publicKey;
-      if (!publicKey) return;
-
-      const base64ToUint8 = (base64String) => {
-        const padding = '='.repeat((4 - base64String.length % 4) % 4);
-        const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-        const rawData = window.atob(base64);
-        const arr = new Uint8Array(rawData.length);
-        for (let i = 0; i < rawData.length; i++) arr[i] = rawData.charCodeAt(i);
-        return arr;
-      };
-
-      // Unsubscribe stale subscription if any, then re-subscribe fresh
-      const existing = await registration.pushManager.getSubscription();
-      if (existing) await existing.unsubscribe();
-
-      const subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: base64ToUint8(publicKey)
-      });
-
-      await base44.functions.invoke('webPush', { action: 'subscribe', subscription: subscription.toJSON() });
-      toast.success("Push notifications enabled.");
+      const result = await enablePush();
+      if (result === "on") toast.success(pushResultMessage.on);
+      else if (result !== "denied") toast.error(pushResultMessage[result]);
     } catch (e) {
       console.error("Push subscribe error:", e);
     }
   };
 
+  useEffect(() => { refreshPushSubscription(); }, []);
+
   useEffect(() => {
     // Prompt for push notifications if not decided yet
     if ('Notification' in window && Notification.permission === 'default' && 'PushManager' in window) {
-      const timer = setTimeout(() => {
+      const timer = setTimeout(async () => {
+        const res = await base44.functions.invoke('webPush', { action: 'getPublicKey' }).catch(() => null);
+        if (!res?.data?.publicKey) return;
         toast('Enable Push Notifications?', {
-          description: 'Get notified when your trainer updates your plan or sends a message.',
+          description: 'Get notified when your coach messages you or updates your plan.',
           action: {
             label: 'Enable',
             onClick: subscribeToPush

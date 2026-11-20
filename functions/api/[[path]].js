@@ -500,6 +500,124 @@ async function deleteClientAndData(env, row) {
   return results.length + 1;
 }
 
+/* ------------------------------ web push -------------------------------- */
+// Standard Web Push (RFC 8291 aes128gcm payload encryption + RFC 8292 VAPID),
+// done with WebCrypto so no outside service is involved. Keys:
+//   VAPID_PUBLIC_KEY  - base64url uncompressed P-256 public key (not secret)
+//   VAPID_PRIVATE_KEY - the matching private key as a JWK JSON string (secret)
+const b64uEncode = (buf) => {
+  const bytes = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
+  let s = '';
+  for (const b of bytes) s += String.fromCharCode(b);
+  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+};
+const b64uDecode = (str) => {
+  const s = String(str).replace(/-/g, '+').replace(/_/g, '/');
+  const bin = atob(s + '='.repeat((4 - (s.length % 4)) % 4));
+  return Uint8Array.from(bin, (c) => c.charCodeAt(0));
+};
+const concatBytes = (...parts) => {
+  const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
+  let o = 0;
+  for (const p of parts) { out.set(p, o); o += p.length; }
+  return out;
+};
+const utf8 = (s) => new TextEncoder().encode(s);
+
+async function hkdf(salt, ikm, info, length) {
+  const key = await crypto.subtle.importKey('raw', ikm, 'HKDF', false, ['deriveBits']);
+  const bits = await crypto.subtle.deriveBits({ name: 'HKDF', hash: 'SHA-256', salt, info }, key, length * 8);
+  return new Uint8Array(bits);
+}
+
+async function vapidAuthHeader(env, endpoint) {
+  const jwk = JSON.parse(env.VAPID_PRIVATE_KEY);
+  const key = await crypto.subtle.importKey('jwk', jwk, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign']);
+  const header = b64uEncode(utf8(JSON.stringify({ typ: 'JWT', alg: 'ES256' })));
+  const claims = b64uEncode(utf8(JSON.stringify({
+    aud: new URL(endpoint).origin,
+    exp: Math.floor(Date.now() / 1000) + 12 * 3600,
+    sub: env.VAPID_SUBJECT || 'https://brigade-app.pages.dev',
+  })));
+  const sig = await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, key, utf8(`${header}.${claims}`));
+  return `vapid t=${header}.${claims}.${b64uEncode(sig)}, k=${env.VAPID_PUBLIC_KEY}`;
+}
+
+async function encryptPushPayload(sub, payload) {
+  const uaPublic = b64uDecode(sub.keys.p256dh);
+  const authSecret = b64uDecode(sub.keys.auth);
+  const local = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
+  const asPublic = new Uint8Array(await crypto.subtle.exportKey('raw', local.publicKey));
+  const uaKey = await crypto.subtle.importKey('raw', uaPublic, { name: 'ECDH', namedCurve: 'P-256' }, false, []);
+  const ecdhSecret = new Uint8Array(await crypto.subtle.deriveBits({ name: 'ECDH', public: uaKey }, local.privateKey, 256));
+  const ikm = await hkdf(authSecret, ecdhSecret, concatBytes(utf8('WebPush: info\0'), uaPublic, asPublic), 32);
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const cek = await hkdf(salt, ikm, utf8('Content-Encoding: aes128gcm\0'), 16);
+  const nonce = await hkdf(salt, ikm, utf8('Content-Encoding: nonce\0'), 12);
+  const aesKey = await crypto.subtle.importKey('raw', cek, 'AES-GCM', false, ['encrypt']);
+  const plain = concatBytes(utf8(payload), new Uint8Array([2])); // 0x02 = last record
+  const cipher = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv: nonce }, aesKey, plain));
+  const rs = new Uint8Array([0, 0, 16, 0]); // record size 4096
+  return concatBytes(salt, rs, new Uint8Array([asPublic.length]), asPublic, cipher);
+}
+
+// Push a notification to every device the user enabled. Expired
+// subscriptions (404/410) are removed. Never throws.
+async function sendPushToUser(env, userId, message) {
+  if (!env.VAPID_PUBLIC_KEY || !env.VAPID_PRIVATE_KEY || !userId) return 0;
+  let sent = 0;
+  try {
+    const { results } = await env.DB.prepare(
+      `SELECT id, data FROM entities WHERE entity_type='PushSubscription' AND json_extract(data,'$.user_id') = ?`
+    ).bind(userId).all();
+    const payload = JSON.stringify(message);
+    for (const row of results) {
+      let sub; try { sub = JSON.parse(row.data); } catch { continue; }
+      if (!sub?.endpoint || !sub?.keys?.p256dh || !sub?.keys?.auth) continue;
+      try {
+        const body = await encryptPushPayload(sub, payload);
+        const res = await fetch(sub.endpoint, {
+          method: 'POST',
+          headers: {
+            Authorization: await vapidAuthHeader(env, sub.endpoint),
+            'Content-Encoding': 'aes128gcm',
+            'Content-Type': 'application/octet-stream',
+            TTL: '86400',
+            Urgency: 'high',
+          },
+          body,
+        });
+        if (res.status === 404 || res.status === 410) {
+          await env.DB.prepare('DELETE FROM entities WHERE id = ?').bind(row.id).run();
+        } else if (res.ok) {
+          sent++;
+        }
+      } catch { /* one bad device shouldn't stop the rest */ }
+    }
+  } catch { /* push is best-effort */ }
+  return sent;
+}
+
+// A new Notification row also goes out as a push. Members can only trigger
+// pushes to staff (their coach), so one member can't push-spam another.
+// Message text isn't put on the lock screen, only who it's from.
+async function pushForNotification(env, user, fields) {
+  const target = fields?.user_id;
+  if (!target || target === user.id) return;
+  if (isMemberUser(user)) {
+    const t = await env.DB.prepare('SELECT role, user_type FROM users WHERE id = ?').bind(target).first();
+    if (!t || (t.role !== 'admin' && t.user_type !== 'trainer')) return;
+  }
+  const isMessage = fields.type === 'message';
+  const sender = isMessage ? String(fields.message || '').split(':')[0].slice(0, 60) : '';
+  await sendPushToUser(env, target, {
+    title: isMessage ? 'New message' : String(fields.title || 'Brigade').slice(0, 80),
+    body: isMessage ? `${sender || 'Someone'} sent you a message.` : String(fields.message || '').slice(0, 140),
+    url: fields.link || '/',
+    tag: isMessage ? 'messages' : undefined,
+  });
+}
+
 // Fetch one entity only if the user is allowed to see it. Returns null when the
 // row is missing OR out of scope — callers answer 404 either way, so an
 // attacker cannot probe for the existence of other users' records.
@@ -806,7 +924,9 @@ async function runFunction(name, payload, ctx) {
         return { success: true };
       }
       if (action === 'test' || action === 'sendTest') {
-        return { success: true, note: 'Push delivery ships with the notification service.' };
+        if (!env.VAPID_PUBLIC_KEY || !env.VAPID_PRIVATE_KEY) return { success: false, error: 'Push notifications are not configured.' };
+        const sent = await sendPushToUser(env, user.id, { title: 'Brigade', body: 'Notifications are working.', url: '/', tag: 'test' });
+        return sent > 0 ? { success: true, sent } : { success: false, error: 'No device is set up for notifications yet.' };
       }
       return { success: false, error: `Unknown webPush action: ${action}` };
     }
@@ -1876,6 +1996,8 @@ async function seedCoachingContent(env) {
 
 export async function onRequest(context) {
   const { request, env } = context;
+  // Lets slow side work (push delivery) finish after the response is sent.
+  if (context.waitUntil) env.__waitUntil = (p) => context.waitUntil(p);
   const url = new URL(request.url);
   const method = request.method.toUpperCase();
   if (env.DB) await ensureSchema(env);
@@ -2215,6 +2337,10 @@ export async function onRequest(context) {
             ).bind(eid, type, JSON.stringify(fields), user.email || user.id, now, now).run();
             created.push({ ...fields, id: eid, created_by: user.email || user.id, created_date: now, updated_date: now });
             await audit(env, { actor: user.email, action: 'create', target: type, targetId: eid, request });
+            if (type === 'Notification') {
+              const p = pushForNotification(env, user, fields);
+              if (env.__waitUntil) env.__waitUntil(p); else await p;
+            }
           }
           return json(Array.isArray(body) ? created : created[0]);
         }

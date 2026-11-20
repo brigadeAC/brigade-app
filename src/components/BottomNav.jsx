@@ -1,7 +1,7 @@
 import React, { useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { createPageUrl } from "../utils";
-import { LayoutDashboard, Users, MessageCircle, CalendarDays, Dumbbell } from "lucide-react";
+import { LayoutDashboard, Users, MessageCircle, Dumbbell } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { useQuery } from "@tanstack/react-query";
@@ -11,7 +11,7 @@ const navItems = [
   { name: "Home", icon: LayoutDashboard, page: "Dashboard", accent: { color: '#4B91DD', rgba: '212,175,55' } },
   { name: "Clients", icon: Users, page: "Clients", accent: { color: '#4B91DD', rgba: '34,197,94' } },
   { name: "Workouts", icon: Dumbbell, page: "Workouts", accent: { color: '#ef4444', rgba: '239,68,68' } },
-  { name: "Schedule", icon: CalendarDays, page: "Schedule", accent: { color: '#4B91DD', rgba: '139,92,246' } },
+  { name: "Messages", icon: MessageCircle, page: "Messages", accent: { color: '#4B91DD', rgba: '139,92,246' } },
 ];
 
 export default function BottomNav({ user, unreadMessages = [] }) {
