@@ -12,6 +12,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.11.0",
     "@base44/sdk": "^0.8.30",
     "@base44/vite-plugin": "^1.0.20",
     "@docuseal/react": "^1.0.0",

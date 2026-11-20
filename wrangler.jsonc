@@ -35,7 +35,7 @@
   // Non-secret vars. Set AUTH_SECRET and LLM_API_KEY as encrypted secrets in the
   // Pages dashboard (Settings → Environment variables) — do NOT commit them here.
   "vars": {
-    "LLM_MODEL": "claude-sonnet-5",
+    "LLM_MODEL": "claude-haiku-5-5",
     "WORKERS_AI_MODEL": "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
   }
 }

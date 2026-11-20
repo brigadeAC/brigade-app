@@ -1,3 +1,4 @@
+import Anthropic from "@anthropic-ai/sdk";
 // Brigade Athletic Club backend — single Cloudflare Pages Function handling all /api/* routes.
 // Bindings (wrangler.jsonc / Pages dashboard):
 //   env.DB          D1 database
@@ -1127,6 +1128,72 @@ async function loadImage(url) {
   }
 }
 
+/* ---------------------------- Claude (primary) --------------------------- */
+// Claude via the official SDK is the primary model whenever LLM_API_KEY is set;
+// Workers AI is the fallback. Default: Claude Haiku 5.5 (override LLM_MODEL).
+const CLAUDE_DEFAULT_MODEL = 'claude-haiku-5-5';
+
+// Structured outputs require additionalProperties:false on every object and
+// reject numeric/length constraints, so normalize the app's ad-hoc schemas.
+function toStrictSchema(node) {
+  if (Array.isArray(node)) return node.map(toStrictSchema);
+  if (!node || typeof node !== 'object') return node;
+  const out = {};
+  for (const [k, v] of Object.entries(node)) {
+    if (['minimum', 'maximum', 'exclusiveMinimum', 'exclusiveMaximum', 'multipleOf',
+         'minLength', 'maxLength', 'minItems', 'maxItems', 'uniqueItems', 'pattern'].includes(k)) continue;
+    out[k] = (k === 'properties')
+      ? Object.fromEntries(Object.entries(v || {}).map(([pk, pv]) => [pk, toStrictSchema(pv)]))
+      : toStrictSchema(v);
+  }
+  const isObject = out.type === 'object' || (Array.isArray(out.type) && out.type.includes('object'));
+  if (isObject) {
+    out.properties = out.properties || {};
+    out.additionalProperties = false;
+    out.required = Object.keys(out.properties);
+  }
+  return out;
+}
+
+const CLAUDE_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
+
+// Returns parsed JSON (schema) or text, or null when Claude can't answer
+// (API error, refusal, truncation) so the caller can fall back.
+async function callClaude(env, { prompt, schema, img }) {
+  const client = new Anthropic({ apiKey: env.LLM_API_KEY });
+  const content = [];
+  if (img) {
+    const media_type = CLAUDE_IMAGE_TYPES.has(img.mediaType) ? img.mediaType : 'image/jpeg';
+    content.push({ type: 'image', source: { type: 'base64', media_type, data: img.base64 } });
+  }
+  content.push({ type: 'text', text: prompt });
+  try {
+    const response = await client.messages.create({
+      model: env.LLM_MODEL || CLAUDE_DEFAULT_MODEL,
+      max_tokens: 16000,
+      system: 'You are an expert fitness and nutrition coaching assistant for Brigade Athletic Club. Be specific and practical. Never give medical diagnoses. Refer to people neutrally (they/them) unless the input states their pronouns.',
+      output_config: {
+        effort: 'low',
+        ...(schema ? { format: { type: 'json_schema', schema: toStrictSchema(schema) } } : {}),
+      },
+      messages: [{ role: 'user', content }],
+    });
+    if (response.stop_reason === 'refusal' || response.stop_reason === 'max_tokens') {
+      console.error('claude stopped:', response.stop_reason, response.stop_details?.category || '');
+      return null;
+    }
+    const text = response.content.filter((b) => b.type === 'text').map((b) => b.text).join('');
+    if (!schema) return text;
+    return JSON.parse(text);
+  } catch (e) {
+    if (e instanceof Anthropic.AuthenticationError) console.error('claude auth failed: check LLM_API_KEY');
+    else if (e instanceof Anthropic.RateLimitError) console.error('claude rate limited');
+    else if (e instanceof Anthropic.APIError) console.error('claude api error', e.status, e.message);
+    else console.error('claude call failed', e?.message || String(e));
+    return null;
+  }
+}
+
 async function invokeLLM(payload, env) {
   const prompt = payload?.prompt || '';
   const schema = payload?.response_json_schema;
@@ -1161,64 +1228,51 @@ async function invokeLLM(payload, env) {
     const img = await loadImage(imageUrl);
     if (!img) return schema ? {} : { __stub: true, message: 'Could not read the image.' };
 
-    // Best quality: Claude vision in one step when an Anthropic key is set.
+    // Primary: Claude reads the image and answers in one call.
     if (env.LLM_API_KEY) {
-      const resp = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', 'x-api-key': env.LLM_API_KEY, 'anthropic-version': '2023-06-01' },
-        body: JSON.stringify({
-          model: env.LLM_MODEL || 'claude-sonnet-5',
-          max_tokens: 1024,
-          system: sys,
-          messages: [{ role: 'user', content: [
-            { type: 'image', source: { type: 'base64', media_type: img.mediaType, data: img.base64 } },
-            { type: 'text', text: prompt },
-          ] }],
-        }),
-      });
-      const out = await resp.json();
-      return parseOut(out?.content?.[0]?.text ?? '');
+      const out = await callClaude(env, { prompt, schema, img });
+      if (out != null) return out;
     }
 
-    // Free path: a vision model describes the image, then the text model turns
-    // that description into the structured answer the caller asked for.
+    // Free path: a multimodal Workers AI model reads the image and answers in
+    // one step. (llava-1.5-7b was retired by Cloudflare on 2026-11-20.)
+    // Override with VISION_MODEL; the next model in the list is the fallback.
     if (env.AI) {
-      let description = '';
+      let mime = img.mediaType || 'image/jpeg';
+      if (!/^image\//.test(mime)) mime = 'image/jpeg';
+      const dataUri = `data:${mime};base64,${img.base64}`;
+      // Plain-text mode with a JSON instruction: Workers AI vision models hung
+      // with response_format + image in testing. Time-boxed so it can't stall.
+      const model = env.VISION_MODEL || '@cf/google/gemma-4-26b-a4b-it';
       try {
-        const desc = await env.AI.run('@cf/llava-hf/llava-1.5-7b-hf', {
-          image: Array.from(img.bytes),
-          prompt: 'Describe what is in this image in detail. If it is food, list the likely foods, ingredients, and approximate portion size.',
-          max_tokens: 384,
+        const run = env.AI.run(model, {
+          messages: [
+            { role: 'system', content: sys },
+            { role: 'user', content: [
+              { type: 'text', text: prompt },
+              { type: 'image_url', image_url: { url: dataUri } },
+            ] },
+          ],
+          max_tokens: 1024,
         });
-        description = desc?.description || desc?.response || '';
-      } catch { /* vision model unavailable or image too large */ }
-      if (!description) return schema ? {} : { __stub: true, message: 'Image analysis is temporarily unavailable.' };
-      // Recurse through the text path (no image) with the description added.
-      return invokeLLM(
-        { prompt: `${prompt}\n\nWhat the image shows: ${description}`, response_json_schema: schema },
-        env
-      );
+        const timeout = new Promise((_, rej) => setTimeout(() => rej(new Error('timed out after 45s')), 45000));
+        const out = await Promise.race([run, timeout]);
+        const parsed = parseOut(out?.response ?? out?.choices?.[0]?.message?.content ?? '');
+        const empty = !parsed || (typeof parsed === 'object' && Object.keys(parsed).length === 0)
+          || (schema && typeof parsed === 'object' && 'text' in parsed && Object.keys(parsed).length === 1);
+        if (!empty) return parsed;
+        console.error('vision fallback returned nothing usable:', model);
+      } catch (e) {
+        console.error('vision fallback failed:', model, e?.message || String(e), 'bytes=', img.bytes.length);
+      }
+      return schema ? {} : { __stub: true, message: 'Image analysis is temporarily unavailable.' };
     }
     return schema ? {} : { __stub: true, message: 'AI vision is not configured.' };
   }
 
   if (env.LLM_API_KEY) {
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-api-key': env.LLM_API_KEY,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: env.LLM_MODEL || 'claude-sonnet-5',
-        max_tokens: 2048,
-        system: sys,
-        messages: [{ role: 'user', content: prompt }],
-      }),
-    });
-    const out = await resp.json();
-    return parseOut(out?.content?.[0]?.text ?? '');
+    const out = await callClaude(env, { prompt, schema });
+    if (out != null) return out;
   }
 
   if (env.AI) {
