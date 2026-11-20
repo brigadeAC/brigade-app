@@ -205,7 +205,10 @@ export default function ClientMeals() {
 
       {/* AI Meal Logger */}
       <PhotoMealLogger onMealAnalyzed={async (data) => {
-        if (!clientProfile) return;
+        if (!clientProfile) {
+          toast.error("No client profile on this account, so the meal can't be saved. Ask your coach to add you as a client.");
+          return;
+        }
         
         try {
           const hour = new Date().getHours();
