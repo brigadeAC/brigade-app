@@ -69,7 +69,7 @@ export default function Clients() {
     queryKey: ["clients", user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
-      return base44.entities.Client.filter({ trainer_id: user.id }, "-created_date");
+      return base44.entities.Client.list("-created_date");
     },
     enabled: !!user,
   });
@@ -220,7 +220,7 @@ export default function Clients() {
               client={client}
               onEdit={(c) => { setEditingClient(c); setShowClientForm(true); }}
               onEditOnboarding={(c) => { setSelectedClient(c); setShowOnboarding(true); }}
-              onDelete={(c) => setDeleteClient(c)}
+              onDelete={user?.role === 'admin' ? (c) => setDeleteClient(c) : undefined}
               onSchedule={(c) => { setSelectedClient(c); setShowSessionForm(true); }}
               onWorkout={(c) => { setSelectedClient(c); setShowWorkoutForm(true); }}
               onMealPlan={(c) => { setSelectedClient(c); setShowMealPlanForm(true); }}
@@ -297,7 +297,7 @@ export default function Clients() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Client</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete {deleteClient?.full_name}? This action cannot be undone.
+              This permanently deletes {deleteClient?.full_name} and all of their data: workouts, meals, journal, progress, notes, contracts, messages and their login. This can't be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -37,11 +37,11 @@ export default function Dashboard() {
     checkAuth();
   }, [navigate]);
 
-  const { data: clients = [] } = useQuery({ queryKey: ["clients", user?.id], queryFn: () => base44.entities.Client.filter({ trainer_id: user?.id }), enabled: !!user });
-  const { data: leads = [] } = useQuery({ queryKey: ["leads", user?.id], queryFn: () => base44.entities.Lead.filter({ trainer_id: user?.id }), enabled: !!user });
-  const { data: sessions = [] } = useQuery({ queryKey: ["sessions", user?.id], queryFn: () => base44.entities.Session.filter({ trainer_id: user?.id }), enabled: !!user });
-  const { data: contracts = [] } = useQuery({ queryKey: ["contracts", user?.id], queryFn: () => base44.entities.Contract.filter({ trainer_id: user?.id }), enabled: !!user });
-  const { data: formChecks = [] } = useQuery({ queryKey: ["formChecks", user?.id], queryFn: () => base44.entities.FormCheck.filter({ trainer_id: user?.id, status: "pending" }), enabled: !!user });
+  const { data: clients = [] } = useQuery({ queryKey: ["clients", user?.id], queryFn: () => base44.entities.Client.list(), enabled: !!user });
+  const { data: leads = [] } = useQuery({ queryKey: ["leads", user?.id], queryFn: () => base44.entities.Lead.list(), enabled: !!user });
+  const { data: sessions = [] } = useQuery({ queryKey: ["sessions", user?.id], queryFn: () => base44.entities.Session.list(), enabled: !!user });
+  const { data: contracts = [] } = useQuery({ queryKey: ["contracts", user?.id], queryFn: () => base44.entities.Contract.list(), enabled: !!user });
+  const { data: formChecks = [] } = useQuery({ queryKey: ["formChecks", user?.id], queryFn: () => base44.entities.FormCheck.filter({ status: "pending" }), enabled: !!user });
 
   const pendingContracts = contracts.filter(c => c.status === "sent");
 

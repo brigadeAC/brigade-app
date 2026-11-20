@@ -82,7 +82,7 @@ export default function Meals() {
     queryKey: ["mealPlans"],
     queryFn: async () => {
       const currentUser = await base44.auth.me();
-      return base44.entities.MealPlan.filter({ trainer_id: currentUser.id }, "-updated_date");
+      return base44.entities.MealPlan.list("-updated_date");
     },
   });
 

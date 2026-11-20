@@ -120,7 +120,7 @@ export default function ClientProfile() {
     queryKey: ["client", clientId],
     queryFn: async () => {
       if (!user?.id || !clientId) return null;
-      const allClients = await base44.entities.Client.filter({ trainer_id: user.id });
+      const allClients = await base44.entities.Client.list();
       return allClients.find((c) => c.id === clientId) || null;
     },
     enabled: !!clientId && !!user

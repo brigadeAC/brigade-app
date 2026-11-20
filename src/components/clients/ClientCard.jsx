@@ -94,9 +94,11 @@ export default function ClientCard({ client, onEdit, onDelete, onSchedule, onWor
             <DropdownMenuItem onClick={(e) => { e.preventDefault(); onEdit?.(client); }} className="gap-2">
               <Edit className="w-4 h-4" /> Edit Client
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={(e) => { e.preventDefault(); onDelete?.(client); }} className="gap-2 text-red-600 focus:text-red-600">
-              <Trash2 className="w-4 h-4" /> Delete
-            </DropdownMenuItem>
+            {onDelete && (
+              <DropdownMenuItem onClick={(e) => { e.preventDefault(); onDelete(client); }} className="gap-2 text-red-600 focus:text-red-600">
+                <Trash2 className="w-4 h-4" /> Delete
+              </DropdownMenuItem>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

@@ -40,19 +40,19 @@ export default function CRM() {
 
   const { data: leads = [], isLoading } = useQuery({
     queryKey: ["leads", user?.id],
-    queryFn: () => base44.entities.Lead.filter({ trainer_id: user.id }, "-created_date"),
+    queryFn: () => base44.entities.Lead.list("-created_date"),
     enabled: !!user
   });
 
   const { data: trainees = [] } = useQuery({
     queryKey: ["clients", user?.id],
-    queryFn: () => base44.entities.Client.filter({ trainer_id: user.id }, "-created_date"),
+    queryFn: () => base44.entities.Client.list("-created_date"),
     enabled: !!user
   });
 
   const { data: trainings = [] } = useQuery({
     queryKey: ["sessions", user?.id],
-    queryFn: () => base44.entities.Session.filter({ trainer_id: user.id }, "-date"),
+    queryFn: () => base44.entities.Session.list("-date"),
     enabled: !!user
   });
 
@@ -279,10 +279,11 @@ export default function CRM() {
                 key={trainee.id} 
                 client={trainee} 
                 onEdit={(c) => { setEditingClient(c); setShowClientForm(true); }}
-                onDelete={async (c) => {
+                onDelete={user?.role === 'admin' ? async (c) => {
+                  if (!window.confirm(`Permanently delete ${c.full_name} and all of their data? This can't be undone.`)) return;
                   await base44.entities.Client.delete(c.id);
                   queryClient.invalidateQueries({ queryKey: ["clients"] });
-                }}
+                } : undefined}
               />
             ))}
             {trainees.length === 0 && (

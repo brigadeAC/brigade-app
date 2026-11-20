@@ -775,7 +775,7 @@ export default function Settings() {
 
             <h3 className="text-lg font-semibold text-foreground mb-2">Delete Account</h3>
             <p className="text-sm text-foreground mb-6">
-              Once you delete your account, all of your data — clients, workout and meal plans, progress logs, journals, documents, and messages — is permanently removed. This cannot be reversed, so export a copy first if you want one.
+              Deleting your account removes your login, notifications and AI chats. Your training records stay with the gym (workouts, meals, progress, journal, documents and messages) and are only deleted if the gym removes them. Export a copy first if you want one.
             </p>
 
             <Button
@@ -796,13 +796,8 @@ export default function Settings() {
           <AlertDialogHeader>
             <AlertDialogTitle className="text-foreground">Are you absolutely sure?</AlertDialogTitle>
             <AlertDialogDescription className="space-y-3 text-muted-foreground">
-              <p>This will permanently delete your account and remove all your data including:</p>
-              <ul className="list-disc list-inside text-sm space-y-1 text-foreground">
-                <li>Physical metrics and logged progress</li>
-                <li>Journals, documents, and signed agreements</li>
-                <li>Workout and meal plans</li>
-                <li>Messages and notifications</li>
-              </ul>
+              <p>This permanently deletes your login. You won't be able to sign in with it again.</p>
+              <p>Your training records stay with the gym and are only deleted if the gym removes them. To have them deleted, ask the gym.</p>
               <p className="font-semibold text-red-400 mt-4">This action cannot be undone.</p>
               <div className="space-y-2 mt-4 text-left">
                 <Label htmlFor="delete-confirm" className="text-foreground">Type DELETE to confirm</Label>

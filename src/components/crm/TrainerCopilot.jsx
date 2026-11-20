@@ -13,13 +13,13 @@ export default function TrainerCopilot({ trainerId }) {
 
   const { data: clients = [] } = useQuery({
     queryKey: ["copilot-clients", trainerId],
-    queryFn: () => base44.entities.Client.filter({ trainer_id: trainerId }),
+    queryFn: () => base44.entities.Client.list(),
     enabled: !!trainerId
   });
 
   const { data: recentSessions = [] } = useQuery({
     queryKey: ["copilot-sessions", trainerId],
-    queryFn: () => base44.entities.Session.filter({ trainer_id: trainerId }, "-date", 20),
+    queryFn: () => base44.entities.Session.list("-date", 20),
     enabled: !!trainerId
   });
 

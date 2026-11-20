@@ -48,13 +48,13 @@ export default function FitnessTools() {
 
   const { data: programs = [] } = useQuery({
     queryKey: ["fitnessPrograms", user?.id],
-    queryFn: () => base44.entities.FitnessProgram.filter({ trainer_id: user.id }, "-created_date"),
+    queryFn: () => base44.entities.FitnessProgram.list("-created_date"),
     enabled: !!user
   });
 
   const { data: calorieLogs = [] } = useQuery({
     queryKey: ["calorieLogs", user?.id],
-    queryFn: () => base44.entities.CalorieLog.filter({ trainer_id: user.id }, "-created_date"),
+    queryFn: () => base44.entities.CalorieLog.list("-created_date"),
     enabled: !!user
   });
 

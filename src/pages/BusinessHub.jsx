@@ -23,7 +23,7 @@ function TicketsTab({ user, queryClient }) {
 
   const { data: tickets = [], isLoading } = useQuery({
     queryKey: ['ticketTemplates', user?.id],
-    queryFn: () => base44.entities.TicketTemplate.filter({ trainer_id: user?.id }),
+    queryFn: () => base44.entities.TicketTemplate.list(),
     enabled: !!user?.id
   });
 
@@ -167,13 +167,13 @@ export default function BusinessHub() {
 
   const { data: tasks = [] } = useQuery({
     queryKey: ['trainerTasks', user?.id],
-    queryFn: () => base44.entities.TrainerTask.filter({ trainer_id: user.id }, '-created_date'),
+    queryFn: () => base44.entities.TrainerTask.list('-created_date'),
     enabled: !!user
   });
 
   const { data: expenses = [] } = useQuery({
     queryKey: ['trainerExpenses', user?.id],
-    queryFn: () => base44.entities.TrainerExpense.filter({ trainer_id: user.id }, '-date'),
+    queryFn: () => base44.entities.TrainerExpense.list('-date'),
     enabled: !!user
   });
 

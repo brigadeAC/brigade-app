@@ -193,15 +193,25 @@ const PHI_TYPES = new Set([
 // Resources (files, forms, guides) are trainer→client content: a user sees
 // their own resources plus everything shared by their own trainer — never
 // other trainers' material. Returns extra OR-terms for ownershipClause.
-async function trainerResourceTerms(env, user) {
+// Members see gym resources (anything staff created) that are shared with
+// everyone, or with one of their own client ids / their login. Resources are
+// gym records, not tied to whichever coach uploaded them.
+async function memberResourceTerm(env, user) {
   const { results } = await env.DB.prepare(
-    `SELECT data FROM entities WHERE entity_type='Client' AND (json_extract(data,'$.email') = ? OR json_extract(data,'$.user_id') = ?)`
+    `SELECT id FROM entities WHERE entity_type='Client' AND (json_extract(data,'$.email') = ? OR json_extract(data,'$.user_id') = ?)`
   ).bind(user.email, user.id).all();
-  const trainerIds = [...new Set(results
-    .map((r) => { try { return JSON.parse(r.data).trainer_id; } catch { return null; } })
-    .filter(Boolean))];
-  return trainerIds.map((tid) => ({ sql: "json_extract(data,'$.trainer_id') = ?", bind: tid }));
+  const ids = [user.id, ...results.map((r) => r.id)];
+  return {
+    sql: `(json_extract(data,'$.trainer_id') IS NOT NULL AND (COALESCE(json_array_length(data,'$.shared_with'),0) = 0 OR EXISTS (SELECT 1 FROM json_each(data,'$.shared_with') WHERE value IN (${ids.map(() => '?').join(',')}))))`,
+    binds: ids,
+  };
 }
+
+// Staff (trainers and admins) work for the gym: they all see the same clients,
+// plans, templates and business records. Only these stay private per person.
+const STAFF_PRIVATE_TYPES = new Set(['Message', 'Notification', 'CoachBriefing', 'AgentConversation']);
+const isStaff = (user) => !!user && (user.role === 'admin' || user.user_type === 'trainer');
+const isMemberUser = (user) => !!user && user.role !== 'admin' && (user.user_type === 'client' || user.user_type === 'independent');
 
 // Ownership scoping: admins see everything; everyone else only rows they own —
 // rows they created, rows assigned to them as trainer, or rows about them as
@@ -427,6 +437,7 @@ const COACH_PRIVATE_TYPES = new Set(['ClientNote', 'ClientNotebookPage']);
 
 async function entityScope(env, type, user) {
   if (SHARED_TYPES.has(type)) return null;
+  if (isStaff(user) && !STAFF_PRIVATE_TYPES.has(type)) return null;
   const scope = await ownershipClause(env, user);
   if (!scope) return null; // admin
   let sql = scope.sql;
@@ -440,14 +451,50 @@ async function entityScope(env, type, user) {
       binds: [user.email, ...scope.binds],
     };
   }
-  if (type === 'Resource') {
-    const extra = await trainerResourceTerms(env, user);
-    if (extra.length) {
-      sql = `(${sql} OR ${extra.map((e) => e.sql).join(' OR ')})`;
-      binds.push(...extra.map((e) => e.bind));
-    }
+  if (type === 'Resource' && isMemberUser(user)) {
+    const extra = await memberResourceTerm(env, user);
+    sql = `(${sql} OR ${extra.sql})`;
+    binds.push(...extra.binds);
   }
   return { sql, binds };
+}
+
+// Admin-only: remove a client and everything stored about them: their own
+// logs and posts, plans, notes, contracts and sessions attached to them,
+// messages to or from their login, and the login itself.
+async function deleteClientAndData(env, row) {
+  let data = {}; try { data = JSON.parse(row.data); } catch { /* ignore */ }
+  const email = data.email ? String(data.email).toLowerCase() : null;
+  // The member's login, if any: linked by user_id or matched by email. Never
+  // a staff login, so a coach's records are never swept up.
+  let login = null;
+  if (data.user_id) login = await env.DB.prepare('SELECT id, email, user_type, role FROM users WHERE id = ?').bind(data.user_id).first();
+  if (!login && email) login = await env.DB.prepare('SELECT id, email, user_type, role FROM users WHERE lower(email) = ?').bind(email).first();
+  const memberLogin = login && login.role !== 'admin' && (login.user_type === 'client' || login.user_type === 'independent') ? login : null;
+
+  const ids = [row.id, data.user_id, memberLogin?.id].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i);
+  const ph = ids.map(() => '?').join(',');
+  const where = [
+    `json_extract(data,'$.client_id') IN (${ph})`,
+    `json_extract(data,'$.client_user_id') IN (${ph})`,
+    `json_extract(data,'$.sender_id') IN (${ph})`,
+    `json_extract(data,'$.receiver_id') IN (${ph})`,
+    `(entity_type = 'Notification' AND json_extract(data,'$.user_id') IN (${ph}))`,
+  ];
+  const binds = [...ids, ...ids, ...ids, ...ids, ...ids];
+  if (memberLogin) {
+    where.push('lower(created_by) = ?');
+    binds.push(String(memberLogin.email).toLowerCase());
+  }
+  const { results } = await env.DB.prepare(
+    `SELECT id FROM entities WHERE id != ? AND (${where.join(' OR ')})`
+  ).bind(row.id, ...binds).all();
+  for (const r of results) {
+    await env.DB.prepare('DELETE FROM entities WHERE id = ?').bind(r.id).run();
+  }
+  await env.DB.prepare('DELETE FROM entities WHERE id = ?').bind(row.id).run();
+  if (memberLogin) await env.DB.prepare('DELETE FROM users WHERE id = ?').bind(memberLogin.id).run();
+  return results.length + 1;
 }
 
 // Fetch one entity only if the user is allowed to see it. Returns null when the
@@ -2028,55 +2075,34 @@ export async function onRequest(context) {
         });
       }
 
-      // Right to erasure (GDPR art. 17): delete the account and everything it
-      // owns. Irreversible — the UI requires typing DELETE to confirm.
+      // Close an account. Only the login and personal items go (notifications,
+      // AI chats, daily briefings). Clients and their data are gym records:
+      // they stay until an admin deletes the client. A member's client record
+      // is kept but unlinked from the closed login. The UI requires typing
+      // DELETE to confirm.
       if (action === 'me' && method === 'DELETE') {
         const user = await currentUser(request, env);
         if (!user) return err('You must be logged in.', 401);
-        const scope = await ownershipClause(env, user);
         let removed = 0;
-        const isMember = user.user_type === 'client' || user.user_type === 'independent';
-        if (isMember && user.role !== 'admin') {
-          // Members delete what they wrote themselves (logs, journal, photos,
-          // posts, messages they sent). Records their coach owns stay: signed
-          // waivers and contracts, coach notes, plans and the coach's messages
-          // are the gym's business records. The coach's Client record is kept
-          // but unlinked from the deleted login.
-          const { results } = await env.DB.prepare(
-            'SELECT id FROM entities WHERE created_by = ?'
-          ).bind(user.email).all();
-          for (const r of results) {
-            await env.DB.prepare('DELETE FROM entities WHERE id = ?').bind(r.id).run();
-            removed++;
-          }
-          const { results: clientRows } = await env.DB.prepare(
-            `SELECT id, data FROM entities WHERE entity_type='Client' AND json_extract(data,'$.user_id') = ?`
-          ).bind(user.id).all();
-          for (const row of clientRows) {
-            let data; try { data = JSON.parse(row.data); } catch { continue; }
-            delete data.user_id;
-            data.status = 'inactive';
-            data.account_deleted = true;
-            await env.DB.prepare('UPDATE entities SET data=?, updated_date=? WHERE id=?')
-              .bind(JSON.stringify(data), nowISO(), row.id).run();
-          }
-        } else if (scope) {
-          const { results } = await env.DB.prepare(
-            `SELECT id FROM entities WHERE ${scope.sql}`
-          ).bind(...scope.binds).all();
-          for (const r of results) {
-            await env.DB.prepare('DELETE FROM entities WHERE id = ?').bind(r.id).run();
-            removed++;
-          }
-        } else {
-          // Admins own nothing implicitly — remove only what they created.
-          const { results } = await env.DB.prepare(
-            'SELECT id FROM entities WHERE created_by = ?'
-          ).bind(user.email).all();
-          for (const r of results) {
-            await env.DB.prepare('DELETE FROM entities WHERE id = ?').bind(r.id).run();
-            removed++;
-          }
+        const personal = await env.DB.prepare(
+          `SELECT id FROM entities WHERE
+             (entity_type = 'Notification' AND json_extract(data,'$.user_id') = ?)
+             OR (entity_type IN ('CoachBriefing','AgentConversation') AND created_by = ?)`
+        ).bind(user.id, user.email).all();
+        for (const r of personal.results) {
+          await env.DB.prepare('DELETE FROM entities WHERE id = ?').bind(r.id).run();
+          removed++;
+        }
+        const { results: clientRows } = await env.DB.prepare(
+          `SELECT id, data FROM entities WHERE entity_type='Client' AND json_extract(data,'$.user_id') = ?`
+        ).bind(user.id).all();
+        for (const row of clientRows) {
+          let data; try { data = JSON.parse(row.data); } catch { continue; }
+          delete data.user_id;
+          data.status = 'inactive';
+          data.account_deleted = true;
+          await env.DB.prepare('UPDATE entities SET data=?, updated_date=? WHERE id=?')
+            .bind(JSON.stringify(data), nowISO(), row.id).run();
         }
         await env.DB.prepare('DELETE FROM users WHERE id = ?').bind(user.id).run();
         // The audit trail deliberately outlives the account (HIPAA requires
@@ -2220,6 +2246,18 @@ export async function onRequest(context) {
           const row = await getScopedEntity(env, type, id, user);
           if (!row) return err('Not found.', 404);
           if (sharedWriteDenied(type, row, user)) return err('Only the author can delete this.', 403);
+          // Clients and their data are kept until an admin deletes the client.
+          if (type === 'Client') {
+            if (user.role !== 'admin') return err('Only an admin can delete a client.', 403);
+            const removed = await deleteClientAndData(env, row);
+            await audit(env, { actor: user.email, action: 'delete_client', target: 'Client', targetId: id, detail: `${removed} records`, request });
+            return json({ success: true, deleted_records: removed });
+          }
+          if (user.role !== 'admin' && row.created_by !== user.email) {
+            const author = await env.DB.prepare('SELECT user_type, role FROM users WHERE email = ?').bind(row.created_by).first();
+            const authorIsStaff = author && (author.role === 'admin' || author.user_type === 'trainer');
+            if (!authorIsStaff) return err("This is a client's own record. Only an admin can delete it.", 403);
+          }
           await env.DB.prepare('DELETE FROM entities WHERE id=? AND entity_type=?').bind(id, type).run();
           await audit(env, { actor: user.email, action: 'delete', target: type, targetId: id, request });
           return json({ success: true });

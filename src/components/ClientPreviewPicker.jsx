@@ -11,7 +11,7 @@ export default function ClientPreviewPicker({ open, onOpenChange, trainerId, onS
 
   const { data: clients = [] } = useQuery({
     queryKey: ["clientsForPreview", trainerId],
-    queryFn: () => base44.entities.Client.filter({ trainer_id: trainerId }, "full_name"),
+    queryFn: () => base44.entities.Client.list("full_name"),
     enabled: open && !!trainerId,
   });
 

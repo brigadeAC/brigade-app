@@ -54,7 +54,7 @@ export default function Messages() {
 
   const { data: clients = [] } = useQuery({
     queryKey: ["clients", user?.id],
-    queryFn: () => base44.entities.Client.filter({ trainer_id: user?.id }),
+    queryFn: () => base44.entities.Client.list(),
     enabled: !!user && !clientProfile,
   });
 

@@ -67,10 +67,9 @@ export default function ClientCommunity() {
   }, []);
 
   const { data: posts = [] } = useQuery({
-    queryKey: ["community-posts", client?.trainer_id ?? "solo"],
-    // Coached members share a feed with their coach's other clients; solo
-    // athletes (no coach) share one feed with each other.
-    queryFn: () => base44.entities.CommunityPost.filter({ trainer_id: client?.trainer_id || null }, "-created_date"),
+    queryKey: ["community-posts"],
+    // One gym-wide feed: every member and coach shares it.
+    queryFn: () => base44.entities.CommunityPost.list("-created_date"),
     enabled: !!user,
     refetchInterval: 5000
   });

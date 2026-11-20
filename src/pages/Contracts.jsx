@@ -40,7 +40,7 @@ export default function Contracts() {
     queryKey: ['clients', user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
-      return base44.entities.Client.filter({ trainer_id: user.id });
+      return base44.entities.Client.list();
     },
     enabled: !!user
   });
@@ -49,7 +49,7 @@ export default function Contracts() {
     queryKey: ['contracts', user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
-      return base44.entities.Contract.filter({ trainer_id: user.id }, '-created_date');
+      return base44.entities.Contract.list('-created_date');
     },
     enabled: !!user
   });

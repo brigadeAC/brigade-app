@@ -46,14 +46,11 @@ export default function ClientResources() {
   }, []);
 
   const { data: resources = [] } = useQuery({
-    queryKey: ["clientResources", clientProfile?.trainer_id],
+    queryKey: ["clientResources", clientProfile?.id],
     queryFn: async () => {
-      let all = [];
-      if (!clientProfile?.trainer_id) {
-        all = await base44.entities.Resource.filter({});
-      } else {
-        all = await base44.entities.Resource.filter({ trainer_id: clientProfile.trainer_id });
-      }
+      // Gym resources from any coach; the server only returns ones shared
+      // with everyone or with this member.
+      const all = await base44.entities.Resource.list();
       // Show resources shared with all clients OR shared specifically with this client
       return all.filter(r => 
         !r.shared_with || 
@@ -66,13 +63,8 @@ export default function ClientResources() {
   });
 
   const { data: recipes = [] } = useQuery({
-    queryKey: ["clientRecipes", clientProfile?.trainer_id],
-    queryFn: async () => {
-      if (!clientProfile?.trainer_id) {
-        return base44.entities.Recipe.filter({});
-      }
-      return base44.entities.Recipe.filter({ trainer_id: clientProfile.trainer_id });
-    },
+    queryKey: ["clientRecipes"],
+    queryFn: () => base44.entities.Recipe.list(),
     enabled: !!clientProfile,
   });
 

@@ -87,7 +87,7 @@ export default function Workouts() {
     queryKey: ["workouts"],
     queryFn: async () => {
       const currentUser = await base44.auth.me();
-      return base44.entities.WorkoutPlan.filter({ trainer_id: currentUser.id }, "-created_date");
+      return base44.entities.WorkoutPlan.list("-created_date");
     },
   });
 

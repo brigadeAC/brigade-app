@@ -76,13 +76,13 @@ export default function ClientNotebooks() {
 
   const { data: clients = [] } = useQuery({
     queryKey: ["clients", user?.id],
-    queryFn: () => base44.entities.Client.filter({ trainer_id: user?.id }),
+    queryFn: () => base44.entities.Client.list(),
     enabled: !!user
   });
 
   const { data: leads = [] } = useQuery({
     queryKey: ["leads", user?.id],
-    queryFn: () => base44.entities.Lead.filter({ trainer_id: user?.id }),
+    queryFn: () => base44.entities.Lead.list(),
     enabled: !!user
   });
 

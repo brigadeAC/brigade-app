@@ -69,7 +69,7 @@ export default function TrainerCommunity() {
     queryKey: ["client-community-posts", user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
-      return base44.entities.CommunityPost.filter({ trainer_id: user.id }, "-created_date");
+      return base44.entities.CommunityPost.list("-created_date");
     },
     enabled: !!user,
     refetchInterval: 5000
@@ -501,7 +501,7 @@ export default function TrainerCommunity() {
                 <MessageCircle className="w-12 h-12 mx-auto text-gray-600" />
                 <h3 className="mt-4 font-medium text-foreground">No client posts yet</h3>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Your clients haven't shared anything in the community yet
+                  No member posts yet
                 </p>
               </CardContent>
             </Card>
