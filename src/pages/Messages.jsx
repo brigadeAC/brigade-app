@@ -8,6 +8,8 @@ import { MessageCircle, Send, Search, Image, Loader2, X, ArrowLeft, Video, Calen
 import ScheduleVideoModal from "@/components/video/ScheduleVideoModal";
 import VideoCallRoom from "@/components/video/VideoCallRoom";
 import { cn } from "@/lib/utils";
+import { Link } from "react-router-dom";
+import { createPageUrl } from "@/utils";
 
 const safeDateParse = (d) => {
   if (!d) return new Date();
@@ -54,7 +56,7 @@ export default function Messages() {
 
   const { data: clients = [] } = useQuery({
     queryKey: ["clients", user?.id],
-    queryFn: () => base44.entities.Client.list(),
+    queryFn: async () => (await base44.entities.Client.list()).filter((c) => !c.account_deleted),
     enabled: !!user && !clientProfile,
   });
 
@@ -77,15 +79,6 @@ export default function Messages() {
       return res.data?.user || null;
     },
     enabled: !!clientProfile?.trainer_id,
-  });
-
-  const { data: allPlatformClients = [] } = useQuery({
-    queryKey: ["all-platform-clients", user?.id],
-    queryFn: async () => {
-      if (!user?.id || clientProfile || user?.role !== 'admin') return [];
-      return base44.entities.Client.list('-created_date', 500);
-    },
-    enabled: !!user && !clientProfile && user?.role === 'admin',
   });
 
   const { data: otherClients = [] } = useQuery({
@@ -299,7 +292,6 @@ export default function Messages() {
   const filteredClients = clients.filter(c => c.full_name.toLowerCase().includes(searchQuery.toLowerCase()));
   const filteredTrainers = trainers.filter(t => t.full_name?.toLowerCase().includes(searchQuery.toLowerCase()));
   const filteredOtherClients = otherClients.filter(c => c.full_name.toLowerCase().includes(searchQuery.toLowerCase()));
-  const filteredAllPlatformClients = allPlatformClients.filter(c => c.full_name.toLowerCase().includes(searchQuery.toLowerCase()));
   const selectedClient = selectedConversation ? (conversations.find(c => c.id === selectedConversation) || getConversationInfo()) : null;
 
   const sidebarBg = { background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' };
@@ -384,25 +376,34 @@ export default function Messages() {
                   ))}
                 </>
               )}
-              {filteredClients.length > 0 && (
-                <>
-                  <p className="px-4 pt-3 pb-1 text-xs font-semibold tracking-wide text-gray-600 uppercase">My Clients</p>
-                  {filteredClients.map((c) => (
-                    <button key={c.id} onClick={() => startConversation(c)}
-                      className="w-full px-4 py-3 flex items-center gap-3 hover:bg-accent transition-colors">
-                      <Avatar className="h-9 w-9 flex-shrink-0">
-                        <AvatarImage src={c.avatar_url} />
-                        <AvatarFallback className="text-sm font-bold text-foreground" style={{ background: 'hsl(var(--secondary))' }}>
-                          {c.full_name?.[0]?.toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 min-w-0 text-left">
-                        <span className="font-medium text-sm text-muted-foreground block">{c.full_name}</span>
-                        <span className="text-xs text-gray-600">{c.email}</span>
-                      </div>
-                    </button>
-                  ))}
-                </>
+              {/* Start a conversation: clients who have joined the app can be
+                  messaged; ones who haven't signed up yet can't receive it. */}
+              <p className="px-4 pt-3 pb-1 text-xs font-semibold tracking-wide text-gray-600 uppercase">Message a client</p>
+              {clients.length === 0 ? (
+                <div className="px-4 py-3 text-sm text-muted-foreground">
+                  No clients yet.{" "}
+                  <Link to={createPageUrl("Clients")} className="text-primary underline">Add a client</Link>{" "}
+                  to message them here.
+                </div>
+              ) : filteredClients.length === 0 ? (
+                <p className="px-4 py-3 text-sm text-muted-foreground">No client matches "{searchQuery}".</p>
+              ) : (
+                [...filteredClients].sort((a, b) => Number(!!b.user_id) - Number(!!a.user_id) || a.full_name.localeCompare(b.full_name)).map((c) => (
+                  <button key={c.id} onClick={() => c.user_id && startConversation(c)} disabled={!c.user_id}
+                    title={c.user_id ? `Message ${c.full_name}` : `${c.full_name} hasn't created their app login yet`}
+                    className="w-full px-4 py-3 flex items-center gap-3 hover:bg-accent transition-colors disabled:opacity-50 disabled:hover:bg-transparent disabled:cursor-not-allowed">
+                    <Avatar className="h-9 w-9 flex-shrink-0">
+                      <AvatarImage src={c.avatar_url} />
+                      <AvatarFallback className="text-sm font-bold text-foreground" style={{ background: 'hsl(var(--secondary))' }}>
+                        {c.full_name?.[0]?.toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0 text-left">
+                      <span className="font-medium text-sm text-foreground block truncate">{c.full_name}</span>
+                      <span className="text-xs text-muted-foreground">{c.user_id ? c.email : "Hasn't joined the app yet"}</span>
+                    </div>
+                  </button>
+                ))
               )}
               {filteredTrainers.length > 0 && (
                 <>
@@ -419,26 +420,6 @@ export default function Messages() {
                       <div className="flex-1 min-w-0 text-left">
                         <span className="font-medium text-sm text-muted-foreground block">{t.full_name}</span>
                         <span className="text-xs text-gray-600">{t.email}</span>
-                      </div>
-                    </button>
-                  ))}
-                </>
-              )}
-              {filteredAllPlatformClients.length > 0 && (
-                <>
-                  <p className="px-4 pt-3 pb-1 text-xs font-semibold tracking-wide text-gray-600 uppercase">All Clients</p>
-                  {filteredAllPlatformClients.map((c) => (
-                    <button key={c.id} onClick={() => startConversation(c)}
-                      className="w-full px-4 py-3 flex items-center gap-3 hover:bg-accent transition-colors">
-                      <Avatar className="h-9 w-9 flex-shrink-0">
-                        <AvatarImage src={c.avatar_url} />
-                        <AvatarFallback className="text-sm font-bold text-foreground" style={{ background: 'hsl(var(--secondary))' }}>
-                          {c.full_name?.[0]?.toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 min-w-0 text-left">
-                        <span className="font-medium text-sm text-muted-foreground block">{c.full_name}</span>
-                        <span className="text-xs text-gray-600">{c.email}</span>
                       </div>
                     </button>
                   ))}
@@ -467,7 +448,6 @@ export default function Messages() {
               </Avatar>
               <div className="flex-1">
                 <h3 className="font-bold text-foreground">{selectedClient?.otherUserName}</h3>
-                <p className="text-xs text-muted-foreground">Offline</p>
               </div>
               <div className="flex items-center gap-2">
                 {(!clientProfile && (user?.role === 'trainer' || user?.role === 'admin')) && (
@@ -597,7 +577,7 @@ export default function Messages() {
                 <MessageCircle className="w-8 h-8 text-primary/50" />
               </div>
               <h3 className="font-bold text-foreground">Select a conversation</h3>
-              <p className="text-gray-600 text-sm">Choose someone to start messaging</p>
+              <p className="text-muted-foreground text-sm">{clientProfile ? "Choose someone to start messaging" : "Pick a client under \"Message a client\" to start a conversation."}</p>
             </div>
           </div>
         )}
