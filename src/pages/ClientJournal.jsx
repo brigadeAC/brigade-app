@@ -44,6 +44,7 @@ export default function ClientJournal() {
       if (created?.id) {
         base44.functions
           .invoke("summarizeJournalEntry", { entry_id: created.id, content: created.content })
+          .then(() => queryClient.invalidateQueries(["journalEntries"]))
           .catch(console.error);
       }
     }
@@ -136,6 +137,11 @@ export default function ClientJournal() {
                   <div className="text-sm text-muted-foreground mb-3 italic">Q: {entry.ai_prompt_used}</div>
                 )}
                 <p className="text-foreground whitespace-pre-wrap">{entry.content}</p>
+                {entry.athlete_insight && (
+                  <div className="mt-3 rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm text-foreground">
+                    <span className="font-semibold text-primary">Insight: </span>{entry.athlete_insight}
+                  </div>
+                )}
               </motion.div>
             ))}
           </AnimatePresence>

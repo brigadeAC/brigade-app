@@ -28,7 +28,8 @@ const postTypeIcons = {
   progress: Trophy,
   question: HelpCircle,
   achievement: Trophy,
-  motivation: Target
+  motivation: Target,
+  announcement: Zap
 };
 
 const postTypeColors = {
@@ -36,7 +37,8 @@ const postTypeColors = {
   progress: "bg-primary/10 text-primary",
   question: "bg-amber-100 text-amber-700",
   achievement: "bg-primary/10 text-primary",
-  motivation: "bg-primary/10 text-primary"
+  motivation: "bg-primary/10 text-primary",
+  announcement: "bg-primary text-primary-foreground"
 };
 
 export default function ClientCommunity() {
@@ -65,12 +67,11 @@ export default function ClientCommunity() {
   }, []);
 
   const { data: posts = [] } = useQuery({
-    queryKey: ["community-posts", client?.trainer_id],
-    queryFn: async () => {
-      if (!client?.trainer_id) return [];
-      return base44.entities.CommunityPost.filter({ trainer_id: client.trainer_id }, "-created_date");
-    },
-    enabled: !!client?.trainer_id,
+    queryKey: ["community-posts", client?.trainer_id ?? "solo"],
+    // Coached members share a feed with their coach's other clients; solo
+    // athletes (no coach) share one feed with each other.
+    queryFn: () => base44.entities.CommunityPost.filter({ trainer_id: client?.trainer_id || null }, "-created_date"),
+    enabled: !!user,
     refetchInterval: 5000
   });
 

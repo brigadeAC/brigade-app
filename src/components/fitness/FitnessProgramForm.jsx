@@ -118,7 +118,7 @@ const ExerciseTable = ({ title, exercises, onChange }) => {
                              </button>
                            ))
                          ) : searchQuery.length >= 2 ? (
-                           <div className="p-3 text-center text-xs text-muted-foreground">No exercises found</div>
+                           <div className="p-3 text-center text-xs text-muted-foreground">Not in the library. The name will be saved as you typed it.</div>
                          ) : null}
                        </div>
                     )}
@@ -143,7 +143,7 @@ const ExerciseTable = ({ title, exercises, onChange }) => {
   );
 };
 
-export default function FitnessProgramForm({ open, onOpenChange, program, clients, onSubmit }) {
+export default function FitnessProgramForm({ open, onOpenChange, program, clients, onSubmit, defaultClientId }) {
   const { system, weightUnit, heightUnit, convertWeightDisplay, parseWeight, convertHeightDisplay, parseHeight } = useUnitSystem();
   const [isLoading, setIsLoading] = useState(false);
   const [isClientInfoOpen, setIsClientInfoOpen] = useState(false);
@@ -199,6 +199,34 @@ export default function FitnessProgramForm({ open, onOpenChange, program, client
     }
   }, [formData.client_info.weight_lbs, formData.client_info.height_feet, formData.client_info.height_inches, system]);
 
+  const pickClient = (val) => {
+                const client = clients?.find(c => c.id === val);
+                setFormData(prev => {
+                  const newFormData = { ...prev, client_id: val, client_name: client?.full_name || prev.client_name };
+                  if (client) {
+                    newFormData.client_info = {
+                      ...prev.client_info,
+                      gender: prev.client_info.gender || client.gender || "",
+                      weight_lbs: prev.client_info.weight_lbs || (client.weight_kg ? convertWeightDisplay(client.weight_kg) : ""),
+                      body_fat: prev.client_info.body_fat || client.body_fat_percentage || "",
+                      height_feet: prev.client_info.height_feet || (client.height_cm ? (system === 'imperial' ? Math.floor(client.height_cm / 30.48) : "") : ""),
+                      height_inches: prev.client_info.height_inches || (client.height_cm ? (system === 'imperial' ? Math.round((client.height_cm / 2.54) % 12) : convertHeightDisplay(client.height_cm)) : ""),
+                    };
+                    if (client.date_of_birth && !prev.client_info.age) {
+                      newFormData.client_info.age = new Date().getFullYear() - new Date(client.date_of_birth).getFullYear();
+                    }
+                  }
+                  return newFormData;
+                });
+  };
+
+  // Opened from a client's profile: start the new program for that client.
+  useEffect(() => {
+    if (open && !program && defaultClientId && clients?.some((c) => c.id === defaultClientId)) {
+      pickClient(defaultClientId);
+    }
+  }, [open, program, defaultClientId, clients]);
+
   const setInfo = (field, val) => setFormData(prev => ({ ...prev, client_info: { ...prev.client_info, [field]: val } }));
 
   const handleSubmit = async (e) => {
@@ -222,26 +250,7 @@ export default function FitnessProgramForm({ open, onOpenChange, program, client
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 bg-secondary border border-border rounded-xl">
             <div className="space-y-1">
               <Label className="text-muted-foreground">Client</Label>
-              <Select value={formData.client_id} onValueChange={(val) => {
-                const client = clients?.find(c => c.id === val);
-                setFormData(prev => {
-                  const newFormData = { ...prev, client_id: val, client_name: client?.full_name || prev.client_name };
-                  if (client) {
-                    newFormData.client_info = {
-                      ...prev.client_info,
-                      gender: prev.client_info.gender || client.gender || "",
-                      weight_lbs: prev.client_info.weight_lbs || (client.weight_kg ? convertWeightDisplay(client.weight_kg) : ""),
-                      body_fat: prev.client_info.body_fat || client.body_fat_percentage || "",
-                      height_feet: prev.client_info.height_feet || (client.height_cm ? (system === 'imperial' ? Math.floor(client.height_cm / 30.48) : "") : ""),
-                      height_inches: prev.client_info.height_inches || (client.height_cm ? (system === 'imperial' ? Math.round((client.height_cm / 2.54) % 12) : convertHeightDisplay(client.height_cm)) : ""),
-                    };
-                    if (client.date_of_birth && !prev.client_info.age) {
-                      newFormData.client_info.age = new Date().getFullYear() - new Date(client.date_of_birth).getFullYear();
-                    }
-                  }
-                  return newFormData;
-                });
-              }}>
+              <Select value={formData.client_id} onValueChange={pickClient}>
                 <SelectTrigger className="bg-card border-border text-foreground"><SelectValue placeholder="Select client" /></SelectTrigger>
                 <SelectContent className="bg-card border-border text-foreground">
                   {clients?.map(c => <SelectItem key={c.id} value={c.id}>{c.full_name}</SelectItem>)}

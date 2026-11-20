@@ -429,15 +429,13 @@ export default function ClientMeals() {
                 <h3 className="text-lg font-medium text-foreground">No active meal plans</h3>
                 <p className="text-muted-foreground mt-2">
                   {clientProfile && !clientProfile.trainer_id 
-                    ? "Head to the AI Assistant to generate a personalized meal plan." 
+                    ? "Build your own meal plan, or just log meals as you go." 
                     : "Your trainer will assign meal plans to you"}
                 </p>
                 {clientProfile && !clientProfile.trainer_id && (
-                  <Link to={createPageUrl("ClientJournal")} className="mt-4">
-                    <Button className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-xl">
-                      Ask AI Assistant
-                    </Button>
-                  </Link>
+                  <Button onClick={() => setShowMealPlanForm(true)} className="mt-4 bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-xl">
+                    Create a plan
+                  </Button>
                 )}
               </CardContent>
             </Card>

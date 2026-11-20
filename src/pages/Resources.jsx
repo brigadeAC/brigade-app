@@ -38,6 +38,7 @@ import {
 "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Link } from "react-router-dom";
 import { Plus, BookOpen, Search, Edit, Trash2, MoreVertical, Users, Upload, Loader2, ExternalLink, Send, ChefHat, Clock, Flame, Download, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import QuickAddResources from "@/components/resources/QuickAddResources";
@@ -168,20 +169,6 @@ export default function Resources() {
     }
   });
 
-  const generatePTFormsMutation = useMutation({
-    mutationFn: async () => {
-      const res = await base44.functions.invoke("generatePTForms", {});
-      if (res.data?.error) throw new Error(res.data.error);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["resources"] });
-      toast.success("Standard PT Forms generated successfully.");
-    },
-    onError: () => {
-      toast.error("Failed to generate forms.");
-    }
-  });
-
   const resetForm = () => {
     setFormData({
       title: "",
@@ -284,14 +271,12 @@ export default function Resources() {
           <p className="text-foreground mt-1">Educational content & forms for your clients</p>
         </div>
         <div className="flex flex-wrap gap-3">
-          <Button
-            variant="outline"
-            onClick={() => generatePTFormsMutation.mutate()}
-            disabled={generatePTFormsMutation.isPending}
-            className="border-border text-foreground bg-secondary hover:bg-accent"
-          >
-            {generatePTFormsMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FileText className="w-4 h-4 mr-2" />}
-            Generate PT Forms
+          {/* Waiver, PAR-Q and intake templates live in Contracts, where clients can sign them. */}
+          <Button asChild variant="outline" className="border-border text-foreground bg-secondary hover:bg-accent">
+            <Link to="/Contracts">
+              <FileText className="w-4 h-4 mr-2" />
+              Waivers & intake forms
+            </Link>
           </Button>
           <Button
             onClick={() => {resetForm();setShowForm(true);}}

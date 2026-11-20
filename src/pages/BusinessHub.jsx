@@ -504,13 +504,32 @@ function ExpensesTab({ user, expenses, queryClient, isOpen, setIsOpen, editingEx
     { value: 'equipment', label: 'Equipment' }
   ];
 
+  const exportCsv = () => {
+    const esc = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const rows = [["Date", "Title", "Vendor", "Category", "Amount", "Notes"]];
+    expenses.forEach((e) => rows.push([
+      e.date || "", e.title || e.description || "", e.vendor || "",
+      irsCategories.find((c) => c.value === e.category)?.label || e.category || "",
+      Number(e.amount || 0).toFixed(2), e.notes || "",
+    ]));
+    const blob = new Blob([rows.map((r) => r.map(esc).join(",")).join("\n")], { type: "text/csv" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `expenses-${format(new Date(), "yyyy-MM-dd")}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center gap-2 flex-wrap">
         <h2 className="text-xl font-semibold text-foreground">Expenses</h2>
-        <Button onClick={() => { setEditingExpense(null); setIsOpen(true); }} className="gap-2">
-          <Plus className="w-4 h-4" /> Add Expense
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={exportCsv} disabled={expenses.length === 0}>Export CSV</Button>
+          <Button onClick={() => { setEditingExpense(null); setIsOpen(true); }} className="gap-2">
+            <Plus className="w-4 h-4" /> Add Expense
+          </Button>
+        </div>
       </div>
 
       <div className="space-y-2">
@@ -519,7 +538,7 @@ function ExpensesTab({ user, expenses, queryClient, isOpen, setIsOpen, editingEx
             <div className="flex items-center justify-between">
               <div>
                 <h4 className="font-medium text-foreground flex items-center gap-2">
-                  {exp.title}
+                  {exp.title || exp.description}
                   <span className="text-[10px] uppercase tracking-wider bg-secondary px-2 py-0.5 rounded-full text-muted-foreground">
                     {irsCategories.find(c => c.value === exp.category)?.label || exp.category}
                   </span>
@@ -530,7 +549,7 @@ function ExpensesTab({ user, expenses, queryClient, isOpen, setIsOpen, editingEx
                 <p className="text-sm text-muted-foreground mt-1">{exp.date} {exp.vendor && `• ${exp.vendor}`} {exp.notes && `• ${exp.notes}`}</p>
               </div>
               <div className="flex items-center gap-4">
-                <span className="font-bold text-red-400">-${exp.amount.toFixed(2)}</span>
+                <span className="font-bold text-red-400">-${Number(exp.amount || 0).toFixed(2)}</span>
                 <div className="flex items-center gap-1 border-l border-border pl-4 flex-wrap">
                   <Button variant="ghost" size="icon" onClick={() => { setEditingExpense(exp); setIsOpen(true); }}>
                     <Pencil className="w-4 h-4 text-muted-foreground" />

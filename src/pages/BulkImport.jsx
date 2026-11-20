@@ -12,6 +12,33 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Upload, Download, FileSpreadsheet, CheckCircle2, AlertCircle, Users, Dumbbell } from "lucide-react";
 import { toast } from "sonner";
 
+// Split CSV text into rows of cells. Handles quoted fields that contain
+// commas, doubled quotes and line breaks, plus Windows line endings and a
+// leading byte-order mark, which spreadsheet and gym-software exports use.
+function csvRows(text) {
+  const rows = [];
+  let row = [], cell = '', quoted = false;
+  const src = text.replace(/^\uFEFF/, '');
+  for (let i = 0; i < src.length; i++) {
+    const ch = src[i];
+    if (quoted) {
+      if (ch === '"' && src[i + 1] === '"') { cell += '"'; i++; }
+      else if (ch === '"') quoted = false;
+      else cell += ch;
+    } else if (ch === '"') quoted = true;
+    else if (ch === ',') { row.push(cell.trim()); cell = ''; }
+    else if (ch === '\n' || ch === '\r') {
+      if (ch === '\r' && src[i + 1] === '\n') i++;
+      row.push(cell.trim()); cell = '';
+      if (row.some(c => c !== '')) rows.push(row);
+      row = [];
+    } else cell += ch;
+  }
+  row.push(cell.trim());
+  if (row.some(c => c !== '')) rows.push(row);
+  return rows;
+}
+
 export default function BulkImport() {
   const [importType, setImportType] = useState("clients");
   const [file, setFile] = useState(null);
@@ -38,20 +65,15 @@ export default function BulkImport() {
     
     // Read and preview first 5 rows
     const text = await selectedFile.text();
-    const rows = text.split('\n').filter(r => r.trim());
-    const previewRows = rows.slice(0, 6).map(row => {
-      return row.split(',').map(cell => cell.trim().replace(/^"|"$/g, ''));
-    });
-    setPreview(previewRows);
+    setPreview(csvRows(text).slice(0, 6));
     setImportResults(null);
   };
 
   const parseCSV = (text) => {
-    const rows = text.split('\n').filter(r => r.trim());
-    const headers = rows[0].split(',').map(h => h.trim().replace(/^"|"$/g, '').toLowerCase());
-    
-    return rows.slice(1).map(row => {
-      const values = row.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+    const rows = csvRows(text);
+    if (rows.length === 0) return [];
+    const headers = rows[0].map(h => h.toLowerCase());
+    return rows.slice(1).map(values => {
       const obj = {};
       headers.forEach((header, idx) => {
         obj[header] = values[idx] || '';
@@ -79,14 +101,18 @@ export default function BulkImport() {
           try {
             // Map common CSV headers to client fields
             const clientData = {
-              full_name: row.name || row.full_name || row['client name'] || '',
-              email: row.email || row['email address'] || '',
+              full_name: row.name || row.full_name || row['client name'] || [row['first name'], row['last name']].filter(Boolean).join(' '),
+              email: (row.email || row['email address'] || '').toLowerCase(),
               phone: row.phone || row['phone number'] || row.mobile || '',
               age: row.age ? parseInt(row.age) : undefined,
               gender: row.gender?.toLowerCase(),
               goals: row.goals || row.notes || '',
               trainer_id: user.id
             };
+            // Blank cells shouldn't wipe what's already on file.
+            Object.keys(clientData).forEach(k => {
+              if (clientData[k] === '' || clientData[k] === undefined || Number.isNaN(clientData[k])) delete clientData[k];
+            });
 
             // Check for existing client by email
             if (clientData.email) {
@@ -100,7 +126,7 @@ export default function BulkImport() {
                 await base44.entities.Client.update(existing[0].id, clientData);
               } else {
                 // Create new client
-                await base44.entities.Client.create(clientData);
+                await base44.entities.Client.create({ ...clientData, status: 'active' });
               }
               success++;
             } else {

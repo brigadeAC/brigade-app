@@ -93,6 +93,29 @@ export default function TrainerCommunity() {
     }
   });
 
+  const [clientPostText, setClientPostText] = useState("");
+  const createClientPostMutation = useMutation({
+    mutationFn: (data) => base44.entities.CommunityPost.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["client-community-posts"] });
+      setClientPostText("");
+      toast.success("Posted to your clients' feed.");
+    },
+    onError: (e) => toast.error(e?.message || "Couldn't post. Try again."),
+  });
+  const handleCreateClientPost = () => {
+    if (!clientPostText.trim()) return;
+    createClientPostMutation.mutate({
+      author_id: user.id,
+      author_name: user.full_name,
+      author_avatar: user.avatar_url,
+      trainer_id: user.id,
+      content: clientPostText.trim(),
+      media_urls: [],
+      post_type: "announcement",
+    });
+  };
+
   const updateClientPostMutation = useMutation({
     mutationFn: ({ id, data }) => base44.entities.CommunityPost.update(id, data),
     onSuccess: () => {
@@ -455,6 +478,21 @@ export default function TrainerCommunity() {
 
         {/* Client Community Tab */}
         <TabsContent value="clients" className="space-y-4">
+          <Card className="glass-card">
+            <CardContent className="pt-6 space-y-3">
+              <Textarea
+                placeholder="Post an update to all your clients..."
+                value={clientPostText}
+                onChange={(e) => setClientPostText(e.target.value)}
+                className="min-h-20 resize-none" />
+              <div className="flex justify-end">
+                <Button onClick={handleCreateClientPost} disabled={!clientPostText.trim() || createClientPostMutation.isPending}>
+                  {createClientPostMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                  Post to clients
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
           {clientPosts.map((post) => renderPost(post, false))}
 
           {clientPosts.length === 0 &&

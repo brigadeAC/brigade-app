@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from "react";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 
 export default function VideoCallRoom({ open, onOpenChange, roomId, userName }) {
   const containerRef = useRef(null);
@@ -71,7 +71,8 @@ export default function VideoCallRoom({ open, onOpenChange, roomId, userName }) 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl w-full h-[80vh] p-0 overflow-hidden bg-black border-primary/20 sm:rounded-2xl" hideCloseButton>
+      <DialogContent className="max-w-5xl w-full h-[80vh] p-0 overflow-hidden bg-black border-primary/20 sm:rounded-2xl" hideCloseButton aria-describedby={undefined}>
+        <DialogTitle className="sr-only">Video call</DialogTitle>
         <div ref={containerRef} className="w-full h-full bg-black flex items-center justify-center">
           <p className="text-muted-foreground animate-pulse">Loading secure connection...</p>
         </div>

@@ -501,15 +501,13 @@ export default function ClientWorkouts() {
                 <h3 className="text-lg font-medium text-foreground">No active workout plans</h3>
                 <p className="text-muted-foreground mt-2">
                   {clientProfile && !clientProfile.trainer_id 
-                    ? "Head to the AI Assistant to generate a personalized workout plan." 
+                    ? "Build your own plan to start logging workouts." 
                     : "Your trainer will assign workout plans to you"}
                 </p>
                 {clientProfile && !clientProfile.trainer_id && (
-                  <Link to={createPageUrl("ClientJournal")} className="mt-4">
-                    <Button className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-xl">
-                      Ask AI Assistant
-                    </Button>
-                  </Link>
+                  <Button onClick={() => setShowWorkoutForm(true)} className="mt-4 bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-xl">
+                    Create a plan
+                  </Button>
                 )}
               </CardContent>
             </Card>
@@ -682,7 +680,8 @@ export default function ClientWorkouts() {
 
       {/* Workout Session Dialog (Live Mode) */}
       <Dialog open={!!workoutSession} onOpenChange={() => setWorkoutSession(null)}>
-        <DialogContent className="max-w-2xl max-h-[95vh] h-[90vh] overflow-y-auto bg-card text-foreground border-border p-4 sm:p-8 flex flex-col">
+        <DialogContent className="max-w-2xl max-h-[95vh] h-[90vh] overflow-y-auto bg-card text-foreground border-border p-4 sm:p-8 flex flex-col" aria-describedby={undefined}>
+          <DialogTitle className="sr-only">Live workout</DialogTitle>
           {workoutSession && (
             <LiveWorkoutMode 
               workoutSession={workoutSession} 

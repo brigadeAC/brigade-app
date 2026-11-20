@@ -291,6 +291,7 @@ export default function FitnessTools() {
         onOpenChange={setShowProgramForm}
         program={editingProgram}
         clients={clients}
+        defaultClientId={new URLSearchParams(window.location.search).get("client_id") || undefined}
         onSubmit={handleSubmitProgram} />
 
 
@@ -299,6 +300,7 @@ export default function FitnessTools() {
         onOpenChange={setShowCalorieForm}
         log={editingLog}
         clients={clients}
+        defaultClientId={new URLSearchParams(window.location.search).get("client_id") || undefined}
         onSubmit={handleSubmitLog} />
 
 

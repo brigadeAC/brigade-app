@@ -55,6 +55,7 @@ export default function MealPlanForm({ open, onOpenChange, plan, clients, onSubm
   };
   const [isLoading, setIsLoading] = useState(false);
   const [foodSearch, setFoodSearch] = useState("");
+  const [customMacros, setCustomMacros] = useState({ calories: "", protein: "", carbs: "", fat: "" });
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   const [activeMealType, setActiveMealType] = useState(null);
@@ -436,6 +437,43 @@ export default function MealPlanForm({ open, onOpenChange, plan, clients, onSubm
                                       <div className="text-xs text-muted-foreground mt-1">{food.calories}cal • P:{food.protein}g C:{food.carbs}g F:{food.fat}g</div>
                                     </button>
                                   ))
+                                ) : foodSearch.trim().length >= 2 ? (
+                                  // No database match (or no food database connected):
+                                  // let the coach add the food with their own numbers.
+                                  <div className="p-3 space-y-2">
+                                    <p className="text-xs text-muted-foreground">
+                                      Not found. Add <span className="font-medium text-foreground">{foodSearch.trim()}</span> with your own numbers (per serving):
+                                    </p>
+                                    <div className="grid grid-cols-4 gap-1.5">
+                                      {[["calories", "Cal"], ["protein", "P (g)"], ["carbs", "C (g)"], ["fat", "F (g)"]].map(([k, label]) => (
+                                        <div key={k}>
+                                          <div className="text-[10px] text-muted-foreground mb-0.5">{label}</div>
+                                          <Input type="number" min="0" inputMode="decimal" value={customMacros[k]}
+                                            onChange={(e) => setCustomMacros((m) => ({ ...m, [k]: e.target.value }))}
+                                            className="h-7 text-xs px-1.5 input-frosted text-foreground" />
+                                        </div>
+                                      ))}
+                                    </div>
+                                    <Button type="button" size="sm" className="w-full h-7 text-xs"
+                                      onClick={() => {
+                                        addFoodToMeal(dayNum, mealType, {
+                                          fdc_id: "custom",
+                                          name: foodSearch.trim(),
+                                          calories: Number(customMacros.calories) || 0,
+                                          protein: Number(customMacros.protein) || 0,
+                                          carbs: Number(customMacros.carbs) || 0,
+                                          fat: Number(customMacros.fat) || 0,
+                                          serving_size: 1,
+                                          serving_unit: "serving",
+                                        });
+                                        setCustomMacros({ calories: "", protein: "", carbs: "", fat: "" });
+                                        setFoodSearch("");
+                                        setSearchResults([]);
+                                        setActiveMealType(null);
+                                      }}>
+                                      Add to {mealType}
+                                    </Button>
+                                  </div>
                                 ) : null}
                               </div>
                             </PopoverContent>
@@ -483,7 +521,7 @@ export default function MealPlanForm({ open, onOpenChange, plan, clients, onSubm
                                       return { ...prev, daily_meals: newDailyMeals };
                                     });
                                   }}
-                                  className="w-12 h-7 text-xs input-frosted text-foreground"
+                                  className="w-20 h-7 text-xs px-2 input-frosted text-foreground"
                                 />
                               </div>
                             </div>

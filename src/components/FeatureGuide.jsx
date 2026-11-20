@@ -138,17 +138,17 @@ const GUIDES = {
   ClientWorkouts: {
     title: "Your workouts",
     steps: [
-      "Your trainer's plans appear here. Open one to see each day's exercises with demo images.",
-      "Tap “Start Workout” to train, then log your completion — your trainer sees it immediately.",
+      "Plans from your coach, or ones you build with “Create Plan”, appear here. Open one to see each day's exercises.",
+      "Tap “Start Workout” to train and log each set. If you have a coach, they see it right away.",
       "The Progress Analytics tab charts your strength over time for every exercise.",
     ],
   },
   ClientMeals: {
     title: "Your nutrition",
     steps: [
-      "Follow the meal plans your trainer assigns, with foods, portions, and macros.",
+      "Follow your meal plan, with foods, portions, and macros.",
       "Use the AI Meal Scanner: snap a photo of any meal and it estimates the calories and macros.",
-      "Log what you eat so your trainer can keep your plan on track.",
+      "Log what you eat to see today's calories and macros. If you have a coach, they see it too.",
     ],
   },
   ClientProgress: {
@@ -156,7 +156,7 @@ const GUIDES = {
     steps: [
       "Tap “Log Progress” to record weight and measurements — charts build automatically over time.",
       "Add progress photos from your dashboard; three or more unlocks the timelapse view.",
-      "Your trainer sees everything you log, so they can adjust your plan.",
+      "If you have a coach, they see everything you log and can adjust your plan.",
     ],
   },
   ClientHabits: {
@@ -178,7 +178,7 @@ const GUIDES = {
     title: "Daily reflection",
     steps: [
       "Answer the daily prompt (or tap “New Prompt” for a different one) and save your entry.",
-      "Journaling helps your trainer understand how you're really doing — entries are summarized with AI insights.",
+      "Each entry gets a short AI summary. If you have a coach, it helps them see how you're really doing.",
     ],
   },
   ClientResources: {
@@ -190,7 +190,7 @@ const GUIDES = {
   ClientCommunity: {
     title: "Community",
     steps: [
-      "Share wins and encouragement with your trainer's other clients.",
+      "Share wins and encouragement with others at the gym.",
       "Add photos to your posts to celebrate milestones.",
     ],
   },

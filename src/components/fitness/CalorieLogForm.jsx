@@ -10,7 +10,7 @@ const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"
 
 const defaultEntry = (day = "") => ({ day, food: "", calories: "", fat_grams: "" });
 
-export default function CalorieLogForm({ open, onOpenChange, log, clients, onSubmit }) {
+export default function CalorieLogForm({ open, onOpenChange, log, clients, onSubmit, defaultClientId }) {
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     client_id: "",
@@ -23,9 +23,9 @@ export default function CalorieLogForm({ open, onOpenChange, log, clients, onSub
     if (log) {
       setFormData({ ...formData, ...log, entries: log.entries?.length ? log.entries : DAYS.map(d => defaultEntry(d)) });
     } else {
-      setFormData({ client_id: "", log_name: "", week_start: "", entries: DAYS.map(d => defaultEntry(d)) });
+      setFormData({ client_id: defaultClientId || "", log_name: "", week_start: "", entries: DAYS.map(d => defaultEntry(d)) });
     }
-  }, [log, open]);
+  }, [log, open, defaultClientId]);
 
   const updateEntry = (i, field, val) => {
     setFormData(prev => {

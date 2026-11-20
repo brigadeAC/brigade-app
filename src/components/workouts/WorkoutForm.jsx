@@ -264,7 +264,21 @@ export default function WorkoutForm({ open, onOpenChange, workout, clients, onSu
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-5xl h-[95vh] flex flex-col bg-card border-border text-foreground p-0 overflow-hidden" aria-describedby="workout-form-description">
+      <DialogContent
+        className="sm:max-w-5xl h-[95vh] flex flex-col bg-card border-border text-foreground p-0 overflow-hidden"
+        aria-describedby="workout-form-description"
+        // Escape closes the exercise suggestions, not the whole plan, and a stray
+        // click outside shouldn't throw away a half-built plan. Cancel or X closes it.
+        onEscapeKeyDown={(e) => {
+          if (activeSearchIndex) {
+            e.preventDefault();
+            setActiveSearchIndex(null);
+            setSearchResults([]);
+            setSearchQuery("");
+          }
+        }}
+        onInteractOutside={(e) => e.preventDefault()}
+      >
         <DialogHeader className="p-6 pb-4 border-b border-border shrink-0">
           <DialogTitle className="flex items-center gap-2 text-xl text-foreground" id="workout-form-description">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary flex items-center justify-center">
@@ -541,7 +555,7 @@ export default function WorkoutForm({ open, onOpenChange, workout, clients, onSu
                                            </button>
                                          ))
                                        ) : searchQuery.length >= 2 ? (
-                                         <div className="p-3 text-center text-xs text-muted-foreground">No exercises found</div>
+                                         <div className="p-3 text-center text-xs text-muted-foreground">Not in the library. The name will be saved as you typed it.</div>
                                        ) : null}
                                      </div>
                                    )}

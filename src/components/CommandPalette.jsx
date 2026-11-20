@@ -27,7 +27,7 @@ const TRAINER_PAGES = [
   { label: "Recipes", page: "Recipes", icon: Utensils },
   { label: "CRM & Leads", page: "CRM", icon: Users2 },
   { label: "Business Hub", page: "BusinessHub", icon: Receipt },
-  { label: "Expenses", page: "TrainerExpenses", icon: Receipt },
+  { label: "Expenses", page: "BusinessHub", icon: Receipt },
   { label: "Client Notebooks", page: "ClientNotebooks", icon: BookOpen },
   { label: "Journal Insights", page: "TrainerJournalInsights", icon: BookOpen },
   { label: "AI Assistant", page: "TrainerAssistant", icon: Bot },

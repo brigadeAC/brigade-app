@@ -852,13 +852,15 @@ async function runFunction(name, payload, ctx) {
 
       const out = await invokeLLM(
         {
-          prompt: `A fitness client wrote this journal entry. Summarize it for their trainer in 1-2 sentences (third person using "the client" or they/them, never guess gender from a name; professional; flag anything the trainer should follow up on), and classify overall sentiment. Entry: """${content}"""`,
+          prompt: `A fitness client wrote this journal entry. (1) trainer_summary: summarize it for their trainer in 1-2 sentences (third person using "the client" or they/them, never guess gender from a name; professional; flag anything the trainer should follow up on). (2) athlete_insight: 1-2 short sentences written to the athlete as "you": one specific, practical takeaway from what they wrote, encouraging but not gushing. If they mention pain or injury, suggest easing off and checking with a coach or medical professional; do not diagnose. (3) Classify overall sentiment. Entry: """${content}"""`,
           response_json_schema: {
             type: 'object',
             properties: {
               trainer_summary: { type: 'string' },
+              athlete_insight: { type: 'string' },
               sentiment: { type: 'string', enum: ['positive', 'neutral', 'negative'] },
             },
+            required: ['trainer_summary', 'athlete_insight', 'sentiment'],
           },
         },
         env
@@ -871,6 +873,7 @@ async function runFunction(name, payload, ctx) {
       if (!row) return { success: false };
       let data; try { data = JSON.parse(row.data); } catch { return { success: false }; }
       data.trainer_summary = out.trainer_summary;
+      if (out.athlete_insight) data.athlete_insight = String(out.athlete_insight).slice(0, 600);
       data.sentiment = out.sentiment || 'neutral';
       await env.DB.prepare('UPDATE entities SET data=?, updated_date=? WHERE id=?')
         .bind(JSON.stringify(data), nowISO(), entryId).run();
@@ -2032,7 +2035,32 @@ export async function onRequest(context) {
         if (!user) return err('You must be logged in.', 401);
         const scope = await ownershipClause(env, user);
         let removed = 0;
-        if (scope) {
+        const isMember = user.user_type === 'client' || user.user_type === 'independent';
+        if (isMember && user.role !== 'admin') {
+          // Members delete what they wrote themselves (logs, journal, photos,
+          // posts, messages they sent). Records their coach owns stay: signed
+          // waivers and contracts, coach notes, plans and the coach's messages
+          // are the gym's business records. The coach's Client record is kept
+          // but unlinked from the deleted login.
+          const { results } = await env.DB.prepare(
+            'SELECT id FROM entities WHERE created_by = ?'
+          ).bind(user.email).all();
+          for (const r of results) {
+            await env.DB.prepare('DELETE FROM entities WHERE id = ?').bind(r.id).run();
+            removed++;
+          }
+          const { results: clientRows } = await env.DB.prepare(
+            `SELECT id, data FROM entities WHERE entity_type='Client' AND json_extract(data,'$.user_id') = ?`
+          ).bind(user.id).all();
+          for (const row of clientRows) {
+            let data; try { data = JSON.parse(row.data); } catch { continue; }
+            delete data.user_id;
+            data.status = 'inactive';
+            data.account_deleted = true;
+            await env.DB.prepare('UPDATE entities SET data=?, updated_date=? WHERE id=?')
+              .bind(JSON.stringify(data), nowISO(), row.id).run();
+          }
+        } else if (scope) {
           const { results } = await env.DB.prepare(
             `SELECT id FROM entities WHERE ${scope.sql}`
           ).bind(...scope.binds).all();
