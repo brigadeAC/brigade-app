@@ -22,6 +22,8 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { calculateHabitStreak, parseLocalDate } from "@/lib/utils";
 import { isLogDone } from "@/lib/habitLibrary";
+import { isScheduledOn } from "@/lib/programs";
+import ClientTodayCard from "@/components/programs/client/ClientTodayCard";
 
 // Local calendar date (matches the Habits page). UTC would roll over to
 // "tomorrow" in the evening for US time zones.
@@ -147,7 +149,9 @@ export default function ClientDashboard() {
     queryFn: () => base44.entities.Habit.filter({ client_id: clientId }),
     enabled: !!clientId,
   });
-  const habits = allHabits.filter((h) => h.is_active !== false);
+  const activeHabits = allHabits.filter((h) => h.is_active !== false);
+  // Program habits have start/end dates and weekdays; only today's count.
+  const habits = activeHabits.filter((h) => isScheduledOn(h, todayStr()));
   const { data: habitLogs = [] } = useQuery({
     queryKey: ["habitLogs", clientId],
     queryFn: () => base44.entities.HabitLog.filter({ client_id: clientId }),
@@ -192,7 +196,13 @@ export default function ClientDashboard() {
     .filter((s) => s.status === "scheduled" && s.date >= today)
     .sort((a, b) => (a.date + (a.start_time || a.time || "")).localeCompare(b.date + (b.start_time || b.time || "")))[0];
 
-  const streak = calculateHabitStreak(habitLogs);
+  // Logs on days a habit wasn't scheduled don't count toward the streak.
+  const streak = calculateHabitStreak(
+    habitLogs.filter((l) => {
+      const h = allHabits.find((x) => x.id === l.habit_id);
+      return !h || isScheduledOn(h, l.date);
+    })
+  );
 
   const allPhotos = progressLogs
     .filter((log) => log.photo_urls && log.photo_urls.length > 0)
@@ -350,6 +360,9 @@ export default function ClientDashboard() {
           <p className="text-sm font-medium text-muted-foreground">Nutrition</p>
         </Link>
       </div>
+
+      {/* ---- Program: today's lesson and check-in ---- */}
+      <ClientTodayCard />
 
       {/* ---- Habit checklist ---- */}
       {habits.length > 0 && (

@@ -210,10 +210,16 @@ async function memberResourceTerm(env, user) {
 // Staff (trainers and admins) work for the gym: they all see the same clients,
 // plans, templates and business records. Only these stay private per person.
 // Gym libraries everyone can read but only staff can change.
-const STAFF_LIBRARY_TYPES = new Set(['HabitTemplate']);
+const STAFF_LIBRARY_TYPES = new Set(['HabitTemplate', 'Lesson', 'Program', 'ProgramItem']);
+// Client records only staff (or the system) may write. Members still read
+// their own rows through the normal ownership scope (client_id/client_user_id).
+const STAFF_WRITE_TYPES = new Set(['ProgramEnrollment', 'ProgramMessageLog']);
+// Member-writable program records; enrollment_id must point at their own enrollment.
+const MEMBER_PROGRAM_RECORD_TYPES = new Set(['LessonCompletion', 'CheckinResponse']);
 const STAFF_PRIVATE_TYPES = new Set(['Message', 'Notification', 'CoachBriefing', 'AgentConversation']);
 const isStaff = (user) => !!user && (user.role === 'admin' || user.user_type === 'trainer');
 const isMemberUser = (user) => !!user && user.role !== 'admin' && (user.user_type === 'client' || user.user_type === 'independent');
+const staffWriteDenied = (type, user) => (STAFF_LIBRARY_TYPES.has(type) || STAFF_WRITE_TYPES.has(type)) && !isStaff(user);
 
 // Ownership scoping: admins see everything; everyone else only rows they own —
 // rows they created, rows assigned to them as trainer, or rows about them as
@@ -285,6 +291,18 @@ async function memberWriteViolation(env, user, type, fields, existing = null) {
     const cid = fields.client_id;
     if (cid !== user.id && !myClientIds.has(cid) && cid !== existing?.client_id) {
       return 'You can only save records to your own profile.';
+    }
+  }
+
+  if (STAFF_WRITE_TYPES.has(type)) return 'Only coaches can change program enrollments.';
+  if (MEMBER_PROGRAM_RECORD_TYPES.has(type) && 'enrollment_id' in fields && fields.enrollment_id
+      && fields.enrollment_id !== existing?.enrollment_id) {
+    const enr = await env.DB.prepare(
+      `SELECT data FROM entities WHERE id = ? AND entity_type = 'ProgramEnrollment'`
+    ).bind(fields.enrollment_id).first();
+    let e = null; try { e = enr ? JSON.parse(enr.data) : null; } catch { /* ignore */ }
+    if (!e || !(myClientIds.has(e.client_id) || e.client_user_id === user.id)) {
+      return 'You can only save records to your own program.';
     }
   }
   return null;
@@ -698,6 +716,469 @@ async function edbFetch(env, path) {
   if (!resp.ok) return { success: false, error: `ExerciseDB ${resp.status}` };
   return resp.json();
 }
+
+/* ------------------------------- programs -------------------------------- */
+// Programs, lessons and program calendars (docs/programs-spec.md). Dates are
+// "yyyy-MM-dd" calendar keys; the math mirrors src/lib/programs.js but works
+// in UTC on the key itself so the server's own time zone never matters.
+const PROGRAM_TZ = 'America/New_York';
+const MESSAGE_BACKLOG_MS = 3 * 864e5; // don't send program messages older than this
+const isDateKey = (k) => typeof k === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(k);
+const keyToUTC = (k) => { const [y, m, d] = String(k).split('-').map(Number); return Date.UTC(y, m - 1, d); };
+const pAddDays = (k, n) => new Date(keyToUTC(k) + n * 864e5).toISOString().slice(0, 10);
+const pDaysBetween = (a, b) => Math.round((keyToUTC(b) - keyToUTC(a)) / 864e5);
+const pDayNumberFor = (start, date) => pDaysBetween(start, date) + 1;
+const pDateForDay = (start, day) => pAddDays(start, Number(day) - 1);
+const pDow = (k) => new Date(keyToUTC(k)).getUTCDay();
+
+// Today's calendar date at the gym (Eastern).
+const programToday = (ms = Date.now()) =>
+  new Intl.DateTimeFormat('en-CA', { timeZone: PROGRAM_TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(ms));
+
+// Minutes the Eastern wall clock is ahead of UTC at instant `ms` (e.g. -300 / -240).
+function tzOffsetMinutes(ms) {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-US', {
+    timeZone: PROGRAM_TZ, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  }).formatToParts(new Date(ms)).map((p) => [p.type, p.value]));
+  const hour = Number(parts.hour) % 24;
+  const asUTC = Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day), hour, Number(parts.minute), Number(parts.second));
+  return Math.round((asUTC - Math.floor(ms / 1000) * 1000) / 60000);
+}
+
+// UTC instant (ms) of an Eastern wall-clock time "HH:mm" on date key `k`, DST-correct.
+function easternToUTC(k, hhmm = '09:00') {
+  const [y, m, d] = String(k).split('-').map(Number);
+  const [hh, mm] = (/^\d{1,2}:\d{2}$/.test(String(hhmm || '')) ? String(hhmm) : '09:00').split(':').map(Number);
+  const guess = Date.UTC(y, m - 1, d, hh, mm);
+  const off1 = tzOffsetMinutes(guess);
+  let t = guess - off1 * 60000;
+  const off2 = tzOffsetMinutes(t);
+  if (off2 !== off1) t = guess - off2 * 60000;
+  return t;
+}
+
+const parseRow = (row) => (row ? rowToEntity(row) : null);
+
+async function selectEntities(env, type, whereSql = '1=1', binds = []) {
+  const { results } = await env.DB.prepare(
+    `SELECT * FROM entities WHERE entity_type = ? AND (${whereSql})`
+  ).bind(type, ...binds).all();
+  return results.map(rowToEntity);
+}
+
+async function getEntityById(env, type, id) {
+  if (!id) return null;
+  return parseRow(await env.DB.prepare('SELECT * FROM entities WHERE id = ? AND entity_type = ?').bind(id, type).first());
+}
+
+async function insertEntity(env, type, data, createdBy, id = uid()) {
+  const now = nowISO();
+  await env.DB.prepare(
+    'INSERT INTO entities (id, entity_type, data, created_by, created_date, updated_date) VALUES (?,?,?,?,?,?)'
+  ).bind(id, type, JSON.stringify(data), createdBy || null, now, now).run();
+  return { ...data, id, created_by: createdBy || null, created_date: now, updated_date: now };
+}
+
+async function patchEntity(env, entity, patch) {
+  const { id, created_by, created_date, updated_date: _u, ...data } = entity;
+  const merged = { ...data, ...patch };
+  const now = nowISO();
+  await env.DB.prepare('UPDATE entities SET data=?, updated_date=? WHERE id=?').bind(JSON.stringify(merged), now, id).run();
+  return { ...merged, id, created_by, created_date, updated_date: now };
+}
+
+const inList = (arr) => arr.map(() => '?').join(',');
+
+// The member's Client record ids (a login can have one per coach).
+async function myClientIds(env, user) {
+  const { results } = await env.DB.prepare(
+    `SELECT id FROM entities WHERE entity_type='Client' AND (json_extract(data,'$.email') = ? OR json_extract(data,'$.user_id') = ?)`
+  ).bind(user.email, user.id).all();
+  return results.map((r) => r.id);
+}
+
+// The member login for a Client record (user_id, else a member account with that email).
+async function clientLogin(env, client) {
+  if (!client) return null;
+  if (client.user_id) {
+    const row = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(client.user_id).first();
+    if (row) return userRow(row);
+  }
+  if (client.email) {
+    const row = await env.DB.prepare(
+      `SELECT * FROM users WHERE lower(email) = lower(?) AND role != 'admin' AND user_type IN ('client','independent') LIMIT 1`
+    ).bind(client.email).first();
+    if (row) return userRow(row);
+  }
+  return null;
+}
+
+async function staffLogin(env, id) {
+  if (!id) return null;
+  const u = userRow(await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(id).first());
+  if (u) u.role = resolveRole(env, u.email, u.role);
+  return u && isStaff(u) ? u : null;
+}
+
+function programLength(program, items) {
+  const weeks = Number(program?.duration_weeks) || 0;
+  if (weeks > 0) return weeks * 7;
+  return Math.max(1, ...items.map((i) => Number(i.end_day) || Number(i.day) || 1));
+}
+
+// Template items + per-client overrides/extras -> effective items. Each gets
+// item_id, eff_day, source (template|extra), moved, skipped. Habits also get
+// eff_end_day (inclusive); a moved habit keeps its length.
+function materializeProgram(enrollment, templateItems, program) {
+  const length = programLength(program, templateItems);
+  const overrides = new Map();
+  for (const o of Array.isArray(enrollment.overrides) ? enrollment.overrides : []) {
+    if (o && o.item_id) overrides.set(o.item_id, o);
+  }
+  const out = [];
+  const add = (item, source) => {
+    const day = Number(item.day) || 1;
+    const o = source === 'template' ? overrides.get(item.id) : null;
+    const skipped = o?.action === 'skip';
+    const moved = o?.action === 'move' && Number(o.day) > 0;
+    const effDay = moved ? Number(o.day) : day;
+    const eff = { ...item, item_id: item.id, eff_day: effDay, source, moved, skipped };
+    if (item.type === 'habit') {
+      const end = Number(item.end_day) > 0 ? Number(item.end_day) + (effDay - day) : Math.max(length, effDay);
+      eff.eff_end_day = Math.max(effDay, end);
+    }
+    out.push(eff);
+  };
+  for (const it of templateItems) if (it.program_id === enrollment.program_id) add(it, 'template');
+  for (const it of Array.isArray(enrollment.extra_items) ? enrollment.extra_items : []) {
+    if (it && it.id && it.type) add(it, 'extra');
+  }
+  out.sort((a, b) => a.eff_day - b.eff_day || (Number(a.sort) || 0) - (Number(b.sort) || 0));
+  return out;
+}
+
+function habitScheduledOn(item, dateKey, start) {
+  const day = pDayNumberFor(start, dateKey);
+  if (day < item.eff_day || day > item.eff_end_day) return false;
+  const dow = item.days_of_week;
+  if (Array.isArray(dow) && dow.length > 0 && dow.length < 7) return dow.map(Number).includes(pDow(dateKey));
+  return true;
+}
+
+// Mirrors isLogDone() in src/lib/habitLibrary.js.
+function habitLogDone(habit, log) {
+  if (!log) return false;
+  if ((habit?.tracking || 'check') !== 'number') return !!log.completed;
+  if (log.value === undefined || log.value === null || log.value === '') return !!log.completed;
+  const v = Number(log.value);
+  return /\bmax\b/i.test(habit?.unit || '') ? v <= Number(habit.target_value) : v >= Number(habit.target_value);
+}
+
+const HABIT_COPY_FIELDS = ['name', 'icon', 'category', 'description', 'tips', 'tracking', 'target_value', 'unit',
+  'frequency', 'days_per_week', 'days_of_week', 'template_id'];
+
+// Make the client's program Habit rows match the enrollment: one per habit item
+// (not skipped), dated from start_date. Rows no longer wanted are archived
+// (is_active:false), never deleted, so logs and history stay.
+async function syncProgramHabits(env, enrollment, effItems, actorEmail) {
+  const existing = await selectEntities(env, 'Habit', "json_extract(data,'$.enrollment_id') = ?", [enrollment.id]);
+  const byItem = new Map(existing.map((h) => [h.item_id, h]));
+  const active = enrollment.status === 'active';
+  const archiveAll = enrollment.status === 'cancelled' || enrollment.status === 'paused';
+  const client = await getEntityById(env, 'Client', enrollment.client_id);
+  const trainerId = client?.trainer_id || enrollment.trainer_id || null;
+  const keep = new Set();
+  if (!archiveAll) {
+    for (const it of effItems) {
+      if (it.type !== 'habit' || it.skipped) continue;
+      keep.add(it.item_id);
+      const schedule = {
+        start_date: pDateForDay(enrollment.start_date, it.eff_day),
+        end_date: pDateForDay(enrollment.start_date, it.eff_end_day),
+        days_of_week: Array.isArray(it.days_of_week) ? it.days_of_week.map(Number) : [],
+      };
+      const h = byItem.get(it.item_id);
+      if (h) {
+        const patch = { ...schedule };
+        if (active) patch.is_active = true;
+        await patchEntity(env, h, patch);
+      } else if (enrollment.status !== 'completed') {
+        const fields = {};
+        for (const f of HABIT_COPY_FIELDS) if (it[f] !== undefined) fields[f] = it[f];
+        await insertEntity(env, 'Habit', {
+          ...fields,
+          ...schedule,
+          client_id: enrollment.client_id,
+          ...(trainerId ? { trainer_id: trainerId } : {}),
+          program_id: enrollment.program_id,
+          enrollment_id: enrollment.id,
+          item_id: it.item_id,
+          is_active: true,
+        }, actorEmail);
+      }
+    }
+  }
+  for (const h of existing) {
+    if (!keep.has(h.item_id) && h.is_active !== false) await patchEntity(env, h, { is_active: false });
+  }
+}
+
+async function loadProgramAndItems(env, programId, cache = null) {
+  if (cache?.has(programId)) return cache.get(programId);
+  const program = await getEntityById(env, 'Program', programId);
+  const items = await selectEntities(env, 'ProgramItem', "json_extract(data,'$.program_id') = ?", [programId]);
+  const v = { program, items };
+  cache?.set(programId, v);
+  return v;
+}
+
+function cleanOverrides(list) {
+  if (!Array.isArray(list)) return [];
+  return list
+    .filter((o) => o && o.item_id && (o.action === 'skip' || (o.action === 'move' && Number(o.day) > 0)))
+    .map((o) => (o.action === 'move' ? { item_id: String(o.item_id), action: 'move', day: Number(o.day) } : { item_id: String(o.item_id), action: 'skip' }));
+}
+
+const PROGRAM_ITEM_TYPES = new Set(['lesson', 'habit', 'message', 'workout', 'checkin']);
+function cleanExtraItems(list) {
+  if (!Array.isArray(list)) return [];
+  return list
+    .filter((it) => it && PROGRAM_ITEM_TYPES.has(it.type) && Number(it.day) > 0)
+    .map((it) => ({ ...it, id: it.id && String(it.id).startsWith('x-') ? String(it.id) : `x-${uid().slice(0, 12)}`, day: Number(it.day) }));
+}
+
+// Send every due program message. opts: { enrollmentIds?: string[] } (default: all active).
+// Idempotent: the ProgramMessageLog row has a deterministic primary key per
+// enrollment+item and is inserted (status "sending") BEFORE the message, so two
+// racing ticks can never both send.
+async function runProgramTick(env, opts = {}) {
+  const now = Date.now();
+  const summary = { success: true, enrollments: 0, sent: 0, skipped: 0, failed: 0 };
+  let where = "json_extract(data,'$.status') = 'active'";
+  const binds = [];
+  const ids = opts.enrollmentIds || (opts.enrollmentId ? [opts.enrollmentId] : null);
+  if (ids) {
+    if (ids.length === 0) return summary;
+    where += ` AND id IN (${inList(ids)})`;
+    binds.push(...ids);
+  }
+  const enrollments = await selectEntities(env, 'ProgramEnrollment', where, binds);
+  const cache = new Map();
+  for (const enr of enrollments) {
+    if (!isDateKey(enr.start_date)) continue;
+    summary.enrollments++;
+    const { program, items } = await loadProgramAndItems(env, enr.program_id, cache);
+    const due = materializeProgram(enr, items, program).filter((it) => it.type === 'message' && !it.skipped
+      && easternToUTC(pDateForDay(enr.start_date, it.eff_day), it.send_time || '09:00') <= now);
+    if (due.length === 0) continue;
+    const logged = new Set((await selectEntities(env, 'ProgramMessageLog',
+      "json_extract(data,'$.enrollment_id') = ?", [enr.id])).map((l) => l.item_id));
+    const pending = due.filter((it) => !logged.has(it.item_id));
+    if (pending.length === 0) continue;
+
+    const client = await getEntityById(env, 'Client', enr.client_id);
+    const coach = await staffLogin(env, client?.trainer_id) || await staffLogin(env, enr.trainer_id);
+    const login = await clientLogin(env, client);
+
+    for (const it of pending) {
+      const scheduledMs = easternToUTC(pDateForDay(enr.start_date, it.eff_day), it.send_time || '09:00');
+      const logId = `pml_${enr.id}_${it.item_id}`;
+      const logData = {
+        enrollment_id: enr.id, item_id: it.item_id, client_id: enr.client_id,
+        program_id: enr.program_id, scheduled_for: new Date(scheduledMs).toISOString(), status: 'sending',
+      };
+      const createdBy = coach?.email || null;
+      const ins = await env.DB.prepare(
+        'INSERT OR IGNORE INTO entities (id, entity_type, data, created_by, created_date, updated_date) VALUES (?,?,?,?,?,?)'
+      ).bind(logId, 'ProgramMessageLog', JSON.stringify(logData), createdBy, nowISO(), nowISO()).run();
+      if (!ins?.meta?.changes) continue; // another tick already claimed it
+      let logEntity = await getEntityById(env, 'ProgramMessageLog', logId);
+
+      let reason = null;
+      if (now - scheduledMs > MESSAGE_BACKLOG_MS) reason = 'too_old';
+      else if (!client) reason = 'client_missing';
+      else if (!login) reason = 'no_login';
+      else if (!coach) reason = 'no_coach';
+      else if (!String(it.text || '').trim()) reason = 'empty';
+      if (reason) {
+        await patchEntity(env, logEntity, { status: 'skipped', reason });
+        summary.skipped++;
+        continue;
+      }
+      try {
+        const content = String(it.text).trim();
+        const message = await insertEntity(env, 'Message', {
+          conversation_id: [coach.id, login.id].sort().join('-'),
+          sender_id: coach.id,
+          sender_name: coach.full_name || 'Coach',
+          receiver_id: login.id,
+          receiver_name: client.full_name || login.full_name || 'Client',
+          content,
+          media_urls: [],
+          timestamp: nowISO(),
+          read: false,
+          program_id: enr.program_id,
+          enrollment_id: enr.id,
+          program_item_id: it.item_id,
+        }, coach.email);
+        const notif = {
+          user_id: login.id, type: 'message', title: 'New message',
+          message: `${coach.full_name || 'Coach'}: ${content.substring(0, 50)}${content.length > 50 ? '...' : ''}`,
+          link: '/Messages',
+        };
+        await insertEntity(env, 'Notification', notif, coach.email);
+        logEntity = await patchEntity(env, logEntity, { status: 'sent', sent_at: nowISO(), message_id: message.id });
+        summary.sent++;
+        const p = pushForNotification(env, coach, notif);
+        if (env.__waitUntil) env.__waitUntil(p); else await p;
+      } catch (e) {
+        await patchEntity(env, logEntity, { status: 'failed', error: String(e?.message || e).slice(0, 200) });
+        summary.failed++;
+      }
+    }
+  }
+  return summary;
+}
+
+// Materialized calendar for one enrollment between two date keys (inclusive).
+// includeSkipped: coach calendars show skipped items so they can be restored.
+async function buildProgramDays(env, enrollment, from, to, { includeSkipped = true, cache = null } = {}) {
+  const { program, items } = await loadProgramAndItems(env, enrollment.program_id, cache);
+  const eff = materializeProgram(enrollment, items, program);
+  const start = enrollment.start_date;
+  const today = programToday();
+  const eid = enrollment.id;
+
+  const lessonIds = [...new Set(eff.filter((i) => i.type === 'lesson' && i.lesson_id).map((i) => i.lesson_id))];
+  const [lessons, completions, checkins, msgLogs, habits, workoutLogs] = await Promise.all([
+    lessonIds.length ? selectEntities(env, 'Lesson', `id IN (${inList(lessonIds)})`, lessonIds) : [],
+    selectEntities(env, 'LessonCompletion', "json_extract(data,'$.enrollment_id') = ?", [eid]),
+    selectEntities(env, 'CheckinResponse', "json_extract(data,'$.enrollment_id') = ?", [eid]),
+    selectEntities(env, 'ProgramMessageLog', "json_extract(data,'$.enrollment_id') = ?", [eid]),
+    selectEntities(env, 'Habit', "json_extract(data,'$.enrollment_id') = ?", [eid]),
+    selectEntities(env, 'WorkoutLog', "json_extract(data,'$.client_id') = ? AND json_extract(data,'$.date') BETWEEN ? AND ?", [enrollment.client_id, from, to]),
+  ]);
+  const habitIds = habits.map((h) => h.id);
+  const habitLogs = habitIds.length
+    ? await selectEntities(env, 'HabitLog', `json_extract(data,'$.habit_id') IN (${inList(habitIds)}) AND json_extract(data,'$.date') BETWEEN ? AND ?`, [...habitIds, from, to])
+    : [];
+
+  const lessonById = new Map(lessons.map((l) => [l.id, l]));
+  const completionByItem = new Map(completions.map((c) => [c.item_id, c]));
+  const checkinByItem = new Map(checkins.map((c) => [c.item_id, c]));
+  const logByItem = new Map(msgLogs.map((l) => [l.item_id, l]));
+  const habitByItem = new Map(habits.map((h) => [h.item_id, h]));
+  const habitLogByKey = new Map(habitLogs.map((l) => [`${l.habit_id}|${l.date}`, l]));
+  const doneOrMissed = (done, date) => (done ? 'done' : date < today ? 'missed' : 'upcoming');
+
+  const entryFor = (it, date) => {
+    const base = { item_id: it.item_id, type: it.type, day: it.eff_day, source: it.source, moved: it.moved, skipped: it.skipped };
+    if (it.skipped) {
+      return { ...base, title: titleFor(it), status: 'skipped', ref: refFor(it, date) };
+    }
+    switch (it.type) {
+      case 'lesson': {
+        const c = completionByItem.get(it.item_id);
+        return { ...base, title: titleFor(it), status: doneOrMissed(!!c, date), ref: refFor(it, date) };
+      }
+      case 'habit': {
+        const h = habitByItem.get(it.item_id);
+        const log = h ? habitLogByKey.get(`${h.id}|${date}`) : null;
+        return { ...base, title: titleFor(it), status: doneOrMissed(habitLogDone(h || it, log), date), ref: refFor(it, date) };
+      }
+      case 'message': {
+        const l = logByItem.get(it.item_id);
+        const status = !l ? 'scheduled' : l.status === 'sent' ? 'sent' : l.status === 'sending' ? 'scheduled' : 'skipped';
+        return { ...base, title: titleFor(it), status, ref: refFor(it, date) };
+      }
+      case 'workout': {
+        const w = workoutFor(it, date);
+        return { ...base, title: titleFor(it), status: doneOrMissed(!!w, date), ref: refFor(it, date) };
+      }
+      case 'checkin': {
+        const c = checkinByItem.get(it.item_id);
+        return { ...base, title: titleFor(it), status: doneOrMissed(!!c, date), ref: refFor(it, date) };
+      }
+      default:
+        return { ...base, title: it.title || it.type, status: 'upcoming', ref: {} };
+    }
+  };
+  function workoutFor(it, date) {
+    return workoutLogs.find((w) => w.date === date && (!it.workout_plan_id || w.workout_plan_id === it.workout_plan_id)) || null;
+  }
+  function titleFor(it) {
+    if (it.type === 'lesson') return lessonById.get(it.lesson_id)?.title || it.title || 'Lesson';
+    if (it.type === 'habit') return it.name || it.title || 'Habit';
+    if (it.type === 'message') { const t = String(it.text || '').trim(); return t.length > 60 ? `${t.slice(0, 57)}...` : (t || 'Message'); }
+    if (it.type === 'workout') return it.title || 'Workout';
+    if (it.type === 'checkin') return it.title || 'Check-in';
+    return it.title || it.type;
+  }
+  function refFor(it, date) {
+    switch (it.type) {
+      case 'lesson': {
+        const c = completionByItem.get(it.item_id);
+        const l = lessonById.get(it.lesson_id);
+        return {
+          lesson_id: it.lesson_id || null,
+          lesson: l ? { id: l.id, title: l.title, subtitle: l.subtitle, category: l.category, cover_image_url: l.cover_image_url } : null,
+          completion_id: c?.id || null,
+          reflection_answer: c?.reflection_answer || null,
+        };
+      }
+      case 'habit': {
+        const h = habitByItem.get(it.item_id);
+        const log = h ? habitLogByKey.get(`${h.id}|${date}`) : null;
+        return {
+          habit_id: h?.id || null, log_id: log?.id || null, icon: it.icon || h?.icon || null,
+          tracking: h?.tracking || it.tracking || 'check', target_value: h?.target_value ?? it.target_value ?? null,
+          unit: h?.unit ?? it.unit ?? '', value: log?.value ?? null,
+          start_day: it.eff_day, end_day: it.eff_end_day,
+        };
+      }
+      case 'message': {
+        const l = logByItem.get(it.item_id);
+        return {
+          text: it.text || '', send_time: it.send_time || '09:00',
+          scheduled_for: new Date(easternToUTC(date, it.send_time || '09:00')).toISOString(),
+          log_id: l?.id || null, log_status: l?.status || null, reason: l?.reason || null,
+          message_id: l?.message_id || null, sent_at: l?.sent_at || null,
+        };
+      }
+      case 'workout': {
+        const w = workoutFor(it, date);
+        return { workout_plan_id: it.workout_plan_id || null, workout_day: it.workout_day ?? null, log_id: w?.id || null };
+      }
+      case 'checkin': {
+        const c = checkinByItem.get(it.item_id);
+        return { fields: it.fields || [], response_id: c?.id || null, values: c?.values || null };
+      }
+      default:
+        return {};
+    }
+  }
+
+  const days = [];
+  const span = Math.min(pDaysBetween(from, to), 400);
+  for (let i = 0; i <= span; i++) {
+    const date = pAddDays(from, i);
+    const day = pDayNumberFor(start, date);
+    const dayItems = [];
+    for (const it of eff) {
+      if (it.skipped && !includeSkipped) continue;
+      const on = it.type === 'habit' ? habitScheduledOn(it, date, start) : it.eff_day === day;
+      if (on) dayItems.push(entryFor(it, date));
+    }
+    days.push({ date, day, items: dayItems });
+  }
+  return { program, eff, days, lessonById, completionByItem, today };
+}
+
+const programSummary = (p) => (p ? {
+  id: p.id, name: p.name, description: p.description, duration_weeks: p.duration_weeks,
+  cover_image_url: p.cover_image_url, kind: p.kind || 'program', status: p.status,
+} : null);
 
 const emailShell = (title, bodyHtml) => `
   <div style="font-family:Inter,Arial,sans-serif;background:#F5F7FA;padding:32px">
@@ -1350,6 +1831,146 @@ async function runFunction(name, payload, ctx) {
         return { success: false, error: 'Couldn\'t read a recipe from that link. Some sites block automated imports — try a different source or add the recipe manually.' };
       }
       return { success: true, recipe };
+    }
+
+    /* ---- Programs (docs/programs-spec.md) ---- */
+    case 'enrollInProgram': {
+      if (!isStaff(user)) return { success: false, error: 'Only coaches can enroll clients.' };
+      const { program_id, client_id } = payload || {};
+      const start_date = payload?.start_date || programToday();
+      if (!isDateKey(start_date)) return { success: false, error: 'start_date must be yyyy-MM-dd.' };
+      const program = await getEntityById(env, 'Program', program_id);
+      if (!program) return { success: false, error: 'Program not found.' };
+      const client = await getEntityById(env, 'Client', client_id);
+      if (!client) return { success: false, error: 'Client not found.' };
+      const dup = await env.DB.prepare(
+        `SELECT id FROM entities WHERE entity_type='ProgramEnrollment' AND json_extract(data,'$.program_id') = ?
+         AND json_extract(data,'$.client_id') = ? AND json_extract(data,'$.status') IN ('active','paused') LIMIT 1`
+      ).bind(program_id, client_id).first();
+      if (dup) return { success: false, error: `${client.full_name || 'This client'} is already in ${program.name || 'this program'}.`, enrollment_id: dup.id };
+      const login = await clientLogin(env, client);
+      const enrollment = await insertEntity(env, 'ProgramEnrollment', {
+        program_id,
+        program_name: program.name || '',
+        client_id,
+        client_user_id: login?.id || null,
+        trainer_id: client.trainer_id || user.id,
+        start_date,
+        status: 'active',
+        overrides: [],
+        extra_items: [],
+      }, user.email);
+      const { items } = await loadProgramAndItems(env, program_id);
+      await syncProgramHabits(env, enrollment, materializeProgram(enrollment, items, program), user.email);
+      await audit(env, { actor: user.email, action: 'create', target: 'ProgramEnrollment', targetId: enrollment.id, request: null });
+      return { success: true, enrollment };
+    }
+
+    case 'unenrollFromProgram': {
+      if (!isStaff(user)) return { success: false, error: 'Only coaches can change enrollments.' };
+      const enr = await getEntityById(env, 'ProgramEnrollment', payload?.enrollment_id);
+      if (!enr) return { success: false, error: 'Enrollment not found.' };
+      const enrollment = await patchEntity(env, enr, { status: 'cancelled', cancelled_at: nowISO() });
+      await syncProgramHabits(env, enrollment, [], user.email);
+      await audit(env, { actor: user.email, action: 'update', target: 'ProgramEnrollment', targetId: enr.id, detail: 'cancelled', request: null });
+      return { success: true, enrollment };
+    }
+
+    case 'updateEnrollment': {
+      if (!isStaff(user)) return { success: false, error: 'Only coaches can change enrollments.' };
+      const enr = await getEntityById(env, 'ProgramEnrollment', payload?.enrollment_id);
+      if (!enr) return { success: false, error: 'Enrollment not found.' };
+      const patch = {};
+      if (payload.overrides !== undefined) patch.overrides = cleanOverrides(payload.overrides);
+      if (payload.extra_items !== undefined) patch.extra_items = cleanExtraItems(payload.extra_items);
+      if (payload.start_date !== undefined) {
+        if (!isDateKey(payload.start_date)) return { success: false, error: 'start_date must be yyyy-MM-dd.' };
+        patch.start_date = payload.start_date;
+      }
+      if (payload.status !== undefined) {
+        if (!['active', 'paused', 'completed', 'cancelled'].includes(payload.status)) return { success: false, error: 'Invalid status.' };
+        patch.status = payload.status;
+      }
+      const enrollment = await patchEntity(env, enr, patch);
+      const { program, items } = await loadProgramAndItems(env, enrollment.program_id);
+      await syncProgramHabits(env, enrollment, materializeProgram(enrollment, items, program), user.email);
+      await audit(env, { actor: user.email, action: 'update', target: 'ProgramEnrollment', targetId: enr.id, request: null });
+      return { success: true, enrollment };
+    }
+
+    case 'programTick': {
+      if (!user) return { success: false, error: 'Not logged in' };
+      if (isStaff(user)) return runProgramTick(env, payload?.enrollment_id ? { enrollmentId: payload.enrollment_id } : {});
+      const cids = await myClientIds(env, user);
+      const mine = await selectEntities(env, 'ProgramEnrollment',
+        `json_extract(data,'$.status') = 'active' AND (json_extract(data,'$.client_user_id') = ?${cids.length ? ` OR json_extract(data,'$.client_id') IN (${inList(cids)})` : ''})`,
+        [user.id, ...cids]);
+      return runProgramTick(env, { enrollmentIds: mine.map((e) => e.id) });
+    }
+
+    case 'programCalendar': {
+      if (!user) return { success: false, error: 'Not logged in' };
+      if (!payload?.enrollment_id) return { success: false, error: 'enrollment_id is required.' };
+      const row = await getScopedEntity(env, 'ProgramEnrollment', payload.enrollment_id, user);
+      if (!row) return { success: false, error: 'Enrollment not found.' };
+      const enrollment = rowToEntity(row);
+      if (!isDateKey(enrollment.start_date)) return { success: false, error: 'Enrollment has no start date.' };
+      const { program, items } = await loadProgramAndItems(env, enrollment.program_id);
+      const length = programLength(program, items);
+      const from = isDateKey(payload?.from) ? payload.from : enrollment.start_date;
+      let to = isDateKey(payload?.to) ? payload.to : pDateForDay(enrollment.start_date, length);
+      if (to < from) return { success: false, error: '"to" is before "from".' };
+      if (pDaysBetween(from, to) > 400) to = pAddDays(from, 400);
+      const built = await buildProgramDays(env, enrollment, from, to, { includeSkipped: isStaff(user) });
+      return {
+        success: true,
+        enrollment,
+        program: programSummary(program),
+        program_days: length,
+        today: built.today,
+        today_day: pDayNumberFor(enrollment.start_date, built.today),
+        days: built.days,
+      };
+    }
+
+    case 'programTodayForMe': {
+      if (!user) return { success: false, error: 'Not logged in' };
+      const cids = await myClientIds(env, user);
+      const mine = await selectEntities(env, 'ProgramEnrollment',
+        `json_extract(data,'$.status') = 'active' AND (json_extract(data,'$.client_user_id') = ?${cids.length ? ` OR json_extract(data,'$.client_id') IN (${inList(cids)})` : ''})`,
+        [user.id, ...cids]);
+      const today = programToday();
+      const cache = new Map();
+      const enrollments = [];
+      for (const enrollment of mine) {
+        if (!isDateKey(enrollment.start_date)) continue;
+        const built = await buildProgramDays(env, enrollment, today, today, { includeSkipped: false, cache });
+        const day = pDayNumberFor(enrollment.start_date, today);
+        const lessons = built.eff
+          .filter((it) => it.type === 'lesson' && !it.skipped && it.eff_day <= day)
+          .map((it) => {
+            const c = built.completionByItem.get(it.item_id);
+            return {
+              item_id: it.item_id,
+              day: it.eff_day,
+              date: pDateForDay(enrollment.start_date, it.eff_day),
+              lesson_id: it.lesson_id || null,
+              lesson: built.lessonById.get(it.lesson_id) || null,
+              completed: !!c,
+              completion: c || null,
+            };
+          });
+        enrollments.push({
+          enrollment,
+          program: programSummary(built.program),
+          program_days: programLength(built.program, (await loadProgramAndItems(env, enrollment.program_id, cache)).items),
+          day,
+          started: day >= 1,
+          items: built.days[0]?.items || [],
+          lessons,
+        });
+      }
+      return { success: true, today, enrollments };
     }
 
     // Content browse helpers — empty until curated content sources are added.
@@ -2317,6 +2938,7 @@ export async function onRequest(context) {
           const prepared = [];
           for (const item of list) {
             const { id: _i, created_date: _c, updated_date: _u, created_by: _b, ...fields } = item || {};
+            if (staffWriteDenied(type, user)) return err('Only coaches can change this.', 403);
             const violation = await memberWriteViolation(env, user, type, fields);
             if (violation) return err(violation, 403);
             // One Client record per email per coach. A duplicate splits the
@@ -2361,6 +2983,7 @@ export async function onRequest(context) {
           const body = await request.json();
           const data = JSON.parse(row.data || '{}');
           const { id: _i, created_date: _c, updated_date: _u, created_by: _b, ...fields } = body || {};
+          if (staffWriteDenied(type, user)) return err('Only coaches can change this.', 403);
           const violation = await memberWriteViolation(env, user, type, fields, data);
           if (violation) return err(violation, 403);
           if (sharedWriteDenied(type, row, user, fields)) return err('Only the author can edit this.', 403);
@@ -2375,7 +2998,7 @@ export async function onRequest(context) {
           const row = await getScopedEntity(env, type, id, user);
           if (!row) return err('Not found.', 404);
           if (sharedWriteDenied(type, row, user)) return err('Only the author can delete this.', 403);
-          if (STAFF_LIBRARY_TYPES.has(type) && !isStaff(user)) return err('Only coaches can change the gym library.', 403);
+          if (staffWriteDenied(type, user)) return err('Only coaches can change this.', 403);
           // Clients and their data are kept until an admin deletes the client.
           if (type === 'Client') {
             if (user.role !== 'admin') return err('Only an admin can delete a client.', 403);
@@ -2551,6 +3174,17 @@ export async function onRequest(context) {
         'SELECT * FROM audit_log ORDER BY created_date DESC LIMIT ?'
       ).bind(limit).all();
       return json(results);
+    }
+
+    /* ---- cron: program message delivery (workers/program-cron POSTs here) ---- */
+    if (segs[0] === 'cron' && segs[1] === 'program-tick') {
+      if (method !== 'POST') return err('Method not allowed.', 405);
+      const given = request.headers.get('x-cron-secret') || '';
+      const secret = env.CRON_SECRET || '';
+      let diff = given.length === secret.length ? 0 : 1;
+      for (let i = 0; i < Math.min(given.length, secret.length); i++) diff |= given.charCodeAt(i) ^ secret.charCodeAt(i);
+      if (!secret || diff !== 0) return err('Unauthorized.', 401);
+      return json(await runProgramTick(env, {}));
     }
 
     if (segs[0] === 'functions') {

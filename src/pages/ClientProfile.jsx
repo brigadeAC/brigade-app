@@ -42,6 +42,7 @@ import ProgressCharts from "@/components/progress/ProgressCharts";
 import ClientNotes from "@/components/clients/ClientNotes";
 import ProgressPhotos from "@/components/clients/ProgressPhotos";
 import TrophyHabitTracker from "@/components/habits/TrophyHabitTracker";
+import ProgramTab from "@/components/programs/client/ProgramTab";
 import WorkoutRoutineCard from "@/components/workouts/WorkoutRoutineCard";
 import ItemCompletionTracker from "@/components/ItemCompletionTracker";
 import ProgressChartForm from "@/components/forms/ProgressChartForm";
@@ -529,6 +530,10 @@ export default function ClientProfile() {
           <TabsTrigger value="habits" className="gap-2 data-[state=active]:bg-secondary data-[state=active]:text-foreground text-muted-foreground">
             <Target className="w-4 h-4" />
             Habits
+          </TabsTrigger>
+          <TabsTrigger value="program" className="gap-2 data-[state=active]:bg-secondary data-[state=active]:text-foreground text-muted-foreground">
+            <CalendarIcon className="w-4 h-4" />
+            Program
           </TabsTrigger>
           <TabsTrigger value="onboarding" className="gap-2 data-[state=active]:bg-secondary data-[state=active]:text-foreground text-muted-foreground">
             <Sparkles className="w-4 h-4" />
@@ -1100,6 +1105,11 @@ export default function ClientProfile() {
         {/* Habits Tab */}
         <TabsContent value="habits" className="space-y-4">
           <TrophyHabitTracker clientId={clientId} trainerId={client?.trainer_id || user?.id} canManage canLog isStaff />
+        </TabsContent>
+
+        {/* Program Tab */}
+        <TabsContent value="program" className="space-y-4">
+          <ProgramTab clientId={clientId} client={client} />
         </TabsContent>
 
         {/* Onboarding Tab */}

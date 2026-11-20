@@ -8,13 +8,14 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Search, Check, ArrowLeft, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { HABIT_CATEGORIES, habitFromTemplate, formatTarget, mergeLibrary } from "@/lib/habitLibrary";
+import { HABIT_CATEGORIES, habitFromTemplate, formatTarget, mergeLibrary, tipsList } from "@/lib/habitLibrary";
 import { HabitFields, TrackingFields } from "@/components/habits/HabitFields";
 
 
 const EMPTY_CUSTOM = {
   name: "", icon: "⭐", category: "lifestyle", description: "",
   tracking: "check", target_value: "", unit: "", frequency: "daily", days_per_week: 3,
+  tips: "", days_of_week: [],
 };
 
 // Pick a habit from the library (prebuilt + the gym's own) or build a custom
@@ -197,6 +198,14 @@ function LibraryConfigure({ item, onBack, onAssign, saving }) {
           {value.description && <p className="text-xs text-muted-foreground">{value.description}</p>}
         </div>
       </div>
+      {tipsList(value.tips).length > 0 && (
+        <div className="space-y-1">
+          <p className="text-xs font-semibold text-foreground">Pro-Tips</p>
+          <ul className="space-y-1 list-disc list-inside text-xs text-muted-foreground">
+            {tipsList(value.tips).map((tip, i) => <li key={i}>{tip}</li>)}
+          </ul>
+        </div>
+      )}
       <TrackingFields value={value} set={set} />
       <Button className="w-full" disabled={saving}
         onClick={() => {

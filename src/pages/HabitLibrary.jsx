@@ -4,14 +4,15 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Plus, Search, Pencil, EyeOff, Eye, RotateCcw, Trash2 } from "lucide-react";
+import { Plus, Search, Pencil, EyeOff, Eye, RotateCcw, Trash2, Lightbulb } from "lucide-react";
 import { toast } from "sonner";
-import { HABIT_CATEGORIES, mergeLibrary, formatTarget, habitFromTemplate } from "@/lib/habitLibrary";
+import { HABIT_CATEGORIES, mergeLibrary, formatTarget, habitFromTemplate, tipsList } from "@/lib/habitLibrary";
 import { HabitFields } from "@/components/habits/HabitFields";
 
 const EMPTY = {
   name: "", icon: "⭐", category: "lifestyle", description: "",
   tracking: "check", target_value: "", unit: "", frequency: "daily", days_per_week: 3,
+  tips: "", days_of_week: [],
 };
 
 // Editable fields stored on a HabitTemplate (gym habit or prebuilt override).
@@ -28,6 +29,7 @@ export default function HabitLibrary() {
   const [showHidden, setShowHidden] = useState(false);
   const [editing, setEditing] = useState(null); // { item, value } ; item null = new
   const [saving, setSaving] = useState(false);
+  const [openTips, setOpenTips] = useState(null); // habit id whose tips are expanded
 
   const { data: templates = [], isLoading } = useQuery({
     queryKey: ["habitTemplates"],
@@ -138,7 +140,8 @@ export default function HabitLibrary() {
           <p className="text-sm text-muted-foreground text-center py-8">{viewHidden ? "Nothing hidden." : "No habits match."}</p>
         )}
         {list.map((t) => (
-          <div key={t.id} className="flex items-center gap-3 p-3 rounded-xl border border-border bg-card">
+          <div key={t.id} className="rounded-xl border border-border bg-card">
+          <div className="flex items-center gap-3 p-3">
             <span className="text-2xl shrink-0">{t.icon}</span>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1.5 flex-wrap">
@@ -150,6 +153,12 @@ export default function HabitLibrary() {
                 </span>
               </div>
               <p className="text-xs text-muted-foreground truncate">{formatTarget(t)}{t.description ? ` · ${t.description}` : ""}</p>
+              {tipsList(t.tips).length > 0 && (
+                <button type="button" onClick={() => setOpenTips((id) => (id === t.id ? null : t.id))} aria-expanded={openTips === t.id}
+                  className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-primary hover:underline">
+                  <Lightbulb className="w-3 h-3" /> {openTips === t.id ? "Hide Pro-Tips" : `Pro-Tips (${tipsList(t.tips).length})`}
+                </button>
+              )}
             </div>
             <div className="flex items-center shrink-0">
               {t.hidden ? (
@@ -168,6 +177,12 @@ export default function HabitLibrary() {
                 </>
               )}
             </div>
+          </div>
+          {openTips === t.id && (
+            <ul className="px-3 pb-3 pl-14 space-y-1 list-disc list-inside text-xs text-muted-foreground">
+              {tipsList(t.tips).map((tip, i) => <li key={i}>{tip}</li>)}
+            </ul>
+          )}
           </div>
         ))}
       </div>

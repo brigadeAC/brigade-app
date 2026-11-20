@@ -2,9 +2,14 @@
 // own target. Gym-specific habits coaches save live in the HabitTemplate
 // entity and are shown alongside these.
 //
+// tips: optional newline-separated "Pro-Tips" shown to coaches and clients
+// days_of_week: optional [0-6] (Sun=0) for daily habits; empty = every day
+//
 // tracking: "check"  -> done / not done
 //           "number" -> log an amount; done when it reaches target_value
 // frequency: "daily", or "weekly" with days_per_week
+
+import { DAY_LABELS } from "@/lib/programs";
 
 export const HABIT_CATEGORIES = [
   { id: "nutrition", label: "Nutrition" },
@@ -15,6 +20,22 @@ export const HABIT_CATEGORIES = [
   { id: "mindset", label: "Mindset" },
   { id: "lifestyle", label: "Lifestyle" },
 ];
+
+// Pro-Tips for the most-used prebuilt habits (one per line).
+const BUILTIN_TIPS = {
+  protein_goal: "Build each meal around a protein source first, then add the rest.\nKeep easy options on hand: Greek yogurt, eggs, jerky, protein shakes.\nA palm-sized portion is roughly 25-30 g.",
+  protein_each_meal: "Breakfast is the meal most people miss. Eggs, Greek yogurt or a shake fix it fast.\nCook a batch of chicken or ground meat on Sunday for quick lunches.",
+  veggies: "Add a vegetable to a meal you already eat before trying to add new meals.\nFrozen vegetables count and last for weeks.\nFill half the plate first.",
+  log_meals: "Log right after you eat, not at the end of the day.\nPhotos count if you're short on time.\nLog the bad days too. That's where the useful information is.",
+  water: "Keep a full bottle where you can see it.\nDrink a glass with every meal.\nFlavor it with lemon or a zero-calorie mix if plain water is a struggle.",
+  sleep_hours: "Count back 8 hours from your wake-up time to find your bedtime.\nKeep the room cool, dark and quiet.\nSet a reminder 30 minutes before bed to start winding down.",
+  consistent_bedtime: "Pick a bedtime you can hit on weekends too.\nA short routine (teeth, lights down, book) tells your body it's time.",
+  no_screens_bed: "Charge your phone outside the bedroom.\nSwap scrolling for a book, stretching or a short journal entry.",
+  steps: "Take calls on the move.\nPark farther away and take the stairs.\nA 10-minute walk after each meal adds about 3,000 steps.",
+  workout: "Put your sessions on the calendar like appointments.\nPack your gym bag the night before.\nOn low-energy days, show up and do the warm-up. Most days you'll keep going.",
+  walk_after_meal: "Even 5 minutes helps.\nMake it the default after dinner, with family or a podcast.",
+  meditate: "Start with 2-3 minutes and build up.\nAttach it to something you already do, like right after coffee.",
+};
 
 const h = (id, category, icon, name, description, extra = {}) => ({
   id: `builtin:${id}`,
@@ -28,6 +49,7 @@ const h = (id, category, icon, name, description, extra = {}) => ({
   unit: "",
   frequency: "daily",
   days_per_week: 7,
+  ...(BUILTIN_TIPS[id] ? { tips: BUILTIN_TIPS[id] } : {}),
   ...extra,
 });
 
@@ -105,9 +127,31 @@ export function habitFromTemplate(t) {
     unit: t.tracking === "number" ? t.unit || "" : "",
     frequency: t.frequency || "daily",
     days_per_week: t.frequency === "weekly" ? Number(t.days_per_week) || 3 : 7,
+    tips: (Array.isArray(t.tips) ? t.tips.join("\n") : String(t.tips || "")).trim(),
+    days_of_week: (t.frequency || "daily") === "daily" ? normalizeDays(t.days_of_week) : [],
     template_id: t.id || null,
   };
 }
+
+// Sorted unique weekdays 0-6; all seven (or none) -> [] meaning every day.
+export function normalizeDays(days) {
+  if (!Array.isArray(days)) return [];
+  const set = [...new Set(days.map(Number).filter((d) => Number.isInteger(d) && d >= 0 && d <= 6))].sort((a, b) => a - b);
+  return set.length === 7 ? [] : set;
+}
+
+// "Mon/Wed/Fri", or "" when the habit runs every day.
+export function formatDays(days) {
+  const d = normalizeDays(days);
+  if (d.length === 0) return "";
+  if (d.join() === "1,2,3,4,5") return "Weekdays";
+  if (d.join() === "0,6") return "Weekends";
+  return d.map((i) => DAY_LABELS[i]).join("/");
+}
+
+// Pro-Tips as a list of lines.
+export const tipsList = (tips) =>
+  (Array.isArray(tips) ? tips : String(tips || "").split("\n")).map((s) => String(s).trim()).filter(Boolean);
 
 // "max" units (e.g. "60 min max") are limits: done when at or under target.
 export const isLimitHabit = (habit) => /\bmax\b/i.test(habit?.unit || "");
@@ -121,7 +165,7 @@ export function isLogDone(habit, log) {
 }
 
 export function formatTarget(habit) {
-  const freq = habit.frequency === "weekly" ? `${habit.days_per_week || 3}x / week` : "daily";
+  const freq = habit.frequency === "weekly" ? `${habit.days_per_week || 3}x / week` : formatDays(habit.days_of_week) || "daily";
   if ((habit.tracking || "check") === "number") {
     const n = Number(habit.target_value);
     return `${n.toLocaleString()} ${habit.unit || ""}`.trim() + ` · ${freq}`;

@@ -2,7 +2,8 @@ import React from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { HABIT_CATEGORIES } from "@/lib/habitLibrary";
+import { HABIT_CATEGORIES, normalizeDays } from "@/lib/habitLibrary";
+import { DAY_LABELS } from "@/lib/programs";
 
 export const HABIT_ICONS = [
   "💧","🌙","👣","🏃","💊","🧘","🤸","⚡","📚","🥗","💪","🎯",
@@ -10,7 +11,7 @@ export const HABIT_ICONS = [
   "🥦","🍗","☕","📵","⚖️","📸","🧊","🙏","🚶","🍱","🌬️","⭐",
 ];
 
-// Name, icon, category, tracking and note. Used when building a custom habit
+// Name, icon, category, tracking, note and Pro-Tips. Used when building a custom habit
 // for a client and when editing the gym's habit library.
 export function HabitFields({ value, set }) {
   const custom = value;
@@ -47,6 +48,7 @@ export function HabitFields({ value, set }) {
                 <Label htmlFor="hp-desc">Note for the client (optional)</Label>
                 <Textarea id="hp-desc" value={custom.description} onChange={(e) => set("description", e.target.value)} placeholder="Why it matters, or how to do it" className="min-h-16" />
               </div>
+              <TipsField value={custom} set={set} />
     </>
   );
 }
@@ -93,6 +95,46 @@ export function TrackingFields({ value, set }) {
           )}
         </div>
       </div>
+      {(value.frequency || "daily") === "daily" && <WeekdayPicker value={value.days_of_week} onChange={(d) => set("days_of_week", d)} />}
+    </div>
+  );
+}
+
+// Optional specific weekdays (Sun=0). None selected = every day.
+export function WeekdayPicker({ value, onChange }) {
+  const days = normalizeDays(value);
+  const toggle = (i) => {
+    const next = days.includes(i) ? days.filter((d) => d !== i) : [...days, i];
+    onChange(normalizeDays(next));
+  };
+  return (
+    <div className="space-y-1.5">
+      <Label>Only on certain days (optional)</Label>
+      <div className="grid grid-cols-7 gap-1">
+        {DAY_LABELS.map((label, i) => {
+          const on = days.includes(i);
+          return (
+            <button key={label} type="button" onClick={() => toggle(i)} aria-pressed={on}
+              className={`py-1.5 rounded-lg text-xs font-medium border ${on ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:bg-accent"}`}>
+              {label}
+            </button>
+          );
+        })}
+      </div>
+      <p className="text-xs text-muted-foreground">
+        {days.length === 0 ? "None selected means every day." : "Other days won't show up or count against the client."}
+      </p>
+    </div>
+  );
+}
+
+// Newline-separated Pro-Tips.
+export function TipsField({ value, set }) {
+  const tips = Array.isArray(value.tips) ? value.tips.join("\n") : value.tips || "";
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor="hp-tips">Pro-Tips (one per line, optional)</Label>
+      <Textarea id="hp-tips" value={tips} onChange={(e) => set("tips", e.target.value)} placeholder={"Keep a full bottle where you can see it\nDrink a glass with every meal"} className="min-h-16" />
     </div>
   );
 }

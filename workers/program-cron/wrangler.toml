@@ -1,0 +1,13 @@
+# Standalone Worker that triggers program message delivery every 15 minutes.
+# Deploy from this folder: npx wrangler deploy
+name = "brigade-program-cron"
+main = "index.js"
+compatibility_date = "2026-07-01"
+workers_dev = false
+
+[triggers]
+crons = ["*/15 * * * *"]
+
+# Optional override (e.g. a preview deployment):
+# [vars]
+# TICK_URL = "https://brigade-app.pages.dev/api/cron/program-tick"
