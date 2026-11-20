@@ -83,23 +83,37 @@ export default function Contracts() {
     }
   });
 
+  // Send = hand it to the client to sign from their Documents page. The coach
+  // never signs on the client's behalf.
   const sendMutation = useMutation({
-    mutationFn: (contract) => {
-      setContractToSign(contract);
-      setESignOpen(true);
-      return Promise.resolve();
+    mutationFn: async (contract) => {
+      await base44.entities.Contract.update(contract.id, { status: "sent", sent_date: new Date().toISOString() });
+      const client = clients.find(c => c.id === contract.client_id);
+      if (client?.user_id) {
+        try {
+          await base44.entities.Notification.create({
+            user_id: client.user_id, type: "contract", title: "Document to sign",
+            message: `${contract.title || "A document"} is ready for your signature.`,
+            link: "/ClientDocuments"
+          });
+        } catch { /* the document still shows on their Documents page */ }
+      }
     },
     onSuccess: () => {
-      toast.success("Opening e-signature");
-    }
+      queryClient.invalidateQueries({ queryKey: ["contracts"] });
+      toast.success("Sent. It's waiting on their Documents page.");
+    },
+    onError: (e) => toast.error(e?.message || "Couldn't send the contract.")
   });
 
+  // Start a new contract with the default type's template loaded; otherwise
+  // the preview is blank until the coach changes the type and back.
   const resetForm = () => {
     setFormData({
       client_id: "",
       title: "",
       type: "service_agreement",
-      content: "",
+      content: contractTemplates.service_agreement || "",
       expiry_date: ""
     });
   };
@@ -499,7 +513,7 @@ Thank you for your feedback.`
             <div className="flex gap-2 flex-wrap">
               <Button size="sm" variant="outline" className="flex-1" onClick={() => handleEdit(contract)}>Edit</Button>
               {contract.status === 'draft' && (
-                <Button size="sm" className="flex-1" onClick={() => sendMutation.mutate(contract.id)}>
+                <Button size="sm" className="flex-1" onClick={() => sendMutation.mutate(contract)}>
                   <Send className="w-3.5 h-3.5 mr-1" /> Send
                 </Button>
               )}
@@ -540,7 +554,7 @@ Thank you for your feedback.`
                     <div className="flex gap-2 flex-wrap">
                       <Button size="sm" variant="outline" onClick={() => handleEdit(contract)}>Edit</Button>
                       {contract.status === 'draft' && (
-                        <Button size="sm" onClick={() => sendMutation.mutate(contract.id)}>
+                        <Button size="sm" onClick={() => sendMutation.mutate(contract)}>
                           <Send className="w-4 h-4 mr-1" /> Send
                         </Button>
                       )}

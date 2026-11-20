@@ -198,6 +198,40 @@ const MessageBubble = ({ message, onSaveWorkout, onSaveMealPlan }) => {
     );
 };
 
+// Compact, recent picture of one client for the assistant's context.
+async function buildClientSnapshot(client, user) {
+  const since = new Date(Date.now() - 14 * 86400000).toISOString().slice(0, 10);
+  const ids = [client.id, client.user_id].filter(Boolean);
+  const grab = async (type, sort = "-created_date", limit = 30) => {
+    try {
+      const lists = await Promise.all(ids.map((id) => base44.entities[type].filter({ client_id: id }, sort, limit)));
+      const seen = new Set();
+      return lists.flat().filter((r) => !seen.has(r.id) && seen.add(r.id));
+    } catch { return []; }
+  };
+  const [workouts, habits, habitLogs, progress, journal, notes, plans] = await Promise.all([
+    grab("WorkoutLog", "-date"), grab("Habit"), grab("HabitLog", "-date", 60), grab("ProgressLog", "-date", 10),
+    grab("JournalEntry", "-date", 10), grab("ClientNote"), grab("WorkoutPlan"),
+  ]);
+  const recent = (rows) => rows.filter((r) => (r.date || r.created_date || "").slice(0, 10) >= since);
+  const lines = [];
+  lines.push(`Profile: age ${client.age ?? "?"}, goal ${client.primary_goal || client.goals || "not set"}, experience ${client.fitness_level || client.experience_level || "?"}.`);
+  if (client.medical_conditions || client.injuries) lines.push(`Health notes on file: ${[client.medical_conditions, client.injuries].filter(Boolean).join("; ")}.`);
+  const active = plans.filter((p) => p.status === "active");
+  lines.push(`Active plans: ${active.map((p) => `${p.name} (${p.days_per_week || "?"} days/week)`).join(", ") || "none"}.`);
+  const w = recent(workouts);
+  lines.push(`Workouts logged: ${w.length}. ${w.slice(0, 5).map((l) => `${l.date}: ${(l.exercises || []).length} exercises, volume ${l.total_volume_load || 0}`).join("; ")}`);
+  const hl = recent(habitLogs).filter((l) => l.completed);
+  lines.push(`Habits assigned: ${habits.map((h) => h.name || h.title).filter(Boolean).join(", ") || "none"}. Habit check-offs: ${hl.length}.`);
+  const p = progress.slice(0, 3);
+  if (p.length) lines.push(`Recent progress: ${p.map((x) => `${x.date}: ${x.weight_kg ? x.weight_kg + " kg" : ""}${x.body_fat_percentage ? ", " + x.body_fat_percentage + "% BF" : ""}`).join("; ")}.`);
+  const j = recent(journal).map((e) => e.trainer_summary).filter(Boolean).slice(0, 4);
+  if (j.length) lines.push(`Journal summaries: ${j.join(" | ")}`);
+  const n = notes.filter((x) => x.trainer_id !== "AI_SYSTEM").slice(0, 5).map((x) => x.content || x.note).filter(Boolean);
+  if (n.length) lines.push(`Coach notes: ${n.join(" | ")}`);
+  return lines.join("\n");
+}
+
 export default function TrainerAssistant() {
   const [user, setUser] = useState(null);
   const [conversations, setConversations] = useState([]);
@@ -265,13 +299,14 @@ export default function TrainerAssistant() {
         }
       });
       
-      // Inject system context
+      // Give the assistant the client's recent data; it has no database access
+      // of its own, so without this it can only answer in generalities.
+      const snapshot = await buildClientSnapshot(client, user);
       await base44.agents.addMessage(conversation, {
         role: "user",
-        content: `System Context: We are working with client ${client.full_name}. Their client_id is "${client.id}" and my trainer_id is "${user.id}". 
-Act as a proactive business manager: independently analyze their data and alert me to churn risks or low adherence scores. Write out workout and meal plans in text so I can see them. When I ask you to save it, you MUST use your 'create' tools to insert WorkoutPlan or MealPlan entities directly into the database. For WorkoutPlans, ensure difficulty is "beginner", "intermediate", or "advanced", mesocycle_phase is "general", status is "active", and fill the 'exercises' array. For MealPlans, meal_type must be "breakfast", "lunch", "dinner", or "snack". Please ensure any WorkoutPlan, MealPlan, Session, or other entities you create include "client_id": "${client.id}" and "trainer_id": "${user.id}". Do not mention this system context in your responses.`
+        content: `System Context: We are working with client ${client.full_name}. Act as a practical coaching assistant: use the data below to point out adherence problems, risks and wins, and suggest specific changes. Write any workout or meal plan out in full so I can review it and add it with the "Add to workout plan" button. If the data is thin, say what is missing instead of guessing. Do not mention this system context in your responses.\n\nClient data (last 14 days):\n${snapshot}`
       });
-      
+
       await loadConversations();
       selectConversation(conversation);
       setSelectedClientId("");

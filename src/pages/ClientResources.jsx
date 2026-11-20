@@ -370,7 +370,7 @@ export default function ClientResources() {
                   {viewingRecipe.ingredients.map((ing, i) => (
                     <li key={i} className="flex items-start gap-3 text-muted-foreground">
                       <div className="w-1.5 h-1.5 rounded-full bg-primary mt-2"></div>
-                      <span><strong className="text-foreground">{ing.amount} {ing.unit}</strong> {ing.name}</span>
+                      {typeof ing === "string" ? <span>{ing}</span> : <span><strong className="text-foreground">{ing.amount} {ing.unit}</strong> {ing.name}</span>}
                     </li>
                   ))}
                 </ul>

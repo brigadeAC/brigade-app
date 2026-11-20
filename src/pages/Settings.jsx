@@ -196,28 +196,12 @@ export default function Settings() {
     }
 
     try {
-      const upperKey = betaKey.toUpperCase();
-      const keys = await base44.entities.BetaKey.filter({ key: upperKey });
-
-      if (keys.length === 0) {
-        setBetaKeyError("Invalid beta key. Please check and try again.");
+      // Checked and claimed on the server; keys are never readable from the app.
+      const { data } = await base44.functions.invoke('claimBetaKey', { key: betaKey.trim() });
+      if (!data?.success) {
+        setBetaKeyError(data?.error || "That beta key didn't work. Check it and try again.");
         return;
       }
-
-      const keyRecord = keys[0];
-
-      if (keyRecord.status === "assigned" && keyRecord.trainer_id && keyRecord.trainer_id !== user.id) {
-        setBetaKeyError("This beta key has already been claimed.");
-        return;
-      }
-
-      await base44.entities.BetaKey.update(keyRecord.id, {
-        status: "assigned",
-        trainer_id: user.id,
-        trainer_email: user.email
-      });
-
-      await base44.auth.updateMe({ beta_key_verified: true, beta_key: upperKey });
       setBetaKeyVerified(true);
       setBetaKey("");
 

@@ -163,11 +163,25 @@ function fieldExpr(field) {
 }
 
 // Entity types every authenticated user of the app may read (shared/global content).
+// Readable by every signed-in user. BetaKey and WaitingList are deliberately
+// NOT here: keys are claimed server-side (claimBetaKey) and the waiting list
+// holds prospects' emails, so both are admin-only.
 const SHARED_TYPES = new Set([
   'CommunityPost', 'TrainerCommunityPost', 'Recipe',
-  'FitnessTemplate', 'MealPlanTemplate', 'WaitingList', 'BetaKey',
-  'CoachingExercise',
+  'FitnessTemplate', 'MealPlanTemplate', 'CoachingExercise',
 ]);
+
+// On shared rows anyone can read, only the author or an admin may change or
+// delete them. Others may only react to community posts (likes, comments).
+const REACTION_FIELDS = new Set(['likes', 'comments']);
+function sharedWriteDenied(type, row, user, fields = null) {
+  if (!SHARED_TYPES.has(type) || user.role === 'admin') return false;
+  if (row.created_by === user.email || row.created_by === user.id) return false;
+  if (fields && (type === 'CommunityPost' || type === 'TrainerCommunityPost')) {
+    return !Object.keys(fields).every((k) => REACTION_FIELDS.has(k));
+  }
+  return true;
+}
 
 // Entity types that carry protected health information. Reads of these are
 // written to the audit trail (HIPAA §164.312(b) — record access to ePHI).
@@ -1125,23 +1139,32 @@ async function runFunction(name, payload, ctx) {
       if (!content) return { success: false, error: 'No recipe content to parse.' };
       const recipe = await invokeLLM(
         {
-          prompt: `Extract the recipe from this web page text. Provide a clear name, a short description, an ingredients array (each a string), an instructions array (each step a string), servings, prep time, and estimated per-serving nutrition. Web page text:\n\n${content}`,
+          prompt: `Extract the recipe from this web page text. Provide a clear name, a short description, a category (breakfast, lunch, dinner, snack, dessert or drink), each ingredient split into name, amount and unit, the instructions as numbered steps on separate lines, servings, prep and cook time in minutes, and estimated per-serving calories, protein, carbs and fat. Web page text:\n\n${content}`,
           response_json_schema: {
             type: 'object',
             properties: {
               name: { type: 'string' },
               description: { type: 'string' },
               category: { type: 'string' },
-              ingredients: { type: 'array', items: { type: 'string' } },
-              instructions: { type: 'array', items: { type: 'string' } },
+              // Matches the app's Recipe model (Recipes, Resources, client view).
+              ingredients: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: { name: { type: 'string' }, amount: { type: 'string' }, unit: { type: 'string' } },
+                  required: ['name', 'amount', 'unit'],
+                },
+              },
+              instructions: { type: 'string' },
               servings: { type: 'number' },
               prep_time_minutes: { type: 'number' },
-              calories: { type: 'number' },
-              protein_g: { type: 'number' },
-              carbs_g: { type: 'number' },
-              fat_g: { type: 'number' },
+              cook_time_minutes: { type: 'number' },
+              calories_per_serving: { type: 'number' },
+              protein_per_serving: { type: 'number' },
+              carbs_per_serving: { type: 'number' },
+              fat_per_serving: { type: 'number' },
             },
-            required: ['name'],
+            required: ['name', 'description', 'category', 'ingredients', 'instructions', 'servings', 'prep_time_minutes', 'cook_time_minutes', 'calories_per_serving', 'protein_per_serving', 'carbs_per_serving', 'fat_per_serving'],
           },
         },
         env
@@ -1974,10 +1997,19 @@ export async function onRequest(context) {
         const user = await currentUser(request, env);
         if (!user) return err('You must be logged in.', 401);
         const scope = await ownershipClause(env, user);
+        // Members get what they can see in the app: coach-private notes and
+        // notebooks (other than their own and AI recovery notes) stay out.
+        const isMember = user.user_type === 'client' || user.user_type === 'independent';
+        const privateTypes = [...COACH_PRIVATE_TYPES].map(() => '?').join(',');
+        const memberFilter = isMember
+          ? ` AND NOT (entity_type IN (${privateTypes}) AND created_by != ? AND COALESCE(json_extract(data,'$.trainer_id'),'') != 'AI_SYSTEM')`
+          : '';
         const sql = scope
-          ? `SELECT * FROM entities WHERE ${scope.sql} ORDER BY entity_type, created_date`
+          ? `SELECT * FROM entities WHERE ${scope.sql}${memberFilter} ORDER BY entity_type, created_date`
           : `SELECT * FROM entities WHERE created_by = ? ORDER BY entity_type, created_date`;
-        const binds = scope ? scope.binds : [user.email];
+        const binds = scope
+          ? [...scope.binds, ...(isMember ? [...COACH_PRIVATE_TYPES, user.email] : [])]
+          : [user.email];
         const { results } = await env.DB.prepare(sql).bind(...binds).all();
         const records = {};
         for (const row of results) {
@@ -2148,6 +2180,7 @@ export async function onRequest(context) {
           const { id: _i, created_date: _c, updated_date: _u, created_by: _b, ...fields } = body || {};
           const violation = await memberWriteViolation(env, user, type, fields, data);
           if (violation) return err(violation, 403);
+          if (sharedWriteDenied(type, row, user, fields)) return err('Only the author can edit this.', 403);
           const merged = { ...data, ...fields };
           const now = nowISO();
           await env.DB.prepare('UPDATE entities SET data=?, updated_date=? WHERE id=?')
@@ -2158,6 +2191,7 @@ export async function onRequest(context) {
         if (method === 'DELETE') {
           const row = await getScopedEntity(env, type, id, user);
           if (!row) return err('Not found.', 404);
+          if (sharedWriteDenied(type, row, user)) return err('Only the author can delete this.', 403);
           await env.DB.prepare('DELETE FROM entities WHERE id=? AND entity_type=?').bind(id, type).run();
           await audit(env, { actor: user.email, action: 'delete', target: type, targetId: id, request });
           return json({ success: true });
@@ -2343,6 +2377,18 @@ export async function onRequest(context) {
       const headers = new Headers();
       obj.writeHttpMetadata(headers);
       headers.set('etag', obj.httpEtag);
+      // Uploads are served from the app's own origin with an uploader-chosen
+      // content type. Never let one run as a page: images, audio, video and
+      // PDFs display inline; anything else downloads. The sandbox CSP stops
+      // script even if a browser decides to render it.
+      const type = (headers.get('content-type') || '').toLowerCase();
+      const inline = /^(image\/(png|jpe?g|gif|webp|heic|heif|avif)|video\/|audio\/|application\/pdf)/.test(type);
+      if (!inline) {
+        headers.set('content-type', 'application/octet-stream');
+        headers.set('content-disposition', 'attachment');
+      }
+      headers.set('x-content-type-options', 'nosniff');
+      headers.set('content-security-policy', "default-src 'none'; img-src 'self'; media-src 'self'; style-src 'unsafe-inline'; sandbox");
       return new Response(obj.body, { headers });
     }
 

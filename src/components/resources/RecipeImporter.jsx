@@ -214,7 +214,7 @@ export default function RecipeImporter({ onImportComplete }) {
                   <ul className="text-sm space-y-1 list-disc pl-5">
                     {parsedRecipe.ingredients.map((ing, i) =>
                 <li key={i} className="text-slate-700">
-                        {ing.amount} {ing.unit} {ing.name}
+                        {typeof ing === "string" ? ing : `${ing.amount || ""} ${ing.unit || ""} ${ing.name || ""}`.trim()}
                       </li>
                 )}
                   </ul>
