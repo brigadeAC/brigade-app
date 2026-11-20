@@ -1243,7 +1243,9 @@ async function invokeLLM(payload, env) {
       const dataUri = `data:${mime};base64,${img.base64}`;
       // Plain-text mode with a JSON instruction: Workers AI vision models hung
       // with response_format + image in testing. Time-boxed so it can't stall.
-      const model = env.VISION_MODEL || '@cf/google/gemma-4-26b-a4b-it';
+      // Not a reasoning model: gemma-4 spends its token budget on hidden
+      // reasoning_content and returns empty content (tested 2026-11-20).
+      const model = env.VISION_MODEL || '@cf/meta/llama-4-scout-17b-16e-instruct';
       try {
         const run = env.AI.run(model, {
           messages: [
@@ -1255,7 +1257,8 @@ async function invokeLLM(payload, env) {
           ],
           max_tokens: 1024,
         });
-        const timeout = new Promise((_, rej) => setTimeout(() => rej(new Error('timed out after 45s')), 45000));
+        // Llama 4 Scout takes ~45s on a 768px meal photo; 45s cut off real answers.
+        const timeout = new Promise((_, rej) => setTimeout(() => rej(new Error('timed out after 90s')), 90000));
         const out = await Promise.race([run, timeout]);
         const parsed = parseOut(out?.response ?? out?.choices?.[0]?.message?.content ?? '');
         const empty = !parsed || (typeof parsed === 'object' && Object.keys(parsed).length === 0)
