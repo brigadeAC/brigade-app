@@ -24,6 +24,7 @@ import { calculateHabitStreak, parseLocalDate } from "@/lib/utils";
 import { isLogDone } from "@/lib/habitLibrary";
 import { isScheduledOn } from "@/lib/programs";
 import ClientTodayCard from "@/components/programs/client/ClientTodayCard";
+import NextClassCard from "@/components/classes/member/NextClassCard";
 
 // Local calendar date (matches the Habits page). UTC would roll over to
 // "tomorrow" in the evening for US time zones.
@@ -360,6 +361,9 @@ export default function ClientDashboard() {
           <p className="text-sm font-medium text-muted-foreground">Nutrition</p>
         </Link>
       </div>
+
+      {/* ---- Next booked class ---- */}
+      <NextClassCard />
 
       {/* ---- Program: today's lesson and check-in ---- */}
       <ClientTodayCard />

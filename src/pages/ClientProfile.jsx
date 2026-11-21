@@ -43,6 +43,7 @@ import ClientNotes from "@/components/clients/ClientNotes";
 import ProgressPhotos from "@/components/clients/ProgressPhotos";
 import TrophyHabitTracker from "@/components/habits/TrophyHabitTracker";
 import ProgramTab from "@/components/programs/client/ProgramTab";
+import MembershipTab from "@/components/classes/coach/MembershipTab";
 import WorkoutRoutineCard from "@/components/workouts/WorkoutRoutineCard";
 import ItemCompletionTracker from "@/components/ItemCompletionTracker";
 import ProgressChartForm from "@/components/forms/ProgressChartForm";
@@ -534,6 +535,10 @@ export default function ClientProfile() {
           <TabsTrigger value="program" className="gap-2 data-[state=active]:bg-secondary data-[state=active]:text-foreground text-muted-foreground">
             <CalendarIcon className="w-4 h-4" />
             Program
+          </TabsTrigger>
+          <TabsTrigger value="membership" className="gap-2 data-[state=active]:bg-secondary data-[state=active]:text-foreground text-muted-foreground">
+            <CalendarIcon className="w-4 h-4" />
+            Membership
           </TabsTrigger>
           <TabsTrigger value="onboarding" className="gap-2 data-[state=active]:bg-secondary data-[state=active]:text-foreground text-muted-foreground">
             <Sparkles className="w-4 h-4" />
@@ -1110,6 +1115,11 @@ export default function ClientProfile() {
         {/* Program Tab */}
         <TabsContent value="program" className="space-y-4">
           <ProgramTab clientId={clientId} client={client} />
+        </TabsContent>
+
+        {/* Membership Tab (group classes) */}
+        <TabsContent value="membership" className="space-y-4">
+          <MembershipTab clientId={clientId} client={client} />
         </TabsContent>
 
         {/* Onboarding Tab */}

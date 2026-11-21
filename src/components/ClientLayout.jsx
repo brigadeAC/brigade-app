@@ -64,6 +64,7 @@ const clientNavGroups = [
     title: "Programs",
     items: [
       { name: "Workouts", icon: Dumbbell, page: "ClientWorkouts" },
+      { name: "Classes", icon: CalendarDays, page: "ClientClasses" },
       { name: "Nutrition", icon: Utensils, page: "ClientMeals" },
       { name: "Progress", icon: LineChart, page: "ClientProgress" },
       { name: "Schedule", icon: CalendarDays, page: "ClientSchedule" },

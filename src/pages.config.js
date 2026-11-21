@@ -85,6 +85,9 @@ import Resources from './pages/Resources';
 import HabitLibrary from './pages/HabitLibrary';
 import LessonLibrary from './pages/LessonLibrary';
 import Programs from './pages/Programs';
+import Classes from './pages/Classes';
+import ClassSetup from './pages/ClassSetup';
+import ClientClasses from './pages/ClientClasses';
 import ProgramBuilder from './pages/ProgramBuilder';
 import ClientProgram from './pages/ClientProgram';
 import Schedule from './pages/Schedule';
@@ -107,6 +110,9 @@ export const PAGES = {
     "HabitLibrary": HabitLibrary,
     "LessonLibrary": LessonLibrary,
     "Programs": Programs,
+    "Classes": Classes,
+    "ClassSetup": ClassSetup,
+    "ClientClasses": ClientClasses,
     "ProgramBuilder": ProgramBuilder,
     "ClientProgram": ClientProgram,
     "CRM": CRM,

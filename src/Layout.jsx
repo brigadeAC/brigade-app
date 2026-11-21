@@ -43,6 +43,8 @@ import {
   BarChart3,
   Share2,
   Upload,
+  CalendarCheck,
+  SlidersHorizontal,
   Package as PackageIcon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -73,6 +75,13 @@ const navGroups = [
       { name: "Notebooks", icon: BookOpen, page: "ClientNotebooks" },
       { name: "Contracts", icon: FileText, page: "Contracts" },
       { name: "Schedule", icon: CalendarDays, page: "Schedule" }
+    ]
+  },
+  {
+    title: "Group Classes",
+    items: [
+      { name: "Classes", icon: CalendarCheck, page: "Classes" },
+      { name: "Class Setup", icon: SlidersHorizontal, page: "ClassSetup" }
     ]
   },
   {
@@ -131,6 +140,13 @@ const adminNavGroups = [
       { name: 'Messages', icon: MessageCircle, page: 'Messages' },
       { name: 'Contact Messages', icon: Mail, page: 'AdminContactMessages' },
       { name: 'Bug Reports', icon: Bug, page: 'AdminBugs' },
+    ]
+  },
+  {
+    title: 'Group Classes',
+    items: [
+      { name: 'Classes', icon: CalendarCheck, page: 'Classes' },
+      { name: 'Class Setup', icon: SlidersHorizontal, page: 'ClassSetup' },
     ]
   },
   {
@@ -391,7 +407,7 @@ export default function Layout({ children, currentPageName }) {
   }
 
   // Client pages - use client layout
-  const clientPages = ['ClientDashboard', 'ClientWorkouts', 'ClientMeals', 'ClientProgress', 'ClientSchedule', 'ClientHabits', 'ClientOnboarding', 'Messages', 'ClientResources', 'ClientCommunity', 'ClientInfo', 'ReportBug', 'ClientJournal', 'OnboardingWalkthrough', 'ClientRecovery', 'ClientDocuments', 'ClientProgram'];
+  const clientPages = ['ClientDashboard', 'ClientWorkouts', 'ClientMeals', 'ClientProgress', 'ClientSchedule', 'ClientHabits', 'ClientOnboarding', 'Messages', 'ClientResources', 'ClientCommunity', 'ClientInfo', 'ReportBug', 'ClientJournal', 'OnboardingWalkthrough', 'ClientRecovery', 'ClientDocuments', 'ClientProgram', 'ClientClasses'];
 
   // Always use client layout if user is a client. Clients may only open
   // member pages; anything else (trainer tools reached by typing a URL) sends

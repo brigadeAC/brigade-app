@@ -1,7 +1,7 @@
 import React, { useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { createPageUrl } from "@/utils";
-import { LayoutDashboard, Dumbbell, Utensils, LineChart, Menu } from "lucide-react";
+import { LayoutDashboard, Dumbbell, Utensils, CalendarCheck, LineChart, Menu } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
@@ -9,6 +9,7 @@ import { base44 } from "@/api/base44Client";
 const navItems = [
   { name: "Today", icon: LayoutDashboard, page: "ClientDashboard", feature: "dashboard" },
   { name: "Workouts", icon: Dumbbell, page: "ClientWorkouts", feature: "workouts" },
+  { name: "Classes", icon: CalendarCheck, page: "ClientClasses", feature: "classes" },
   { name: "Nutrition", icon: Utensils, page: "ClientMeals", feature: "nutrition" },
   { name: "Progress", icon: LineChart, page: "ClientProgress", feature: "progress" },
 ];

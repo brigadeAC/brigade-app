@@ -210,10 +210,14 @@ async function memberResourceTerm(env, user) {
 // Staff (trainers and admins) work for the gym: they all see the same clients,
 // plans, templates and business records. Only these stay private per person.
 // Gym libraries everyone can read but only staff can change.
-const STAFF_LIBRARY_TYPES = new Set(['HabitTemplate', 'Lesson', 'Program', 'ProgramItem']);
+const STAFF_LIBRARY_TYPES = new Set(['HabitTemplate', 'Lesson', 'Program', 'ProgramItem',
+  'ClassType', 'ClassSlot', 'ClassSession', 'MembershipPlan', 'GymSettings']);
 // Client records only staff (or the system) may write. Members still read
 // their own rows through the normal ownership scope (client_id/client_user_id).
-const STAFF_WRITE_TYPES = new Set(['ProgramEnrollment', 'ProgramMessageLog']);
+// Reservation/Membership: members book only through the class functions.
+const STAFF_WRITE_TYPES = new Set(['ProgramEnrollment', 'ProgramMessageLog', 'Reservation', 'Membership']);
+// Class entities whose staff writes trigger session/count upkeep (afterClassEntityWrite).
+const CLASS_HOOK_TYPES = new Set(['ClassSlot', 'ClassType', 'ClassSession', 'Reservation']);
 // Member-writable program records; enrollment_id must point at their own enrollment.
 const MEMBER_PROGRAM_RECORD_TYPES = new Set(['LessonCompletion', 'CheckinResponse']);
 const STAFF_PRIVATE_TYPES = new Set(['Message', 'Notification', 'CoachBriefing', 'AgentConversation']);
@@ -1175,6 +1179,672 @@ async function buildProgramDays(env, enrollment, from, to, { includeSkipped = tr
   return { program, eff, days, lessonById, completionByItem, today };
 }
 
+/* ---------------------------- group classes ------------------------------ */
+// Group classes (docs/classes-spec.md): schedule, reservations, attendance and
+// plan limits. Dates are Eastern "yyyy-MM-dd" keys, times "HH:mm" Eastern,
+// start_at/end_at ISO UTC (easternToUTC). Every capacity / allowance change is
+// a single conditional SQL statement (or a D1 batch, which runs as one
+// transaction), so two people racing for the last spot can't both get it.
+const CLASS_SETTINGS_DEFAULTS = {
+  booking_open_hours: 168, booking_close_minutes: 60, late_cancel_hours: 8,
+  self_checkin_before_minutes: 30, self_checkin_after_minutes: 30,
+  open_gym_checkin_until_end: true, no_show_after_minutes: 120,
+  waitlist_enabled: true, late_cancel_counts_toward_limit: false, no_show_counts_toward_limit: false,
+  waiver_required: true, show_roster_to_members: true, generate_days_ahead: 21,
+};
+const ACTIVE_RES = ['reserved', 'waitlisted', 'checked_in'];
+const NO_LIMIT_KINDS = new Set(['unlimited', 'comp', 'intro']);
+const sqlStr = (arr) => arr.map((s) => `'${s}'`).join(','); // constant status names only
+const numOr = (v, d) => (v === null || v === undefined || v === '' || !Number.isFinite(Number(v)) ? d : Number(v));
+const hmToMin = (hm) => { const m = /^(\d{1,2}):(\d{2})$/.exec(String(hm || '')); return m ? Number(m[1]) * 60 + Number(m[2]) : null; };
+const minToHm = (n) => { const x = ((n % 1440) + 1440) % 1440; return `${String(Math.floor(x / 60)).padStart(2, '0')}:${String(x % 60).padStart(2, '0')}`; };
+const capOf = (session) => { const c = numOr(session?.capacity, null); return c !== null && c > 0 ? c : null; };
+const classWeekStart = (k) => pAddDays(k, -((pDow(k) + 6) % 7));
+const RES_SPOT_COUNT = `(SELECT COUNT(*) FROM entities WHERE entity_type='Reservation' AND json_extract(data,'$.session_id') = ? AND json_extract(data,'$.status') IN ('reserved','checked_in'))`;
+
+function monthAnchorKey(y, m, day) { // m is 1-based and may overflow either way
+  const d = new Date(Date.UTC(y, m - 1, 1));
+  const yy = d.getUTCFullYear(); const mm = d.getUTCMonth() + 1;
+  const dim = new Date(Date.UTC(yy, mm, 0)).getUTCDate();
+  return `${yy}-${String(mm).padStart(2, '0')}-${String(Math.min(day, dim)).padStart(2, '0')}`;
+}
+// Billing month containing `k`, anchored on the membership start date's day of month.
+function billingPeriod(anchorKey, k) {
+  const day = Number(String(isDateKey(anchorKey) ? anchorKey : k).slice(8, 10)) || 1;
+  const [y, m] = k.split('-').map(Number);
+  let start = monthAnchorKey(y, m, day);
+  if (start > k) start = monthAnchorKey(y, m - 1, day);
+  const [sy, sm] = start.split('-').map(Number);
+  return { start, end: pAddDays(monthAnchorKey(sy, sm + 1, day), -1) };
+}
+
+async function getGymSettings(env) {
+  const row = parseRow(await env.DB.prepare(
+    `SELECT * FROM entities WHERE entity_type='GymSettings' ORDER BY created_date ASC LIMIT 1`
+  ).first());
+  const s = { ...CLASS_SETTINGS_DEFAULTS };
+  if (row) {
+    for (const k of Object.keys(s)) {
+      const v = row[k];
+      if (v === undefined || v === null || v === '') continue;
+      if (typeof s[k] === 'boolean') s[k] = v === true || v === 1 || v === 'true';
+      else s[k] = numOr(v, s[k]);
+    }
+  }
+  return s;
+}
+
+function sessionRules(session, s) {
+  const o = session?.overrides || {};
+  return {
+    open_h: numOr(o.booking_open_hours, s.booking_open_hours),
+    close_m: numOr(o.booking_close_minutes, s.booking_close_minutes),
+    late_h: numOr(o.late_cancel_hours, s.late_cancel_hours),
+  };
+}
+function sessionWindows(session, s) {
+  const start = Date.parse(session.start_at);
+  const end = Date.parse(session.end_at) || start;
+  const r = sessionRules(session, s);
+  const iso = (ms) => (Number.isFinite(ms) ? new Date(ms).toISOString() : null);
+  const ciClose = session.reservable === false && s.open_gym_checkin_until_end ? end : start + s.self_checkin_after_minutes * 60000;
+  return {
+    booking_opens_at: iso(start - r.open_h * 3600000),
+    booking_closes_at: iso(start - r.close_m * 60000),
+    late_cancel_at: iso(start - r.late_h * 3600000),
+    checkin_opens_at: iso(start - s.self_checkin_before_minutes * 60000),
+    checkin_closes_at: iso(ciClose),
+  };
+}
+const classWhen = (session) => {
+  const [y, m, d] = String(session.date).split('-').map(Number);
+  const day = new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-US', { timeZone: 'UTC', weekday: 'short', month: 'short', day: 'numeric' });
+  const mins = hmToMin(session.start_time) ?? 0;
+  const h = Math.floor(mins / 60);
+  return `${day} at ${h % 12 === 0 ? 12 : h % 12}:${String(mins % 60).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
+};
+const shortName = (full) => {
+  const parts = String(full || '').trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return 'Member';
+  return parts.length > 1 ? `${parts[0]} ${parts[parts.length - 1][0].toUpperCase()}.` : parts[0];
+};
+
+// Who a class action is for. Members act for themselves (all their Client
+// records); staff must name client_id. -> { client, clientIds, loginId } | { error }
+async function resolveClassClient(env, user, clientId) {
+  if (isStaff(user)) {
+    if (!clientId) return { error: 'client_id is required.' };
+    const client = await getEntityById(env, 'Client', clientId);
+    if (!client) return { error: 'Client not found.' };
+    const login = await clientLogin(env, client);
+    return { client, clientIds: [client.id], loginId: login?.id || client.user_id || null };
+  }
+  const { results } = await env.DB.prepare(
+    `SELECT * FROM entities WHERE entity_type='Client' AND (json_extract(data,'$.email') = ? OR json_extract(data,'$.user_id') = ?) ORDER BY created_date ASC`
+  ).bind(user.email, user.id).all();
+  const clients = results.map(rowToEntity);
+  if (!clients.length) return { error: 'Your account is not linked to a client profile yet. Ask the front desk.' };
+  if (clientId && !clients.some((c) => c.id === clientId)) return { error: 'You can only book classes for yourself.' };
+  const client = clients.find((c) => c.id === clientId) || clients.find((c) => c.user_id === user.id) || clients[0];
+  return { client, clientIds: clients.map((c) => c.id), loginId: user.id };
+}
+
+const clientMatchSql = (who) => {
+  const ors = [`json_extract(data,'$.client_id') IN (${inList(who.clientIds)})`];
+  const binds = [...who.clientIds];
+  if (who.loginId) { ors.push(`json_extract(data,'$.client_user_id') = ?`); binds.push(who.loginId); }
+  return { sql: `(${ors.join(' OR ')})`, binds };
+};
+
+async function waiverStatus(env, who) {
+  const ids = [...who.clientIds, ...(who.loginId ? [who.loginId] : [])];
+  const row = await env.DB.prepare(
+    `SELECT id FROM entities WHERE entity_type='Contract' AND json_extract(data,'$.status') = 'signed'
+     AND (json_extract(data,'$.client_id') IN (${inList(ids)}) OR json_extract(data,'$.client_user_id') = ?)
+     AND (json_extract(data,'$.type') = 'waiver' OR lower(COALESCE(json_extract(data,'$.title'),'')) LIKE '%waiver%')
+     ORDER BY created_date DESC LIMIT 1`
+  ).bind(...ids, who.loginId || '').first();
+  return { signed: !!row, contract_id: row?.id || null };
+}
+
+function membershipCoversDate(m, date) {
+  if (!m || m.status === 'ended') return false;
+  if (!isDateKey(m.start_date) || m.start_date > date) return false;
+  if (isDateKey(m.end_date) && m.end_date < date) return false;
+  const inHold = isDateKey(m.hold_from) && m.hold_from <= date && (!isDateKey(m.hold_to) || date <= m.hold_to);
+  if (m.status === 'on_hold') return isDateKey(m.hold_from) && !inHold;
+  if (m.status !== 'active') return false;
+  return !inHold;
+}
+const membershipCoversType = (m, typeId) => !Array.isArray(m.class_type_ids) || m.class_type_ids.length === 0 || m.class_type_ids.includes(typeId);
+function membershipLimit(m) {
+  if (NO_LIMIT_KINDS.has(m.kind)) return null;
+  if (m.kind === 'punch' || m.kind === 'drop_in' || m.limit_period === 'total') {
+    return { period: 'total', count: numOr(m.sessions_total, numOr(m.limit_count, 0)) };
+  }
+  if ((m.limit_period === 'week' || m.limit_period === 'month') && numOr(m.limit_count, null) !== null) {
+    return { period: m.limit_period, count: Number(m.limit_count) };
+  }
+  return null;
+}
+const membershipRank = (m) => (NO_LIMIT_KINDS.has(m.kind) ? 0 : membershipLimit(m)?.period === 'total' ? 2 : 1);
+function countedStatuses(s, forTotal = false) {
+  const st = forTotal ? ['reserved'] : ['reserved', 'checked_in'];
+  if (s.late_cancel_counts_toward_limit) st.push('late_cancelled');
+  if (s.no_show_counts_toward_limit) st.push('no_show');
+  return st;
+}
+// SQL condition "this membership still has room for one more class on `date`".
+// Week: Mon-Sun Eastern week; month: billing month; total: sessions_used (bumped
+// at check-in) + reservations not yet checked in.
+function allowanceGuard(m, date, s) {
+  const lim = membershipLimit(m);
+  if (!lim) return { sql: '1=1', binds: [], lim: null };
+  if (lim.period === 'total') {
+    return {
+      sql: `(COALESCE((SELECT json_extract(data,'$.sessions_used') FROM entities WHERE id = ?),0) + (SELECT COUNT(*) FROM entities WHERE entity_type='Reservation' AND json_extract(data,'$.membership_id') = ? AND json_extract(data,'$.status') IN (${sqlStr(countedStatuses(s, true))}))) < ?`,
+      binds: [m.id, m.id, lim.count], lim,
+    };
+  }
+  const p = lim.period === 'week' ? { start: classWeekStart(date), end: pAddDays(classWeekStart(date), 6) } : billingPeriod(m.start_date, date);
+  return {
+    sql: `(SELECT COUNT(*) FROM entities WHERE entity_type='Reservation' AND json_extract(data,'$.membership_id') = ? AND json_extract(data,'$.status') IN (${sqlStr(countedStatuses(s))}) AND json_extract(data,'$.date') BETWEEN ? AND ?) < ?`,
+    binds: [m.id, p.start, p.end, lim.count], lim, period: p,
+  };
+}
+// Allowance for display, for the period containing `date` (default today).
+async function membershipAllowance(env, m, s, date = programToday()) {
+  const lim = membershipLimit(m);
+  if (!lim) return { period: null, limit: null, used: null, remaining: null };
+  if (lim.period === 'total') {
+    const r = await env.DB.prepare(
+      `SELECT COUNT(*) AS n FROM entities WHERE entity_type='Reservation' AND json_extract(data,'$.membership_id') = ? AND json_extract(data,'$.status') IN (${sqlStr(countedStatuses(s, true))})`
+    ).bind(m.id).first();
+    const used = numOr(m.sessions_used, 0);
+    const reserved = r?.n || 0;
+    return { period: 'total', limit: lim.count, used: used + reserved, checked_in: used, reserved, remaining: Math.max(0, lim.count - used - reserved) };
+  }
+  const p = lim.period === 'week' ? { start: classWeekStart(date), end: pAddDays(classWeekStart(date), 6) } : billingPeriod(m.start_date, date);
+  const r = await env.DB.prepare(
+    `SELECT COUNT(*) AS n FROM entities WHERE entity_type='Reservation' AND json_extract(data,'$.membership_id') = ? AND json_extract(data,'$.status') IN (${sqlStr(countedStatuses(s))}) AND json_extract(data,'$.date') BETWEEN ? AND ?`
+  ).bind(m.id, p.start, p.end).first();
+  const used = r?.n || 0;
+  return { period: lim.period, limit: lim.count, used, remaining: Math.max(0, lim.count - used), period_start: p.start, period_end: p.end };
+}
+
+async function clientMemberships(env, who) {
+  const m = clientMatchSql(who);
+  const list = await selectEntities(env, 'Membership', m.sql, m.binds);
+  return list.sort((a, b) => String(a.created_date).localeCompare(String(b.created_date)));
+}
+
+// First membership that covers the session and has room: unlimited/comp/intro,
+// then limited, then punch/drop-in. -> { membership, guard } | { reason }
+async function findClassMembership(env, who, session, s) {
+  const all = await clientMemberships(env, who);
+  const covering = all.filter((m) => membershipCoversDate(m, session.date) && membershipCoversType(m, session.class_type_id))
+    .sort((a, b) => membershipRank(a) - membershipRank(b));
+  if (!covering.length) return { reason: 'No active membership covers this class.', code: 'no_membership' };
+  for (const m of covering) {
+    const guard = allowanceGuard(m, session.date, s);
+    if (!guard.lim) return { membership: m, guard };
+    const ok = await env.DB.prepare(`SELECT CASE WHEN ${guard.sql} THEN 1 ELSE 0 END AS ok`).bind(...guard.binds).first();
+    if (ok?.ok) return { membership: m, guard };
+  }
+  const lim = membershipLimit(covering[0]);
+  const reason = lim?.period === 'week' ? `You have used all ${lim.count} classes on your plan for that week.`
+    : lim?.period === 'month' ? `You have used all ${lim.count} classes on your plan for that month.`
+      : 'No classes left on your plan.';
+  return { reason, code: 'limit_reached' };
+}
+
+// Conditional insert of a reservation. mode: 'spot' (needs a free spot),
+// 'waitlist' (class must be full; gets the next position), 'force' (staff override).
+// Always refuses a second active reservation for the same client, and a
+// session that is no longer scheduled. Returns { stmt, id }.
+function reservationInsert(env, { data, createdBy, session, clientIds, guard, mode }) {
+  const id = uid();
+  const now = nowISO();
+  const conds = [
+    `EXISTS (SELECT 1 FROM entities WHERE id = ? AND entity_type='ClassSession' AND json_extract(data,'$.status') = 'scheduled')`,
+    `NOT EXISTS (SELECT 1 FROM entities WHERE entity_type='Reservation' AND json_extract(data,'$.session_id') = ? AND json_extract(data,'$.client_id') IN (${inList(clientIds)}) AND json_extract(data,'$.status') IN (${sqlStr(ACTIVE_RES)}))`,
+  ];
+  const condBinds = [session.id, session.id, ...clientIds];
+  const cap = capOf(session);
+  if (mode === 'spot' && cap !== null) { conds.push(`${RES_SPOT_COUNT} < ?`); condBinds.push(session.id, cap); }
+  if (mode === 'waitlist') { conds.push(`${RES_SPOT_COUNT} >= ?`); condBinds.push(session.id, cap ?? 0); }
+  if (guard && guard.lim) { conds.push(guard.sql); condBinds.push(...guard.binds); }
+  const dataExpr = mode === 'waitlist'
+    ? `json_set(?, '$.waitlist_position', (SELECT COALESCE(MAX(CAST(json_extract(data,'$.waitlist_position') AS INTEGER)),0)+1 FROM entities WHERE entity_type='Reservation' AND json_extract(data,'$.session_id') = ? AND json_extract(data,'$.status') = 'waitlisted'))`
+    : '?';
+  const binds = [id, JSON.stringify(data), ...(mode === 'waitlist' ? [session.id] : []), createdBy || null, now, now, ...condBinds];
+  const stmt = env.DB.prepare(
+    `INSERT INTO entities (id, entity_type, data, created_by, created_date, updated_date)
+     SELECT ?, 'Reservation', ${dataExpr}, ?, ?, ? WHERE ${conds.join(' AND ')}`
+  ).bind(...binds);
+  return { stmt, id };
+}
+
+const punchStmt = (env, membershipId, delta, existsSql, existsBinds) => env.DB.prepare(
+  `UPDATE entities SET data = json_set(data, '$.sessions_used', MAX(0, COALESCE(json_extract(data,'$.sessions_used'),0) + ?)), updated_date = ?
+   WHERE id = ? AND entity_type = 'Membership' AND EXISTS (${existsSql})`
+).bind(delta, nowISO(), membershipId, ...existsBinds);
+
+// Keep a session's counts (and waitlist numbering) in step with its reservations.
+// reserved_count = spots taken (reserved + checked_in); checked_in_count is a subset.
+async function recountSession(env, sessionId) {
+  if (!sessionId) return;
+  const cnt = (st) => `(SELECT COUNT(*) FROM entities WHERE entity_type='Reservation' AND json_extract(data,'$.session_id') = ?1 AND json_extract(data,'$.status') IN (${st}))`;
+  await env.DB.batch([
+    env.DB.prepare(
+      `UPDATE entities SET data = json_set(data, '$.waitlist_position', (SELECT rn FROM (SELECT id AS rid, ROW_NUMBER() OVER (ORDER BY CAST(json_extract(data,'$.waitlist_position') AS INTEGER), json_extract(data,'$.booked_at'), created_date) AS rn FROM entities WHERE entity_type='Reservation' AND json_extract(data,'$.session_id') = ?1 AND json_extract(data,'$.status') = 'waitlisted') WHERE rid = entities.id))
+       WHERE entity_type='Reservation' AND json_extract(data,'$.session_id') = ?1 AND json_extract(data,'$.status') = 'waitlisted'`
+    ).bind(sessionId),
+    env.DB.prepare(
+      `UPDATE entities SET data = json_set(data, '$.reserved_count', ${cnt("'reserved','checked_in'")}, '$.waitlist_count', ${cnt("'waitlisted'")}, '$.checked_in_count', ${cnt("'checked_in'")}), updated_date = ?2
+       WHERE id = ?1 AND entity_type = 'ClassSession'`
+    ).bind(sessionId, nowISO()),
+  ]);
+}
+
+async function classActorEmail(env, actor, session) {
+  if (actor && isStaff(actor)) return actor.email;
+  const coach = await staffLogin(env, session?.coach_user_id);
+  if (coach) return coach.email;
+  const row = await env.DB.prepare(`SELECT email FROM users WHERE user_type = 'trainer' ORDER BY created_date LIMIT 1`).first();
+  return row?.email || (env.ADMIN_EMAILS || '').split(',')[0].trim() || null;
+}
+// Gym -> member notice (Notification row + push). Sent with server authority,
+// so it bypasses pushForNotification's member->member block on purpose.
+async function notifyClassMember(env, { loginId, title, message, createdBy }) {
+  if (!loginId) return false;
+  await insertEntity(env, 'Notification', { user_id: loginId, type: 'class', title, message, link: '/ClientClasses', read: false }, createdBy);
+  const p = sendPushToUser(env, loginId, { title, body: String(message).slice(0, 140), url: '/ClientClasses', tag: 'classes' });
+  if (env.__waitUntil) env.__waitUntil(p); else await p;
+  return true;
+}
+
+// Move waitlisted people into free spots, oldest first, only before the
+// late-cancel cutoff and only if one of their memberships still qualifies.
+async function promoteWaitlist(env, session, s, actor) {
+  if (!session || session.status !== 'scheduled') return [];
+  const cutoff = Date.parse(session.start_at) - sessionRules(session, s).late_h * 3600000;
+  if (Date.now() >= cutoff) return [];
+  const waiting = (await selectEntities(env, 'Reservation',
+    `json_extract(data,'$.session_id') = ? AND json_extract(data,'$.status') = 'waitlisted'`, [session.id]))
+    .sort((a, b) => numOr(a.waitlist_position, 1e9) - numOr(b.waitlist_position, 1e9) || String(a.booked_at).localeCompare(String(b.booked_at)));
+  const cap = capOf(session);
+  const promoted = [];
+  let createdBy = null;
+  for (const r of waiting) {
+    if (cap !== null) {
+      const c = await env.DB.prepare(`SELECT ${RES_SPOT_COUNT} AS n`).bind(session.id).first();
+      if ((c?.n || 0) >= cap) break;
+    }
+    const pick = await findClassMembership(env, { clientIds: [r.client_id], loginId: r.client_user_id || null }, session, s);
+    if (!pick.membership) continue;
+    const now = nowISO();
+    const capSql = cap === null ? '1=1' : `${RES_SPOT_COUNT} < ?`;
+    const res = await env.DB.prepare(
+      `UPDATE entities SET data = json_set(data, '$.status', 'reserved', '$.waitlist_position', NULL, '$.membership_id', ?, '$.promoted_at', ?), updated_date = ?
+       WHERE id = ? AND json_extract(data,'$.status') = 'waitlisted' AND ${capSql} AND ${pick.guard.sql}`
+    ).bind(pick.membership.id, now, now, r.id, ...(cap === null ? [] : [session.id, cap]), ...pick.guard.binds).run();
+    if (!res?.meta?.changes) continue;
+    promoted.push(r.id);
+    if (createdBy === null) createdBy = await classActorEmail(env, actor, session);
+    await notifyClassMember(env, {
+      loginId: r.client_user_id, createdBy,
+      title: 'You are in',
+      message: `A spot opened in ${session.class_type_name || 'class'} on ${classWhen(session)}. You moved off the waitlist and are booked.`,
+    });
+  }
+  if (promoted.length) await recountSession(env, session.id);
+  return promoted;
+}
+
+// Cancel every active reservation of a session (class cancelled by the gym).
+async function cancelSessionReservations(env, session, actor, reason) {
+  const active = await selectEntities(env, 'Reservation',
+    `json_extract(data,'$.session_id') = ? AND json_extract(data,'$.status') IN (${sqlStr(ACTIVE_RES)})`, [session.id]);
+  const createdBy = await classActorEmail(env, actor, session);
+  let affected = 0; let notified = 0;
+  for (const r of active) {
+    const now = nowISO();
+    const stmts = [];
+    if (r.status === 'checked_in' && r.punch_applied && r.membership_id) {
+      stmts.push(punchStmt(env, r.membership_id, -1,
+        `SELECT 1 FROM entities WHERE id = ? AND json_extract(data,'$.status') = 'checked_in'`, [r.id]));
+    }
+    stmts.push(env.DB.prepare(
+      `UPDATE entities SET data = json_set(data, '$.status', 'cancelled_by_gym', '$.cancelled_at', ?, '$.waitlist_position', NULL, '$.punch_applied', json('false')), updated_date = ?
+       WHERE id = ? AND json_extract(data,'$.status') = ?`
+    ).bind(now, now, r.id, r.status));
+    const out = await env.DB.batch(stmts);
+    if (!out[out.length - 1]?.meta?.changes) continue;
+    affected++;
+    if (await notifyClassMember(env, {
+      loginId: r.client_user_id, createdBy,
+      title: 'Class cancelled',
+      message: `${session.class_type_name || 'Class'} on ${classWhen(session)} was cancelled${reason ? `: ${String(reason).slice(0, 80)}` : '.'}`,
+    })) notified++;
+  }
+  await recountSession(env, session.id);
+  return { affected, notified };
+}
+
+/* ---- session generation from weekly slots ---- */
+function slotSessionFields(slot, type, date) {
+  const startMin = hmToMin(slot.start_time);
+  const duration = numOr(slot.duration_min, numOr(type?.default_duration_min, 60)) || 60;
+  const startMs = easternToUTC(date, minToHm(startMin));
+  const capRaw = numOr(slot.capacity, numOr(type?.default_capacity, null));
+  return {
+    class_type_id: slot.class_type_id,
+    class_type_name: type?.name || '',
+    color: type?.color || null,
+    slot_id: slot.id,
+    date,
+    start_time: minToHm(startMin),
+    end_time: minToHm(startMin + duration),
+    duration_min: duration,
+    start_at: new Date(startMs).toISOString(),
+    end_at: new Date(startMs + duration * 60000).toISOString(),
+    capacity: capRaw !== null && capRaw > 0 ? capRaw : null,
+    coach_user_id: slot.coach_user_id || null,
+    coach_name: slot.coach_name || '',
+    reservable: type?.reservable !== false,
+  };
+}
+const TIME_FIELDS = ['date', 'start_time', 'end_time', 'duration_min', 'start_at', 'end_at', 'capacity'];
+const LABEL_FIELDS = ['class_type_id', 'class_type_name', 'color', 'coach_user_id', 'coach_name', 'reservable'];
+
+// Bring one slot's future sessions in line with it and generate to the horizon.
+// Empty future sessions follow the slot; booked ones keep time and capacity
+// (only coach / name / color follow) and are reported in booked_sessions.
+// Sessions staff edited one by one (edited_manually) or cancelled are left alone.
+async function syncSlotSessions(env, slot, type, s, now = Date.now()) {
+  const out = { generated: 0, revived: 0, updated: 0, cancelled: 0, booked_kept: 0, booked_sessions: [] };
+  const today = programToday(now);
+  const horizonEnd = pAddDays(today, Math.max(1, numOr(s.generate_days_ahead, 21)) - 1);
+  const active = slot.is_active !== false && !!type && type.is_active !== false && hmToMin(slot.start_time) !== null
+    && Number.isInteger(Number(slot.day_of_week));
+  const wants = (date) => active && pDow(date) === Number(slot.day_of_week)
+    && (!isDateKey(slot.start_date) || date >= slot.start_date) && (!isDateKey(slot.end_date) || date <= slot.end_date)
+    && date >= today && date <= horizonEnd;
+
+  const existing = await selectEntities(env, 'ClassSession',
+    `json_extract(data,'$.slot_id') = ? AND json_extract(data,'$.date') >= ?`, [slot.id, today]);
+  for (const ex of existing) {
+    if (Date.parse(ex.start_at) <= now) continue;
+    if (ex.status === 'cancelled' && !ex.auto_cancelled) continue;
+    if (ex.edited_manually) continue;
+    const c = await env.DB.prepare(
+      `SELECT COUNT(*) AS n FROM entities WHERE entity_type='Reservation' AND json_extract(data,'$.session_id') = ? AND json_extract(data,'$.status') IN (${sqlStr(ACTIVE_RES)})`
+    ).bind(ex.id).first();
+    const booked = (c?.n || 0) > 0;
+    if (wants(ex.date)) {
+      const want = slotSessionFields(slot, type, ex.date);
+      if (ex.status === 'cancelled') {
+        await patchEntity(env, ex, { ...want, status: 'scheduled', auto_cancelled: false, cancel_reason: null });
+        out.revived++;
+      } else if (!booked) {
+        if ([...TIME_FIELDS, ...LABEL_FIELDS].some((k) => (ex[k] ?? null) !== (want[k] ?? null))) {
+          await patchEntity(env, ex, want);
+          out.updated++;
+        }
+      } else {
+        const labels = Object.fromEntries(LABEL_FIELDS.filter((k) => k !== 'reservable' && k !== 'class_type_id').map((k) => [k, want[k]]));
+        if (Object.keys(labels).some((k) => (ex[k] ?? null) !== (labels[k] ?? null))) await patchEntity(env, ex, labels);
+        if (TIME_FIELDS.some((k) => (ex[k] ?? null) !== (want[k] ?? null))) {
+          out.booked_kept++;
+          out.booked_sessions.push({ id: ex.id, date: ex.date, start_time: ex.start_time, reserved_count: ex.reserved_count || 0 });
+        }
+      }
+    } else if (ex.status !== 'cancelled') {
+      if (!booked) {
+        await patchEntity(env, ex, { status: 'cancelled', auto_cancelled: true, cancel_reason: 'Removed from the weekly schedule' });
+        out.cancelled++;
+      } else {
+        out.booked_kept++;
+        out.booked_sessions.push({ id: ex.id, date: ex.date, start_time: ex.start_time, reserved_count: ex.reserved_count || 0 });
+      }
+    }
+  }
+
+  if (active) {
+    const stmts = [];
+    for (let d = today; d <= horizonEnd; d = pAddDays(d, 1)) {
+      if (!wants(d)) continue;
+      const f = slotSessionFields(slot, type, d);
+      if (Date.parse(f.start_at) <= now) continue;
+      const data = { ...f, status: 'scheduled', cancel_reason: null, notes: '', reserved_count: 0, waitlist_count: 0, checked_in_count: 0 };
+      stmts.push(env.DB.prepare(
+        'INSERT OR IGNORE INTO entities (id, entity_type, data, created_by, created_date, updated_date) VALUES (?,?,?,?,?,?)'
+      ).bind(`cs_${slot.id}_${d}`, 'ClassSession', JSON.stringify(data), slot.created_by || null, nowISO(), nowISO()));
+    }
+    if (stmts.length) {
+      const res = await env.DB.batch(stmts);
+      out.generated += res.reduce((n, r) => n + (r?.meta?.changes || 0), 0);
+    }
+  }
+  return out;
+}
+
+function addSync(total, part) {
+  for (const k of ['generated', 'revived', 'updated', 'cancelled', 'booked_kept']) total[k] = (total[k] || 0) + (part[k] || 0);
+  total.booked_sessions = [...(total.booked_sessions || []), ...(part.booked_sessions || [])];
+  return total;
+}
+
+async function syncSlotsWhere(env, s, whereSql, binds, overrideSlot = null) {
+  const slots = overrideSlot ? [overrideSlot] : await selectEntities(env, 'ClassSlot', whereSql, binds);
+  const typeCache = new Map();
+  const total = { generated: 0, revived: 0, updated: 0, cancelled: 0, booked_kept: 0, booked_sessions: [] };
+  for (const slot of slots) {
+    if (!typeCache.has(slot.class_type_id)) typeCache.set(slot.class_type_id, await getEntityById(env, 'ClassType', slot.class_type_id));
+    addSync(total, await syncSlotSessions(env, slot, typeCache.get(slot.class_type_id), s));
+  }
+  return total;
+}
+
+// Automatic tick: generate to the horizon, mark no-shows, expire old waitlists.
+async function runClassTick(env) {
+  const s = await getGymSettings(env);
+  const summary = { success: true, ...(await syncSlotsWhere(env, s, '1=1', [])), no_shows: 0, waitlist_expired: 0 };
+  const now = Date.now();
+  const touched = new Set();
+  const noShowCutoff = new Date(now - s.no_show_after_minutes * 60000).toISOString();
+  const nowIso = new Date(now).toISOString();
+  const jobs = [
+    { status: 'reserved', cutoff: noShowCutoff, set: `'$.status', 'no_show', '$.no_show_at', ?, '$.auto_no_show', json('true')`, key: 'no_shows' },
+    { status: 'waitlisted', cutoff: nowIso, set: `'$.status', 'cancelled', '$.cancelled_at', ?, '$.waitlist_position', NULL, '$.waitlist_expired', json('true')`, key: 'waitlist_expired' },
+  ];
+  for (const job of jobs) {
+    const { results } = await env.DB.prepare(
+      `SELECT r.id AS id, json_extract(r.data,'$.session_id') AS session_id FROM entities r
+       JOIN entities cs ON cs.id = json_extract(r.data,'$.session_id') AND cs.entity_type = 'ClassSession'
+       WHERE r.entity_type = 'Reservation' AND json_extract(r.data,'$.status') = ? AND json_extract(cs.data,'$.end_at') < ?`
+    ).bind(job.status, job.cutoff).all();
+    for (let i = 0; i < results.length; i += 50) {
+      const chunk = results.slice(i, i + 50);
+      const res = await env.DB.prepare(
+        `UPDATE entities SET data = json_set(data, ${job.set}), updated_date = ?
+         WHERE id IN (${inList(chunk)}) AND json_extract(data,'$.status') = ?`
+      ).bind(nowIso, nowIso, ...chunk.map((r) => r.id), job.status).run();
+      summary[job.key] += res?.meta?.changes || 0;
+      chunk.forEach((r) => touched.add(r.session_id));
+    }
+  }
+  for (const sid of touched) await recountSession(env, sid);
+  return summary;
+}
+
+/* ---- entity-route hooks for class types (staff writes only) ---- */
+// Fill derived fields on a ClassSession written through the entity API
+// (one-off sessions, single-session edits). Mutates `fields`.
+async function normalizeClassSession(env, fields, existing) {
+  for (const k of ['reserved_count', 'waitlist_count', 'checked_in_count']) if (existing) delete fields[k];
+  const merged = { ...(existing || {}), ...fields };
+  const type = await getEntityById(env, 'ClassType', merged.class_type_id);
+  if (!existing || ('class_type_id' in fields && fields.class_type_id !== existing.class_type_id)) {
+    if (type) {
+      if (fields.class_type_name === undefined) fields.class_type_name = type.name || '';
+      if (fields.color === undefined) fields.color = type.color || null;
+      if (fields.reservable === undefined) fields.reservable = type.reservable !== false;
+      if (!existing && fields.capacity === undefined) fields.capacity = numOr(type.default_capacity, null);
+    }
+  }
+  const timeKeys = ['date', 'start_time', 'end_time', 'duration_min'];
+  const timeChanged = !existing || timeKeys.some((k) => k in fields && fields[k] !== existing[k]);
+  if (timeChanged && isDateKey(merged.date) && hmToMin(merged.start_time) !== null) {
+    const st = hmToMin(merged.start_time);
+    // An explicit end_time wins; otherwise keep the duration (start moves, length stays).
+    let dur = ('end_time' in fields && hmToMin(fields.end_time) !== null) || (numOr(merged.duration_min, null) === null && hmToMin(merged.end_time) !== null)
+      ? hmToMin(merged.end_time) - st
+      : numOr(merged.duration_min, numOr(type?.default_duration_min, 60));
+    if (dur <= 0) dur += 1440;
+    const startMs = easternToUTC(merged.date, minToHm(st));
+    Object.assign(fields, {
+      start_time: minToHm(st), end_time: minToHm(st + dur), duration_min: dur,
+      start_at: new Date(startMs).toISOString(), end_at: new Date(startMs + dur * 60000).toISOString(),
+    });
+  }
+  if (existing && (timeChanged || 'capacity' in fields)) fields.edited_manually = true;
+  if (!existing) {
+    if (fields.status === undefined) fields.status = 'scheduled';
+    if (fields.slot_id === undefined) fields.slot_id = null;
+    fields.reserved_count = 0; fields.waitlist_count = 0; fields.checked_in_count = 0;
+  }
+}
+
+// Copy plan fields onto a new Membership (only fields the caller left out).
+async function normalizeMembership(env, fields) {
+  const plan = await getEntityById(env, 'MembershipPlan', fields.plan_id);
+  const fill = (k, v) => { if (fields[k] === undefined) fields[k] = v; };
+  if (plan) {
+    fill('plan_name', plan.name || '');
+    fill('kind', plan.kind || 'unlimited');
+    fill('limit_count', plan.limit_count ?? null);
+    fill('limit_period', plan.limit_period ?? null);
+    fill('class_type_ids', Array.isArray(plan.class_type_ids) ? plan.class_type_ids : []);
+    if (['punch', 'drop_in'].includes(fields.kind) || fields.limit_period === 'total') fill('sessions_total', numOr(plan.limit_count, null));
+    if (isDateKey(fields.start_date) && numOr(plan.duration_days, null) && fields.end_date === undefined) {
+      fields.end_date = pAddDays(fields.start_date, Number(plan.duration_days) - 1);
+    }
+  }
+  fill('start_date', programToday());
+  fill('end_date', null);
+  fill('sessions_used', 0);
+  fill('status', 'active');
+  if (fields.client_id && (fields.client_name === undefined || fields.client_user_id === undefined)) {
+    const client = await getEntityById(env, 'Client', fields.client_id);
+    if (client) {
+      fill('client_name', client.full_name || '');
+      fill('client_user_id', (await clientLogin(env, client))?.id || client.user_id || null);
+    }
+  }
+}
+
+// After a staff write to a class entity: keep sessions / counts consistent.
+// Returns an object merged into the API response as `class_sync`, or null.
+async function afterClassEntityWrite(env, type, id, data, prev, user) {
+  if (!isStaff(user)) return null;
+  if (type === 'ClassSlot') {
+    const s = await getGymSettings(env);
+    const slot = data ? { ...data, id } : { ...(prev || {}), id, is_active: false };
+    if (!data && prev) slot.created_by = prev.created_by;
+    return syncSlotsWhere(env, s, '', [], slot);
+  }
+  if (type === 'ClassType') {
+    const s = await getGymSettings(env);
+    return syncSlotsWhere(env, s, `json_extract(data,'$.class_type_id') = ?`, [id]);
+  }
+  if (type === 'Reservation') {
+    const ids = new Set([data?.session_id, prev?.session_id].filter(Boolean));
+    for (const sid of ids) await recountSession(env, sid);
+    return null;
+  }
+  if (type === 'ClassSession' && data) {
+    const session = { ...data, id };
+    if (session.status === 'cancelled' && prev && prev.status !== 'cancelled') {
+      const r = await cancelSessionReservations(env, session, user, session.cancel_reason);
+      return { cancelled_reservations: r.affected };
+    }
+    await recountSession(env, id);
+    if (prev) {
+      const fresh = await getEntityById(env, 'ClassSession', id);
+      const promoted = await promoteWaitlist(env, fresh, await getGymSettings(env), user);
+      return promoted.length ? { promoted: promoted.length } : null;
+    }
+  }
+  return null;
+}
+
+// Member/staff summary: upcoming, recent, memberships with allowance, waiver.
+async function classMemberSummary(env, who, s, { includeAll = false } = {}) {
+  const today = programToday();
+  const now = Date.now();
+  const m = clientMatchSql(who);
+  const reservations = await selectEntities(env, 'Reservation', m.sql, m.binds);
+  const sessionIds = [...new Set(reservations.map((r) => r.session_id).filter(Boolean))];
+  const sessions = new Map();
+  for (let i = 0; i < sessionIds.length; i += 90) {
+    const chunk = sessionIds.slice(i, i + 90);
+    (await selectEntities(env, 'ClassSession', `id IN (${inList(chunk)})`, chunk)).forEach((x) => sessions.set(x.id, x));
+  }
+  const enrich = (r) => {
+    const cs = sessions.get(r.session_id) || {};
+    return {
+      ...r,
+      start_time: cs.start_time || null, end_time: cs.end_time || null, end_at: cs.end_at || null,
+      color: cs.color || null, overrides: cs.overrides || null, reservable: cs.reservable !== false,
+      coach_name: cs.coach_name || '', session_status: cs.status || null, class_name: r.class_name || cs.class_type_name || '',
+    };
+  };
+  const all = reservations.map(enrich);
+  const upcoming = all.filter((r) => ACTIVE_RES.includes(r.status) && (Date.parse(r.end_at || r.start_at) > now || r.date >= today))
+    .sort((a, b) => String(a.start_at).localeCompare(String(b.start_at)));
+  const recent = all.filter((r) => !['reserved', 'waitlisted'].includes(r.status) && Date.parse(r.start_at) <= now)
+    .sort((a, b) => String(b.start_at).localeCompare(String(a.start_at))).slice(0, 30);
+  const since = new Date(now - 30 * 864e5).toISOString();
+  const last30 = all.filter((r) => r.start_at >= since && Date.parse(r.start_at) <= now);
+  const memberships = await clientMemberships(env, who);
+  const current = memberships.filter((x) => x.status !== 'ended' && (!isDateKey(x.end_date) || x.end_date >= today));
+  const withAllowance = [];
+  const weekCount = async (x, st, en) => (await env.DB.prepare(
+    `SELECT COUNT(*) AS n FROM entities WHERE entity_type='Reservation' AND json_extract(data,'$.membership_id') = ? AND json_extract(data,'$.status') IN (${sqlStr(countedStatuses(s))}) AND json_extract(data,'$.date') BETWEEN ? AND ?`
+  ).bind(x.id, st, en).first())?.n || 0;
+  for (const x of current) {
+    const allowance = await membershipAllowance(env, x, s, today);
+    const bp = billingPeriod(x.start_date, today);
+    withAllowance.push({
+      ...x, allowance, remaining: allowance.remaining,
+      used_this_week: await weekCount(x, classWeekStart(today), pAddDays(classWeekStart(today), 6)),
+      used_this_month: await weekCount(x, bp.start, bp.end),
+    });
+  }
+  const waiver = await waiverStatus(env, who);
+  const out = {
+    success: true,
+    client: who.client ? { id: who.client.id, full_name: who.client.full_name || '', email: who.client.email || '' } : null,
+    today,
+    upcoming,
+    recent,
+    recent_attendance: recent,
+    memberships: withAllowance,
+    waiver: { required: !!s.waiver_required, signed: waiver.signed, contract_id: waiver.contract_id },
+    stats: {
+      visits_30d: last30.filter((r) => r.status === 'checked_in').length,
+      no_shows_30d: last30.filter((r) => r.status === 'no_show').length,
+      late_cancels_30d: last30.filter((r) => r.status === 'late_cancelled').length,
+      total_visits: all.filter((r) => r.status === 'checked_in').length,
+    },
+    settings: s,
+  };
+  if (includeAll) out.all_memberships = memberships;
+  return out;
+}
+
 const programSummary = (p) => (p ? {
   id: p.id, name: p.name, description: p.description, duration_weeks: p.duration_weeks,
   cover_image_url: p.cover_image_url, kind: p.kind || 'program', status: p.status,
@@ -1971,6 +2641,373 @@ async function runFunction(name, payload, ctx) {
         });
       }
       return { success: true, today, enrollments };
+    }
+
+    /* ---- Group classes (docs/classes-spec.md) ---- */
+    case 'classSchedule': {
+      if (!user) return { success: false, error: 'Not logged in' };
+      const s = await getGymSettings(env);
+      const today = programToday();
+      const from = isDateKey(payload?.from) ? payload.from : today;
+      let to = isDateKey(payload?.to) ? payload.to : pAddDays(from, 6);
+      if (to < from) return { success: false, error: '"to" is before "from".' };
+      if (pDaysBetween(from, to) > 62) to = pAddDays(from, 62);
+      const sessions = (await selectEntities(env, 'ClassSession',
+        `json_extract(data,'$.date') BETWEEN ? AND ? AND COALESCE(json_extract(data,'$.auto_cancelled'),0) = 0`, [from, to]))
+        .sort((a, b) => String(a.start_at).localeCompare(String(b.start_at)));
+      const staff = isStaff(user);
+      let mine = new Map();
+      const attendees = new Map();
+      if (!staff) {
+        const cids = await myClientIds(env, user);
+        const who = { clientIds: cids.length ? cids : ['__none__'], loginId: user.id };
+        const cm = clientMatchSql(who);
+        const myRes = await selectEntities(env, 'Reservation',
+          `json_extract(data,'$.date') BETWEEN ? AND ? AND ${cm.sql}`, [from, to, ...cm.binds]);
+        const rank = (r) => (ACTIVE_RES.includes(r.status) ? 0 : ['no_show', 'late_cancelled'].includes(r.status) ? 1 : 2);
+        for (const r of myRes.sort((a, b) => rank(a) - rank(b) || String(b.booked_at).localeCompare(String(a.booked_at)))) {
+          if (!mine.has(r.session_id)) mine.set(r.session_id, { id: r.id, status: r.status, waitlist_position: r.waitlist_position ?? null, checked_in_at: r.checked_in_at || null });
+        }
+        if (s.show_roster_to_members) {
+          const { results } = await env.DB.prepare(
+            `SELECT json_extract(data,'$.session_id') AS session_id, json_extract(data,'$.client_name') AS client_name, json_extract(data,'$.booked_at') AS booked_at
+             FROM entities WHERE entity_type='Reservation' AND json_extract(data,'$.date') BETWEEN ? AND ? AND json_extract(data,'$.status') IN ('reserved','checked_in')
+             ORDER BY json_extract(data,'$.booked_at')`
+          ).bind(from, to).all();
+          for (const r of results) {
+            if (!attendees.has(r.session_id)) attendees.set(r.session_id, []);
+            attendees.get(r.session_id).push({ name: shortName(r.client_name) });
+          }
+        }
+      }
+      const out = sessions.map((cs) => {
+        const cap = capOf(cs);
+        const row = {
+          ...cs,
+          capacity: cap,
+          spots_left: cap === null ? null : Math.max(0, cap - (cs.reserved_count || 0)),
+          is_full: cap !== null && (cs.reserved_count || 0) >= cap,
+          windows: sessionWindows(cs, s),
+        };
+        if (!staff) {
+          row.my_reservation = mine.get(cs.id) || null;
+          if (s.show_roster_to_members) row.attendees = attendees.get(cs.id) || [];
+        }
+        return row;
+      });
+      return { success: true, from, to, today, now: nowISO(), settings: s, sessions: out };
+    }
+
+    case 'classRoster': {
+      if (!isStaff(user)) return { success: false, error: 'Only coaches can see the full roster.' };
+      const session = await getEntityById(env, 'ClassSession', payload?.session_id);
+      if (!session) return { success: false, error: 'Class not found.' };
+      const s = await getGymSettings(env);
+      const order = { checked_in: 0, reserved: 1, waitlisted: 2, no_show: 3, late_cancelled: 4, cancelled: 5, cancelled_by_gym: 6 };
+      const reservations = (await selectEntities(env, 'Reservation', `json_extract(data,'$.session_id') = ?`, [session.id]))
+        .sort((a, b) => (order[a.status] ?? 9) - (order[b.status] ?? 9)
+          || numOr(a.waitlist_position, 0) - numOr(b.waitlist_position, 0)
+          || String(a.booked_at).localeCompare(String(b.booked_at)));
+      const memIds = [...new Set(reservations.map((r) => r.membership_id).filter(Boolean))];
+      const mems = new Map();
+      if (memIds.length) (await selectEntities(env, 'Membership', `id IN (${inList(memIds)})`, memIds)).forEach((m) => mems.set(m.id, m));
+      const waivers = new Map();
+      for (const cid of [...new Set(reservations.map((r) => r.client_id))]) {
+        const r0 = reservations.find((r) => r.client_id === cid);
+        waivers.set(cid, (await waiverStatus(env, { clientIds: [cid], loginId: r0?.client_user_id || null })).signed);
+      }
+      return {
+        success: true,
+        session: { ...session, windows: sessionWindows(session, s) },
+        reservations: reservations.map((r) => ({
+          ...r,
+          membership_name: mems.get(r.membership_id)?.plan_name || null,
+          membership_kind: mems.get(r.membership_id)?.kind || null,
+          waiver_signed: waivers.get(r.client_id) || false,
+        })),
+      };
+    }
+
+    case 'myClasses': {
+      if (!user) return { success: false, error: 'Not logged in' };
+      const s = await getGymSettings(env);
+      const who = await resolveClassClient(env, isStaff(user) ? { ...user, role: 'user', user_type: 'client' } : user, null);
+      if (who.error) {
+        return { success: true, client: null, today: programToday(), upcoming: [], recent: [], memberships: [], waiver: { required: !!s.waiver_required, signed: false, contract_id: null }, stats: null, settings: s, notice: who.error };
+      }
+      return classMemberSummary(env, who, s);
+    }
+
+    case 'classMemberStatus': {
+      if (!isStaff(user)) return { success: false, error: 'Only coaches can see member status.' };
+      const who = await resolveClassClient(env, user, payload?.client_id);
+      if (who.error) return { success: false, error: who.error };
+      return classMemberSummary(env, who, await getGymSettings(env), { includeAll: true });
+    }
+
+    case 'classCoaches': {
+      // Staff picker for slots/sessions (User.list is admin-only for trainers).
+      if (!isStaff(user)) return { success: false, error: 'Only coaches can see this.' };
+      const { results } = await env.DB.prepare(`SELECT * FROM users ORDER BY full_name`).all();
+      const coaches = results.map(userRow).map((u) => ({ ...u, role: resolveRole(env, u.email, u.role) }))
+        .filter(isStaff).map((u) => ({ id: u.id, full_name: u.full_name || u.email, email: u.email }));
+      return { success: true, coaches };
+    }
+
+    case 'bookClass': {
+      if (!user) return { success: false, error: 'Not logged in' };
+      const staff = isStaff(user);
+      const s = await getGymSettings(env);
+      const session = await getEntityById(env, 'ClassSession', payload?.session_id);
+      if (!session) return { success: false, error: 'Class not found.' };
+      if (session.status !== 'scheduled') return { success: false, error: 'This class was cancelled.', code: 'class_cancelled' };
+      if (session.reservable === false) return { success: false, error: 'This class does not take reservations. Check in when you arrive.', code: 'not_reservable' };
+      const now = Date.now();
+      const w = sessionWindows(session, s);
+      if (!staff) {
+        if (now < Date.parse(w.booking_opens_at)) return { success: false, error: `Booking for this class opens ${new Date(w.booking_opens_at).toLocaleString('en-US', { timeZone: PROGRAM_TZ, weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}.`, code: 'booking_not_open' };
+        if (now > Date.parse(w.booking_closes_at)) return { success: false, error: 'Booking for this class has closed.', code: 'booking_closed' };
+      } else if (now > Date.parse(session.end_at)) {
+        return { success: false, error: 'This class is over. Use check-in to record attendance.', code: 'class_over' };
+      }
+      const who = await resolveClassClient(env, user, payload?.client_id);
+      if (who.error) return { success: false, error: who.error, code: 'no_client' };
+      const warnings = [];
+      const override = staff && !!payload?.override;
+      if (s.waiver_required && !(await waiverStatus(env, who)).signed) {
+        if (!staff) return { success: false, error: 'Sign the liability waiver before booking a class. You can find it under Documents.', code: 'waiver_required' };
+        warnings.push('No signed waiver on file.');
+      }
+      let reservation = null;
+      for (let attempt = 0; attempt < 3 && !reservation; attempt++) {
+        const pick = await findClassMembership(env, who, session, s);
+        if (!pick.membership && !override) {
+          return { success: false, error: staff ? pick.reason.replace(/^You have/, 'This client has') : pick.reason, code: pick.code, ...(staff ? { can_override: true } : {}) };
+        }
+        if (!pick.membership) warnings.push('Booked without a covering membership (staff override).');
+        const data = {
+          session_id: session.id, class_type_id: session.class_type_id, class_name: session.class_type_name || '',
+          date: session.date, start_at: session.start_at,
+          client_id: who.client.id, client_user_id: who.loginId || null, client_name: who.client.full_name || '',
+          status: 'reserved', waitlist_position: null, membership_id: pick.membership?.id || null,
+          booked_at: nowISO(), cancelled_at: null, checked_in_at: null, check_in_method: null, booked_by: user.id,
+          ...(pick.membership ? {} : { membership_override: true }),
+        };
+        const ins = reservationInsert(env, { data, createdBy: user.email, session, clientIds: who.clientIds, guard: pick.guard, mode: override ? 'force' : 'spot' });
+        const r1 = await ins.stmt.run();
+        if (r1?.meta?.changes) { reservation = await getEntityById(env, 'Reservation', ins.id); break; }
+        // Why not? Already booked / class cancelled / allowance used / full.
+        const fresh = await getEntityById(env, 'ClassSession', session.id);
+        if (!fresh || fresh.status !== 'scheduled') return { success: false, error: 'This class was cancelled.', code: 'class_cancelled' };
+        const dup = await env.DB.prepare(
+          `SELECT json_extract(data,'$.status') AS status FROM entities WHERE entity_type='Reservation' AND json_extract(data,'$.session_id') = ? AND json_extract(data,'$.client_id') IN (${inList(who.clientIds)}) AND json_extract(data,'$.status') IN (${sqlStr(ACTIVE_RES)}) LIMIT 1`
+        ).bind(session.id, ...who.clientIds).first();
+        if (dup) return { success: false, error: dup.status === 'waitlisted' ? 'You are already on the waitlist for this class.' : 'You are already booked in this class.', code: 'already_booked' };
+        const cap = capOf(session);
+        const c = await env.DB.prepare(`SELECT ${RES_SPOT_COUNT} AS n`).bind(session.id).first();
+        if (cap === null || (c?.n || 0) < cap) continue; // allowance changed underneath us: re-pick
+        if (!s.waitlist_enabled) return { success: false, error: 'Class is full.', code: 'class_full', ...(staff ? { can_override: true } : {}) };
+        const wl = reservationInsert(env, { data: { ...data, status: 'waitlisted' }, createdBy: user.email, session, clientIds: who.clientIds, guard: null, mode: 'waitlist' });
+        const r2 = await wl.stmt.run();
+        if (r2?.meta?.changes) reservation = await getEntityById(env, 'Reservation', wl.id);
+      }
+      if (!reservation) return { success: false, error: 'Could not book this class. Refresh and try again.', code: 'retry' };
+      await recountSession(env, session.id);
+      if (reservation.status === 'waitlisted') reservation = await getEntityById(env, 'Reservation', reservation.id);
+      await audit(env, { actor: user.email, action: 'create', target: 'Reservation', targetId: reservation.id, detail: reservation.status, request: null });
+      return { success: true, status: reservation.status, reservation, session: await getEntityById(env, 'ClassSession', session.id), warnings };
+    }
+
+    case 'cancelReservation': {
+      if (!user) return { success: false, error: 'Not logged in' };
+      const staff = isStaff(user);
+      const resv = await getEntityById(env, 'Reservation', payload?.reservation_id);
+      if (!resv) return { success: false, error: 'Reservation not found.' };
+      if (!staff) {
+        const cids = await myClientIds(env, user);
+        if (!cids.includes(resv.client_id) && resv.client_user_id !== user.id) return { success: false, error: 'Reservation not found.' };
+      }
+      if (!['reserved', 'waitlisted'].includes(resv.status)) return { success: false, error: 'This reservation can no longer be cancelled.', code: 'not_cancellable' };
+      const s = await getGymSettings(env);
+      const session = await getEntityById(env, 'ClassSession', resv.session_id);
+      const now = Date.now();
+      const start = Date.parse(session?.start_at || resv.start_at);
+      if (!staff && now >= start) return { success: false, error: 'This class has already started.', code: 'class_started' };
+      const lateCut = start - sessionRules(session || {}, s).late_h * 3600000;
+      const late = resv.status === 'reserved' && now >= lateCut && !(staff && payload?.waive_late_cancel);
+      const newStatus = late ? 'late_cancelled' : 'cancelled';
+      const ts = nowISO();
+      const res = await env.DB.prepare(
+        `UPDATE entities SET data = json_set(data, '$.status', ?, '$.cancelled_at', ?, '$.waitlist_position', NULL, '$.cancelled_by', ?), updated_date = ?
+         WHERE id = ? AND entity_type = 'Reservation' AND json_extract(data,'$.status') = ?`
+      ).bind(newStatus, ts, user.id, ts, resv.id, resv.status).run();
+      if (!res?.meta?.changes) return { success: false, error: 'This reservation just changed. Refresh and try again.', code: 'retry' };
+      await recountSession(env, resv.session_id);
+      let promoted = [];
+      if (resv.status === 'reserved' && session) {
+        promoted = await promoteWaitlist(env, await getEntityById(env, 'ClassSession', session.id), s, user);
+      }
+      await audit(env, { actor: user.email, action: 'update', target: 'Reservation', targetId: resv.id, detail: newStatus, request: null });
+      return {
+        success: true, late_cancel: late, status: newStatus, promoted: promoted.length,
+        reservation: await getEntityById(env, 'Reservation', resv.id),
+        session: await getEntityById(env, 'ClassSession', resv.session_id),
+      };
+    }
+
+    case 'checkIn': {
+      if (!user) return { success: false, error: 'Not logged in' };
+      const staff = isStaff(user);
+      const s = await getGymSettings(env);
+      let resv = null;
+      if (payload?.reservation_id && staff) resv = await getEntityById(env, 'Reservation', payload.reservation_id);
+      const session = await getEntityById(env, 'ClassSession', resv?.session_id || payload?.session_id);
+      if (!session) return { success: false, error: 'Class not found.' };
+      if (session.status !== 'scheduled') return { success: false, error: 'This class was cancelled.', code: 'class_cancelled' };
+      const who = await resolveClassClient(env, user, resv?.client_id || payload?.client_id);
+      if (who.error) return { success: false, error: who.error, code: 'no_client' };
+      const now = Date.now();
+      const w = sessionWindows(session, s);
+      if (!staff) {
+        if (now < Date.parse(w.checkin_opens_at)) return { success: false, error: `Check-in opens ${s.self_checkin_before_minutes} minutes before class.`, code: 'checkin_not_open' };
+        if (now > Date.parse(w.checkin_closes_at)) return { success: false, error: 'Check-in for this class has closed.', code: 'checkin_closed' };
+      } else if (session.date > programToday()) {
+        return { success: false, error: 'You can check people in on the day of the class.', code: 'checkin_not_open' };
+      }
+      if (!resv) {
+        const mine = await selectEntities(env, 'Reservation',
+          `json_extract(data,'$.session_id') = ? AND json_extract(data,'$.client_id') IN (${inList(who.clientIds)}) AND json_extract(data,'$.status') IN ('reserved','waitlisted','checked_in','no_show')`,
+          [session.id, ...who.clientIds]);
+        const rank = { checked_in: 0, reserved: 1, waitlisted: 2, no_show: 3 };
+        resv = mine.sort((a, b) => rank[a.status] - rank[b.status])[0] || null;
+      }
+      if (resv && resv.status === 'checked_in') return { success: true, already: true, reservation: resv, session, warnings: [] };
+      const warnings = [];
+      const override = staff && !!payload?.override;
+      if (s.waiver_required && !(await waiverStatus(env, who)).signed) {
+        if (!staff) return { success: false, error: 'Sign the liability waiver before checking in. You can find it under Documents.', code: 'waiver_required' };
+        warnings.push('No signed waiver on file.');
+      }
+      const ts = nowISO();
+      const method = staff ? 'coach' : 'self';
+      const usable = resv && (resv.status === 'reserved' || (staff && ['no_show', 'waitlisted'].includes(resv.status)));
+      if (resv && resv.status === 'waitlisted' && !staff) return { success: false, error: 'You are on the waitlist for this class.', code: 'waitlisted' };
+
+      let resultId = null;
+      if (usable) {
+        if (resv.status === 'waitlisted' && !override) {
+          const cap = capOf(session);
+          const c = await env.DB.prepare(`SELECT ${RES_SPOT_COUNT} AS n`).bind(session.id).first();
+          if (cap !== null && (c?.n || 0) >= cap) return { success: false, error: 'Class is full.', code: 'class_full', can_override: true };
+        }
+        const mem = resv.membership_id ? await getEntityById(env, 'Membership', resv.membership_id) : null;
+        const punch = !!(mem && membershipLimit(mem)?.period === 'total');
+        const stmts = [];
+        if (punch) {
+          stmts.push(punchStmt(env, mem.id, 1,
+            `SELECT 1 FROM entities WHERE id = ? AND json_extract(data,'$.status') = ?`, [resv.id, resv.status]));
+        }
+        stmts.push(env.DB.prepare(
+          `UPDATE entities SET data = json_set(data, '$.status', 'checked_in', '$.checked_in_at', ?, '$.check_in_method', ?, '$.waitlist_position', NULL, '$.punch_applied', json(?), '$.checked_in_by', ?), updated_date = ?
+           WHERE id = ? AND entity_type = 'Reservation' AND json_extract(data,'$.status') = ?`
+        ).bind(ts, method, punch ? 'true' : 'false', user.id, ts, resv.id, resv.status));
+        const out = await env.DB.batch(stmts);
+        if (!out[out.length - 1]?.meta?.changes) return { success: false, error: 'This reservation just changed. Refresh and try again.', code: 'retry' };
+        resultId = resv.id;
+      } else {
+        // No reservation: book-and-check-in (reservable), open gym, or staff walk-in.
+        const pick = await findClassMembership(env, who, session, s);
+        if (!pick.membership && !override) {
+          return { success: false, error: staff ? pick.reason.replace(/^You have/, 'This client has') : pick.reason, code: pick.code, ...(staff ? { can_override: true } : {}) };
+        }
+        if (!pick.membership) warnings.push('Checked in without a covering membership (staff override).');
+        const punch = !!(pick.membership && membershipLimit(pick.membership)?.period === 'total');
+        const data = {
+          session_id: session.id, class_type_id: session.class_type_id, class_name: session.class_type_name || '',
+          date: session.date, start_at: session.start_at,
+          client_id: who.client.id, client_user_id: who.loginId || null, client_name: who.client.full_name || '',
+          status: 'checked_in', waitlist_position: null, membership_id: pick.membership?.id || null,
+          booked_at: ts, cancelled_at: null, checked_in_at: ts,
+          check_in_method: staff ? 'walk_in' : 'self', booked_by: user.id, checked_in_by: user.id,
+          created_at_checkin: true, punch_applied: punch,
+          ...(pick.membership ? {} : { membership_override: true }),
+        };
+        const ins = reservationInsert(env, { data, createdBy: user.email, session, clientIds: who.clientIds, guard: pick.guard, mode: override ? 'force' : 'spot' });
+        const stmts = [ins.stmt];
+        if (punch) stmts.push(punchStmt(env, pick.membership.id, 1, `SELECT 1 FROM entities WHERE id = ?`, [ins.id]));
+        const out = await env.DB.batch(stmts);
+        if (!out[0]?.meta?.changes) {
+          const cap = capOf(session);
+          const c = await env.DB.prepare(`SELECT ${RES_SPOT_COUNT} AS n`).bind(session.id).first();
+          if (cap !== null && (c?.n || 0) >= cap) return { success: false, error: 'Class is full.', code: 'class_full', ...(staff ? { can_override: true } : {}) };
+          return { success: false, error: 'Could not check in. Refresh and try again.', code: 'retry' };
+        }
+        resultId = ins.id;
+      }
+      await recountSession(env, session.id);
+      await audit(env, { actor: user.email, action: 'update', target: 'Reservation', targetId: resultId, detail: 'checked_in', request: null });
+      return { success: true, reservation: await getEntityById(env, 'Reservation', resultId), session: await getEntityById(env, 'ClassSession', session.id), warnings };
+    }
+
+    case 'undoCheckIn':
+    case 'markNoShow': {
+      if (!isStaff(user)) return { success: false, error: 'Only coaches can change attendance.' };
+      let resv = payload?.reservation_id ? await getEntityById(env, 'Reservation', payload.reservation_id) : null;
+      if (!resv && payload?.session_id && payload?.client_id) {
+        const want = name === 'undoCheckIn' ? ['checked_in'] : ['reserved', 'checked_in'];
+        resv = (await selectEntities(env, 'Reservation',
+          `json_extract(data,'$.session_id') = ? AND json_extract(data,'$.client_id') = ? AND json_extract(data,'$.status') IN (${sqlStr(want)})`,
+          [payload.session_id, payload.client_id]))[0] || null;
+      }
+      if (!resv) return { success: false, error: 'Reservation not found.' };
+      const ts = nowISO();
+      let newStatus;
+      if (name === 'undoCheckIn') {
+        if (resv.status !== 'checked_in') return { success: false, error: 'This person is not checked in.', code: 'not_checked_in' };
+        newStatus = resv.created_at_checkin ? 'cancelled' : 'reserved';
+      } else {
+        if (!['reserved', 'checked_in'].includes(resv.status)) return { success: false, error: 'Only booked or checked-in reservations can be marked as a no-show.', code: 'invalid_status' };
+        const session = await getEntityById(env, 'ClassSession', resv.session_id);
+        if (session && Date.now() < Date.parse(session.start_at)) return { success: false, error: 'You can mark a no-show once the class has started.', code: 'class_not_started' };
+        newStatus = 'no_show';
+      }
+      const stmts = [];
+      if (resv.status === 'checked_in' && resv.punch_applied && resv.membership_id) {
+        stmts.push(punchStmt(env, resv.membership_id, -1,
+          `SELECT 1 FROM entities WHERE id = ? AND json_extract(data,'$.status') = 'checked_in'`, [resv.id]));
+      }
+      const extra = newStatus === 'no_show' ? `, '$.no_show_at', '${ts}'` : newStatus === 'cancelled' ? `, '$.cancelled_at', '${ts}'` : '';
+      stmts.push(env.DB.prepare(
+        `UPDATE entities SET data = json_set(data, '$.status', ?, '$.checked_in_at', NULL, '$.punch_applied', json('false')${extra}), updated_date = ?
+         WHERE id = ? AND entity_type = 'Reservation' AND json_extract(data,'$.status') = ?`
+      ).bind(newStatus, ts, resv.id, resv.status));
+      const out = await env.DB.batch(stmts);
+      if (!out[out.length - 1]?.meta?.changes) return { success: false, error: 'This reservation just changed. Refresh and try again.', code: 'retry' };
+      await recountSession(env, resv.session_id);
+      await audit(env, { actor: user.email, action: 'update', target: 'Reservation', targetId: resv.id, detail: newStatus, request: null });
+      return { success: true, reservation: await getEntityById(env, 'Reservation', resv.id), session: await getEntityById(env, 'ClassSession', resv.session_id) };
+    }
+
+    case 'cancelClassSession': {
+      if (!isStaff(user)) return { success: false, error: 'Only coaches can cancel a class.' };
+      const session = await getEntityById(env, 'ClassSession', payload?.session_id);
+      if (!session) return { success: false, error: 'Class not found.' };
+      if (session.status === 'cancelled') return { success: false, error: 'This class is already cancelled.' };
+      const reason = String(payload?.reason || '').trim().slice(0, 300) || null;
+      const res = await env.DB.prepare(
+        `UPDATE entities SET data = json_set(data, '$.status', 'cancelled', '$.cancel_reason', ?, '$.cancelled_at', ?, '$.cancelled_by', ?, '$.auto_cancelled', json('false')), updated_date = ?
+         WHERE id = ? AND entity_type = 'ClassSession' AND json_extract(data,'$.status') != 'cancelled'`
+      ).bind(reason, nowISO(), user.id, nowISO(), session.id).run();
+      if (!res?.meta?.changes) return { success: false, error: 'This class is already cancelled.' };
+      const fresh = await getEntityById(env, 'ClassSession', session.id);
+      const r = await cancelSessionReservations(env, fresh, user, reason);
+      await audit(env, { actor: user.email, action: 'update', target: 'ClassSession', targetId: session.id, detail: `cancelled; ${r.affected} reservations`, request: null });
+      return { success: true, session: await getEntityById(env, 'ClassSession', session.id), affected: r.affected, notified: r.notified };
+    }
+
+    case 'classTick': {
+      if (!isStaff(user)) return { success: false, error: 'Only coaches can run this.' };
+      return runClassTick(env);
     }
 
     // Content browse helpers — empty until curated content sources are added.
@@ -2949,6 +3986,8 @@ export async function onRequest(context) {
               ).bind(fields.email, fields.trainer_id).first();
               if (dup) return err(`${fields.email} is already one of your clients.`, 409, { code: 'duplicate_client', id: dup.id });
             }
+            if (type === 'ClassSession' && isStaff(user)) await normalizeClassSession(env, fields, null);
+            if (type === 'Membership' && isStaff(user)) await normalizeMembership(env, fields);
             prepared.push(fields);
           }
           for (const fields of prepared) {
@@ -2959,6 +3998,10 @@ export async function onRequest(context) {
             ).bind(eid, type, JSON.stringify(fields), user.email || user.id, now, now).run();
             created.push({ ...fields, id: eid, created_by: user.email || user.id, created_date: now, updated_date: now });
             await audit(env, { actor: user.email, action: 'create', target: type, targetId: eid, request });
+            if (CLASS_HOOK_TYPES.has(type)) {
+              const sync = await afterClassEntityWrite(env, type, eid, { ...fields, created_by: user.email || user.id }, null, user);
+              if (sync) created[created.length - 1].class_sync = sync;
+            }
             if (type === 'Notification') {
               const p = pushForNotification(env, user, fields);
               if (env.__waitUntil) env.__waitUntil(p); else await p;
@@ -2987,11 +4030,17 @@ export async function onRequest(context) {
           const violation = await memberWriteViolation(env, user, type, fields, data);
           if (violation) return err(violation, 403);
           if (sharedWriteDenied(type, row, user, fields)) return err('Only the author can edit this.', 403);
+          if (type === 'ClassSession' && isStaff(user)) await normalizeClassSession(env, fields, data);
           const merged = { ...data, ...fields };
           const now = nowISO();
           await env.DB.prepare('UPDATE entities SET data=?, updated_date=? WHERE id=?')
             .bind(JSON.stringify(merged), now, id).run();
           await audit(env, { actor: user.email, action: 'update', target: type, targetId: id, request });
+          if (CLASS_HOOK_TYPES.has(type)) {
+            const sync = await afterClassEntityWrite(env, type, id, { ...merged, created_by: row.created_by }, data, user);
+            const fresh = type === 'ClassSession' ? await getEntityById(env, 'ClassSession', id) : null;
+            return json({ ...(fresh || { ...merged, id, created_by: row.created_by, created_date: row.created_date, updated_date: now }), ...(sync ? { class_sync: sync } : {}) });
+          }
           return json({ ...merged, id, created_by: row.created_by, created_date: row.created_date, updated_date: now });
         }
         if (method === 'DELETE') {
@@ -3013,6 +4062,11 @@ export async function onRequest(context) {
           }
           await env.DB.prepare('DELETE FROM entities WHERE id=? AND entity_type=?').bind(id, type).run();
           await audit(env, { actor: user.email, action: 'delete', target: type, targetId: id, request });
+          if (CLASS_HOOK_TYPES.has(type) && type !== 'ClassSession') {
+            let prev = {}; try { prev = JSON.parse(row.data || '{}'); } catch { /* ignore */ }
+            const sync = await afterClassEntityWrite(env, type, id, null, { ...prev, created_by: row.created_by }, user);
+            return json({ success: true, ...(sync ? { class_sync: sync } : {}) });
+          }
           return json({ success: true });
         }
       }
@@ -3184,7 +4238,10 @@ export async function onRequest(context) {
       let diff = given.length === secret.length ? 0 : 1;
       for (let i = 0; i < Math.min(given.length, secret.length); i++) diff |= given.charCodeAt(i) ^ secret.charCodeAt(i);
       if (!secret || diff !== 0) return err('Unauthorized.', 401);
-      return json(await runProgramTick(env, {}));
+      const programs = await runProgramTick(env, {});
+      let classes;
+      try { classes = await runClassTick(env); } catch (e) { classes = { success: false, error: String(e?.message || e).slice(0, 200) }; }
+      return json({ ...programs, classes });
     }
 
     if (segs[0] === 'functions') {
