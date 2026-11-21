@@ -5,7 +5,10 @@ import { dayNumberFor, dateForDay, todayKey, addDays, fromKey } from "@/lib/prog
 
 export async function invoke(name, payload) {
   const res = await base44.functions.invoke(name, payload);
-  return res?.data;
+  const data = res?.data;
+  // Rule failures come back as 200 { success: false, error }: surface them.
+  if (data && data.success === false) throw new Error(data.error || "Something went wrong. Try again.");
+  return data;
 }
 
 export const errorMessage = (e, fallback = "Something went wrong. Try again.") =>

@@ -39,6 +39,7 @@ import SessionForm from "@/components/sessions/SessionForm";
 import WorkoutForm from "@/components/workouts/WorkoutForm";
 import MealPlanForm from "@/components/meals/MealPlanForm";
 import GoogleSheetsImporter from "@/components/imports/GoogleSheetsImporter";
+import EnrollDialog from "@/components/programs/client/EnrollDialog";
 import { cn } from "@/lib/utils";
 import EmptyState from "@/components/ui/empty-state";
 import SkeletonList from "@/components/ui/skeleton-list";
@@ -58,6 +59,8 @@ export default function Clients() {
   const [editingClient, setEditingClient] = useState(null);
   const [selectedClient, setSelectedClient] = useState(null);
   const [deleteClient, setDeleteClient] = useState(null);
+  const [assignFor, setAssignFor] = useState(null);
+  const [scope, setScope] = useState(null); // "mine" | "all"; null = decide once clients load
 
   const queryClient = useQueryClient();
 
@@ -127,7 +130,12 @@ export default function Clients() {
     queryClient.invalidateQueries({ queryKey: ["mealplans"] });
   };
 
+  const myCount = clients.filter((c) => c.trainer_id && c.trainer_id === user?.id).length;
+  // Default to the coach's own clients when they have any.
+  const effectiveScope = scope || (myCount > 0 ? "mine" : "all");
+
   const filteredClients = clients.filter(client => {
+    if (effectiveScope === "mine" && client.trainer_id !== user?.id) return false;
     const matchesSearch = client.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       client.email?.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === "all" || client.status === statusFilter;
@@ -172,7 +180,15 @@ export default function Clients() {
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <div className="flex bg-secondary border border-border rounded-lg p-1">
+            {[["mine", `My clients (${myCount})`], ["all", `All (${clients.length})`]].map(([k, label]) => (
+              <button key={k} type="button" onClick={() => setScope(k)}
+                className={cn("px-3 h-8 rounded-md text-sm text-muted-foreground hover:text-foreground", effectiveScope === k && "bg-background text-foreground shadow-sm")}>
+                {label}
+              </button>
+            ))}
+          </div>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="flex-1 sm:w-[140px]">
               <Filter className="w-4 h-4 mr-2" />
@@ -224,14 +240,15 @@ export default function Clients() {
               onSchedule={(c) => { setSelectedClient(c); setShowSessionForm(true); }}
               onWorkout={(c) => { setSelectedClient(c); setShowWorkoutForm(true); }}
               onMealPlan={(c) => { setSelectedClient(c); setShowMealPlanForm(true); }}
+              onAssignProgram={(c) => setAssignFor(c)}
             />
           ))}
         </div>
       ) : (
         <EmptyState
           icon={Users}
-          filtered={!!searchQuery || statusFilter !== "all"}
-          onClearFilters={() => { setSearchQuery(""); setStatusFilter("all"); }}
+          filtered={!!searchQuery || statusFilter !== "all" || (effectiveScope === "mine" && clients.length > 0)}
+          onClearFilters={() => { setSearchQuery(""); setStatusFilter("all"); setScope("all"); }}
           title="Add your first client"
           description="Clients get their own portal where they see the plans you assign and log their training."
           actionLabel="Onboard a client"
@@ -283,6 +300,14 @@ export default function Clients() {
         plan={selectedClient ? { client_id: selectedClient.id } : null}
         clients={clients}
         onSubmit={handleCreateMealPlan}
+      />
+
+      <EnrollDialog
+        open={!!assignFor}
+        onOpenChange={(o) => !o && setAssignFor(null)}
+        clientId={assignFor?.id}
+        client={assignFor}
+        onEnrolled={() => queryClient.invalidateQueries({ queryKey: ["programEnrollments"] })}
       />
 
       <GoogleSheetsImporter

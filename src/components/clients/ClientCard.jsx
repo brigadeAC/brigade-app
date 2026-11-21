@@ -9,7 +9,7 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
-import { Mail, Phone, MoreVertical, Edit, Trash2, Calendar, Dumbbell, Eye, ClipboardList, Utensils, BookOpen } from "lucide-react";
+import { Mail, Phone, MoreVertical, Edit, Trash2, Calendar, Dumbbell, Eye, ClipboardList, Utensils, BookOpen, GraduationCap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createPageUrl } from "@/utils";
 
@@ -19,7 +19,7 @@ const statusStyles = {
   paused: "bg-amber-100 text-amber-700 border-amber-200"
 };
 
-export default function ClientCard({ client, onEdit, onDelete, onSchedule, onWorkout, onMealPlan, onEditOnboarding }) {
+export default function ClientCard({ client, onEdit, onDelete, onSchedule, onWorkout, onMealPlan, onEditOnboarding, onAssignProgram }) {
   const navigate = useNavigate();
   return (
     <div 
@@ -69,33 +69,38 @@ export default function ClientCard({ client, onEdit, onDelete, onSchedule, onWor
             <Button 
               variant="ghost" 
               size="icon" 
-              className="opacity-0 group-hover:opacity-100 transition-opacity"
-              onClick={(e) => e.preventDefault()}
+              className="sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
             >
               <MoreVertical className="w-4 h-4" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuItem onClick={(e) => { e.preventDefault(); onSchedule?.(client); }} className="gap-2">
+          <DropdownMenuContent align="end" className="w-48" onClick={(e) => e.stopPropagation()}>
+            {onAssignProgram && (
+              <DropdownMenuItem onClick={(e) => { e.preventDefault(); e.stopPropagation(); onAssignProgram(client); }} className="gap-2">
+                <GraduationCap className="w-4 h-4" /> Assign Program
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuItem onClick={(e) => { e.preventDefault(); e.stopPropagation(); onSchedule?.(client); }} className="gap-2">
               <Calendar className="w-4 h-4" /> Schedule Session
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={(e) => { e.preventDefault(); onWorkout?.(client); }} className="gap-2">
+            <DropdownMenuItem onClick={(e) => { e.preventDefault(); e.stopPropagation(); onWorkout?.(client); }} className="gap-2">
               <Dumbbell className="w-4 h-4" /> Create Workout
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={(e) => { e.preventDefault(); onMealPlan?.(client); }} className="gap-2">
+            <DropdownMenuItem onClick={(e) => { e.preventDefault(); e.stopPropagation(); onMealPlan?.(client); }} className="gap-2">
               <Utensils className="w-4 h-4" /> Create Meal Plan
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={(e) => { e.preventDefault(); navigate(createPageUrl("ClientNotebooks") + "?clientId=" + client.id); }} className="gap-2">
+            <DropdownMenuItem onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigate(createPageUrl("ClientNotebooks") + "?clientId=" + client.id); }} className="gap-2">
               <BookOpen className="w-4 h-4" /> Open Notebook
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={(e) => { e.preventDefault(); onEditOnboarding?.(client); }} className="gap-2">
+            <DropdownMenuItem onClick={(e) => { e.preventDefault(); e.stopPropagation(); onEditOnboarding?.(client); }} className="gap-2">
               <ClipboardList className="w-4 h-4" /> Edit Onboarding
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={(e) => { e.preventDefault(); onEdit?.(client); }} className="gap-2">
+            <DropdownMenuItem onClick={(e) => { e.preventDefault(); e.stopPropagation(); onEdit?.(client); }} className="gap-2">
               <Edit className="w-4 h-4" /> Edit Client
             </DropdownMenuItem>
             {onDelete && (
-              <DropdownMenuItem onClick={(e) => { e.preventDefault(); onDelete(client); }} className="gap-2 text-red-600 focus:text-red-600">
+              <DropdownMenuItem onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(client); }} className="gap-2 text-red-600 focus:text-red-600">
                 <Trash2 className="w-4 h-4" /> Delete
               </DropdownMenuItem>
             )}
