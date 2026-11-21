@@ -43,3 +43,4 @@ dist-ssr
 # Exported third-party content library: local only (repo is public)
 content/hsn/
 content/coachcatalyst/
+content/wodify/
