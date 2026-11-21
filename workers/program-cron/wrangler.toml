@@ -1,5 +1,5 @@
 # Standalone Worker that triggers program message delivery every 15 minutes.
-# Deploy from this folder: npx wrangler deploy
+# Deploy from this folder: npx wrangler deploy --config wrangler.toml
 name = "brigade-program-cron"
 main = "index.js"
 compatibility_date = "2026-07-01"

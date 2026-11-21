@@ -11,11 +11,12 @@ in the app.
 Pick a long random secret (for example `openssl rand -hex 32`) and use the
 **same value** in both places.
 
-From this folder (`workers/program-cron`):
+From this folder (`workers/program-cron`). Pass `--config wrangler.toml` every time; without it
+wrangler picks up the Pages app's `wrangler.jsonc` one folder up and refuses:
 
 ```sh
-npx wrangler deploy
-npx wrangler secret put CRON_SECRET
+npx wrangler deploy --config wrangler.toml
+npx wrangler secret put CRON_SECRET --config wrangler.toml
 ```
 
 Then give the Pages app the same secret (from anywhere in the repo):
@@ -30,7 +31,7 @@ The Pages secret takes effect on the next Pages deploy
 ## Checking it
 
 ```sh
-npx wrangler tail brigade-program-cron
+npx wrangler tail brigade-program-cron --config wrangler.toml
 ```
 
 Each run logs `program-tick ok: {"success":true,"enrollments":N,"sent":N,...}`.
