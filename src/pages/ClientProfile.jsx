@@ -1273,7 +1273,8 @@ export default function ClientProfile() {
             open={showFitnessProgramForm}
             onOpenChange={setShowFitnessProgramForm}
             program={editingFitnessProgram}
-            clients={[client]}
+            clients={client ? [client] : []}
+            defaultClientId={clientId}
             onSubmit={handleSubmitFitnessProgram} 
           />
 

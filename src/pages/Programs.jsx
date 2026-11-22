@@ -12,9 +12,10 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  Plus, Search, MoreVertical, Pencil, Copy, Archive, ArchiveRestore, Eye, EyeOff, LayoutGrid, Users, ImagePlus, X,
+  Plus, Search, MoreVertical, Pencil, Copy, Archive, ArchiveRestore, Eye, EyeOff, LayoutGrid, Users, ImagePlus, X, UserPlus,
 } from "lucide-react";
 import { toast } from "sonner";
+import EnrollClientsDialog from "@/components/programs/EnrollClientsDialog";
 import { TYPE_ORDER, TYPE_STYLES, typeEmoji, typeLabel, countByType, stripSystem } from "@/components/programs/builder/itemMeta";
 
 const EMPTY = { name: "", description: "", duration_weeks: 4, kind: "program", cover_image_url: "" };
@@ -28,6 +29,7 @@ export default function Programs() {
   const [editing, setEditing] = useState(null); // { program|null, value }
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState(null);
+  const [enrollFor, setEnrollFor] = useState(null);
 
   const { data: programs = [], isLoading } = useQuery({
     queryKey: ["programs"],
@@ -238,6 +240,11 @@ export default function Programs() {
                   </div>
                 </div>
               </button>
+              {p.status === "published" && !p.is_archived && (
+                <Button type="button" size="sm" variant="outline" onClick={() => setEnrollFor(p)} className="h-fit gap-1.5 shrink-0">
+                  <UserPlus className="w-4 h-4" /> <span className="hidden sm:inline">Enroll clients</span><span className="sm:hidden">Enroll</span>
+                </Button>
+              )}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button type="button" aria-label={`Actions for ${p.name}`} disabled={busyId === p.id}
@@ -246,6 +253,9 @@ export default function Programs() {
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                  {p.status === "published" && !p.is_archived && (
+                    <DropdownMenuItem onClick={() => setEnrollFor(p)}><UserPlus className="w-4 h-4 mr-2" /> Enroll clients</DropdownMenuItem>
+                  )}
                   <DropdownMenuItem onClick={() => openBuilder(p)}><LayoutGrid className="w-4 h-4 mr-2" /> Open builder</DropdownMenuItem>
                   <DropdownMenuItem onClick={() => openEdit(p)}><Pencil className="w-4 h-4 mr-2" /> Edit details</DropdownMenuItem>
                   <DropdownMenuItem onClick={() => duplicate(p)}><Copy className="w-4 h-4 mr-2" /> Duplicate</DropdownMenuItem>
@@ -266,6 +276,14 @@ export default function Programs() {
           );
         })}
       </div>
+
+      <EnrollClientsDialog
+        program={enrollFor}
+        open={!!enrollFor}
+        onOpenChange={(o) => !o && setEnrollFor(null)}
+        enrollments={enrollments}
+        onDone={() => queryClient.invalidateQueries({ queryKey: ["programEnrollments"] })}
+      />
 
       <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">

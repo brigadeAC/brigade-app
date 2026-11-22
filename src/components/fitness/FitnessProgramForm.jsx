@@ -222,7 +222,7 @@ export default function FitnessProgramForm({ open, onOpenChange, program, client
 
   // Opened from a client's profile: start the new program for that client.
   useEffect(() => {
-    if (open && !program && defaultClientId && clients?.some((c) => c.id === defaultClientId)) {
+    if (open && !program && defaultClientId && !formData.client_id && clients?.some((c) => c.id === defaultClientId)) {
       pickClient(defaultClientId);
     }
   }, [open, program, defaultClientId, clients]);
@@ -240,12 +240,12 @@ export default function FitnessProgramForm({ open, onOpenChange, program, client
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent 
         onInteractOutside={(e) => e.preventDefault()}
-        className="glass-card max-w-5xl max-h-[90vh] overflow-y-auto border-border text-foreground p-6 bg-background"
+        className="glass-card w-[calc(100vw-1rem)] sm:w-full max-w-5xl max-h-[90vh] overflow-y-auto overflow-x-hidden [&>*]:min-w-0 border-border text-foreground p-4 sm:p-6 bg-background"
       >
         <DialogHeader>
           <DialogTitle className="text-xl font-bold text-foreground">Fitness Training Program</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6 min-w-0">
           {/* Header Info */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 bg-secondary border border-border rounded-xl">
             <div className="space-y-1">
@@ -342,7 +342,7 @@ export default function FitnessProgramForm({ open, onOpenChange, program, client
             </TabsContent>
           </Tabs>
 
-          <div className="flex justify-end gap-3 pt-4 border-t border-border">
+          <div className="sticky -bottom-4 sm:-bottom-6 z-10 -mx-4 sm:-mx-6 px-4 sm:px-6 py-3 flex justify-end gap-3 border-t border-border bg-background">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="border-border text-foreground hover:bg-accent">Cancel</Button>
             <Button type="submit" disabled={isLoading} className="bg-gradient-to-r from-[#4B91DD] to-[#4B91DD] text-black font-bold border-none hover:opacity-90">
               {isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
