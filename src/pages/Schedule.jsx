@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { gymToday } from "@/lib/programs";
 import { 
   format, 
   startOfWeek, 
@@ -8,8 +9,7 @@ import {
   eachDayOfInterval, 
   isSameDay,
   addWeeks,
-  subWeeks,
-  isToday
+  subWeeks
 } from "date-fns";
 import { 
   ChevronLeft, 
@@ -49,7 +49,7 @@ const typeColors = {
 
 export default function Schedule() {
   const [user, setUser] = useState(null);
-  const [currentWeek, setCurrentWeek] = useState(new Date());
+  const [currentWeek, setCurrentWeek] = useState(gymToday);
   const [showSessionForm, setShowSessionForm] = useState(false);
   const [editingSession, setEditingSession] = useState(null);
   const [selectedDate, setSelectedDate] = useState(null);
@@ -145,7 +145,7 @@ export default function Schedule() {
           <h2 className="text-sm sm:text-lg font-semibold text-foreground text-center">
             {format(weekStart, "MMM d")} – {format(weekEnd, "MMM d, yyyy")}
           </h2>
-          <Button variant="outline" size="sm" onClick={() => setCurrentWeek(new Date())}>
+          <Button variant="outline" size="sm" onClick={() => setCurrentWeek(gymToday())}>
             Today
           </Button>
         </div>
@@ -155,10 +155,10 @@ export default function Schedule() {
           {weekDays.map((day) => {
             const daySessions = getSessionsForDay(day);
             return (
-              <div key={day.toISOString()} className={cn("rounded-xl overflow-hidden", isToday(day) ? "ring-1 ring-primary/40" : "")}>
-                <div className={cn("flex items-center justify-between px-3 py-2", isToday(day) ? "bg-primary/15" : "bg-secondary")}>
+              <div key={day.toISOString()} className={cn("rounded-xl overflow-hidden", isSameDay(day, gymToday()) ? "ring-1 ring-primary/40" : "")}>
+                <div className={cn("flex items-center justify-between px-3 py-2", isSameDay(day, gymToday()) ? "bg-primary/15" : "bg-secondary")}>
                   <div className="flex items-center gap-3">
-                    <p className={cn("text-base font-bold", isToday(day) ? "text-primary" : "text-foreground")}>{format(day, "d")}</p>
+                    <p className={cn("text-base font-bold", isSameDay(day, gymToday()) ? "text-primary" : "text-foreground")}>{format(day, "d")}</p>
                     <p className="text-sm text-muted-foreground">{format(day, "EEEE")}</p>
                   </div>
                   <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground hover:text-foreground" onClick={() => { setSelectedDate(format(day, "yyyy-MM-dd")); setShowSessionForm(true); }}>
@@ -206,13 +206,13 @@ export default function Schedule() {
           {weekDays.map((day) => (
             <div key={day.toISOString()} className="text-center pb-2 border-b border-border">
               <p className="text-xs font-medium text-muted-foreground">{format(day, "EEE")}</p>
-              <p className={cn("text-lg font-semibold mt-1", isToday(day) ? "text-primary" : "text-foreground")}>{format(day, "d")}</p>
+              <p className={cn("text-lg font-semibold mt-1", isSameDay(day, gymToday()) ? "text-primary" : "text-foreground")}>{format(day, "d")}</p>
             </div>
           ))}
           {weekDays.map((day) => {
             const daySessions = getSessionsForDay(day);
             return (
-              <div key={day.toISOString()} className={cn("min-h-[300px] p-2 rounded-xl transition-colors", isToday(day) ? "bg-primary/10" : "bg-secondary", "hover:bg-accent")}>
+              <div key={day.toISOString()} className={cn("min-h-[300px] p-2 rounded-xl transition-colors", isSameDay(day, gymToday()) ? "bg-primary/10" : "bg-secondary", "hover:bg-accent")}>
                 {daySessions.map((session) => {
                   const client = getClientById(session.client_id);
                   return (

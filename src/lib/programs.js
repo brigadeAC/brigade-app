@@ -36,6 +36,9 @@ export const todayKey = (now = new Date()) => {
   return `${p.year}-${p.month}-${p.day}`;
 };
 
+// Today at the gym as a calendar Date (local midnight), for calendars and formatting.
+export const gymToday = () => fromKey(todayKey());
+
 export const addDays = (key, n) => {
   const d = fromKey(key);
   d.setDate(d.getDate() + n);

@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { format, subDays } from "date-fns";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
 import { useMediaQuery } from "@/components/hooks/use-media-query";
+import { todayKey, gymToday } from "@/lib/programs";
 
 const HABIT_ICONS = {
   water_intake: Droplets,
@@ -87,7 +88,7 @@ export default function HabitTracker({ clientId, trainerId, readOnly = false }) 
   });
 
   const toggleHabitToday = (habit) => {
-    const todayStr = format(new Date(), 'yyyy-MM-dd');
+    const todayStr = todayKey();
     const existingLog = habitLogs.find(l => l.habit_id === habit.id && l.date === todayStr);
     
     if (existingLog) {
@@ -138,7 +139,7 @@ export default function HabitTracker({ clientId, trainerId, readOnly = false }) 
 
   const getHabitCompliance = (habit) => {
     const last7Days = Array.from({ length: 7 }, (_, i) => 
-      format(subDays(new Date(), i), 'yyyy-MM-dd')
+      format(subDays(gymToday(), i), 'yyyy-MM-dd')
     );
     
     const logsForHabit = habitLogs.filter(log => 
@@ -279,7 +280,7 @@ export default function HabitTracker({ clientId, trainerId, readOnly = false }) 
             const Icon = HABIT_ICONS[habit.type] || Check;
             const compliance = getHabitCompliance(habit);
 
-            const todayStr = format(new Date(), 'yyyy-MM-dd');
+            const todayStr = todayKey();
             const isCompletedToday = habitLogs.some(l => l.habit_id === habit.id && l.date === todayStr && l.completed);
 
             return (
@@ -312,12 +313,12 @@ export default function HabitTracker({ clientId, trainerId, readOnly = false }) 
                         <div className="flex items-center gap-2">
                           {isCompletedToday && (
                             <span className="text-xs text-primary bg-primary/10 px-2 py-1 rounded font-medium max-w-[200px] truncate" title={(() => {
-                                const log = habitLogs.find(l => l.habit_id === habit.id && l.date === format(new Date(), 'yyyy-MM-dd'));
+                                const log = habitLogs.find(l => l.habit_id === habit.id && l.date === todayKey());
                                 return log?.notes ? log.notes : 'Completed';
                               })()}>
                               ✓ Done
                               {(() => {
-                                const log = habitLogs.find(l => l.habit_id === habit.id && l.date === format(new Date(), 'yyyy-MM-dd'));
+                                const log = habitLogs.find(l => l.habit_id === habit.id && l.date === todayKey());
                                 return log?.notes ? ` - ${log.notes}` : '';
                               })()}
                             </span>

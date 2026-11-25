@@ -2,6 +2,8 @@ import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ResponsiveLine } from "@nivo/line";
 import { DollarSign } from "lucide-react";
+import { gymToday } from "@/lib/programs";
+import { parseLocalDate } from "@/lib/utils";
 
 const nivoTheme = {
   background: "transparent",
@@ -28,7 +30,7 @@ const nivoTheme = {
 export default function RevenueChart({ payments }) {
   const monthlyRevenue = payments.reduce((acc, payment) => {
     if (payment.status === "completed") {
-      const date = new Date(payment.paid_date || payment.updated_date || payment.created_date || new Date());
+      const date = parseLocalDate(payment.paid_date || payment.updated_date || payment.created_date || new Date());
       const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
       if (!acc[monthKey]) acc[monthKey] = { month: monthKey, revenue: 0 };
       acc[monthKey].revenue += payment.amount || 0;
@@ -40,7 +42,7 @@ export default function RevenueChart({ payments }) {
     .sort((a, b) => a.month.localeCompare(b.month))
     .slice(-6)
     .map(item => ({
-      x: new Date(item.month + "-01").toLocaleDateString("en-US", { month: "short" }),
+      x: parseLocalDate(item.month + "-01").toLocaleDateString("en-US", { month: "short" }),
       y: item.revenue,
     }));
 
@@ -48,8 +50,8 @@ export default function RevenueChart({ payments }) {
   const thisMonthRevenue = payments
     .filter(p => {
       if (p.status !== "completed") return false;
-      const date = new Date(p.paid_date || p.updated_date || p.created_date || new Date());
-      const now = new Date();
+      const date = parseLocalDate(p.paid_date || p.updated_date || p.created_date || new Date());
+      const now = gymToday();
       return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
     })
     .reduce((sum, p) => sum + (p.amount || 0), 0);

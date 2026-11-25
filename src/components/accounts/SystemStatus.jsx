@@ -1,4 +1,6 @@
-import React from "react";
+import React, { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { accountCall } from "./api";
 
@@ -12,6 +14,14 @@ const Row = ({ ok, label, text }) => (
 );
 
 export default function SystemStatus() {
+  const [testing, setTesting] = useState(false);
+  const [testError, setTestError] = useState("");
+  const sendTest = async () => {
+    setTesting(true); setTestError("");
+    try { toast.success(`Test email sent to ${(await accountCall("sendTestEmail")).to}.`); }
+    catch (e) { setTestError(e.message); }
+    finally { setTesting(false); }
+  };
   const { data, error } = useQuery({ queryKey: ["systemStatus"], queryFn: () => accountCall("systemStatus"), refetchInterval: 60000, retry: false });
   if (error) return <p className="text-sm text-red-600">{error.message}</p>;
   if (!data) return null;
@@ -20,6 +30,8 @@ export default function SystemStatus() {
       <h2 className="text-base font-semibold text-foreground">System status</h2>
       <Row ok={data.cron_ok} label="Scheduled job" text={data.cron_last_ok ? `last ran ${when(data.cron_last_ok)}` : "hasn't reported yet"} />
       <Row ok={data.email_enabled} label="Email" text={data.email_enabled ? "connected" : "not connected"} />
+      {data.email_enabled && <Button size="sm" variant="outline" disabled={testing} onClick={sendTest}>{testing ? "Sending" : "Send me a test email"}</Button>}
+      {testError && <p role="alert" className="text-sm text-red-600">{testError}</p>}
       <Row ok={data.errors.length === 0} label="Errors, last 30 days" text={data.errors.length ? `${data.errors.length} different` : "none"} />
       {data.errors.length > 0 && (
         <ul className="divide-y divide-border rounded-lg border border-border">

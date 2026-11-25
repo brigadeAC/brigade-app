@@ -1,6 +1,7 @@
 import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { parseLocalDate } from "@/lib/utils";
 import {
   User,
   Activity,
@@ -43,7 +44,7 @@ export default function OnboardingResponses({ onboarding }) {
             <div className="flex items-center justify-between">
               <span className="text-sm text-slate-500">Completed</span>
               <span className="font-medium">
-                {new Date(onboarding.completed_date).toLocaleDateString()}
+                {parseLocalDate(onboarding.completed_date).toLocaleDateString()}
               </span>
             </div>
           )}

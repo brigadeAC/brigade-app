@@ -2,13 +2,14 @@ import React from "react";
 import { parseLocalDate } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import { gymToday } from "@/lib/programs";
 
 const COLORS = ['#4B91DD', '#4B91DD', '#4B91DD', '#f59e0b', '#ef4444'];
 
 export function ClientActivityChart({ sessions, clients }) {
   // Group sessions by week
   const last8Weeks = [];
-  const today = new Date();
+  const today = gymToday();
   
   for (let i = 7; i >= 0; i--) {
     const weekStart = new Date(today);
@@ -93,7 +94,7 @@ export function SessionTypeChart({ sessions }) {
 
 export function CompletionRateChart({ sessions }) {
   const last4Weeks = [];
-  const today = new Date();
+  const today = gymToday();
   
   for (let i = 3; i >= 0; i--) {
     const weekStart = new Date(today);

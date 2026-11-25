@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
+import { todayKey } from "@/lib/programs";
 import {
   Dialog,
   DialogContent,
@@ -248,7 +249,7 @@ export default function ClientWorkouts() {
       workout_plan_id: workout.id,
       day: sessionDay,
       client_id: clientProfile.id,
-      date: new Date().toLocaleDateString('sv-SE'),
+      date: todayKey(),
       exercises: dayExercises.map(ex => ({
         name: ex.name,
         target_sets: ex.sets || 3,
@@ -307,7 +308,7 @@ export default function ClientWorkouts() {
       const response = await base44.functions.invoke('syncWorkoutToCalendar', {
         workoutPlan: workout,
         clientEmail: user.email,
-        scheduledDate: new Date().toLocaleDateString('sv-SE'),
+        scheduledDate: todayKey(),
         startTime: '09:00'
       });
 
@@ -324,7 +325,6 @@ export default function ClientWorkouts() {
     }
   };
 
-  const today = new Date().getDate();
   const activeWorkouts = workoutPlans.filter(w => w.status === 'active');
   // Show all active workouts (not filtered by today's day) so client always sees their plans
   const todayWorkouts = activeWorkouts.length > 0 ? activeWorkouts : workoutPlans.filter(w => w.status !== 'archived');

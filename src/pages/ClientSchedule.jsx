@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { gymToday } from "@/lib/programs";
 import {
   Calendar as CalendarIcon,
   Clock,
@@ -16,7 +17,7 @@ import {
   Video } from
 "lucide-react";
 import VideoCallRoom from "@/components/video/VideoCallRoom";
-import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, isToday } from "date-fns";
+import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay } from "date-fns";
 
 const sessionTypeColors = {
   personal_training: "bg-primary/10 text-primary border-primary/20",
@@ -43,8 +44,8 @@ const statusIcons = {
 export default function ClientSchedule() {
   const [user, setUser] = useState(null);
   const [clientProfile, setClientProfile] = useState(null);
-  const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [currentMonth, setCurrentMonth] = useState(gymToday);
+  const [selectedDate, setSelectedDate] = useState(gymToday);
   const [videoCallOpen, setVideoCallOpen] = useState(false);
   const [activeRoomId, setActiveRoomId] = useState(null);
 
@@ -101,8 +102,7 @@ export default function ClientSchedule() {
   const selectedDateSessions = getSessionsForDate(selectedDate);
   const upcomingSessions = sessions.filter((s) => {
     const sessionDate = new Date(s.date + 'T00:00:00');
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = gymToday();
     return s.status === 'scheduled' && sessionDate >= today;
   }).slice(0, 5);
 
@@ -149,7 +149,7 @@ export default function ClientSchedule() {
                 {daysInMonth.map((day) => {
                   const daySessions = getSessionsForDate(day);
                   const isSelected = isSameDay(day, selectedDate);
-                  const isCurrentDay = isToday(day);
+                  const isCurrentDay = isSameDay(day, gymToday());
 
                   return (
                     <button
@@ -240,7 +240,7 @@ export default function ClientSchedule() {
       <Card className="glass-card border-border">
         <CardHeader>
           <CardTitle className="text-foreground">
-            {isToday(selectedDate) ? 'Today' : format(selectedDate, 'EEEE, MMMM d, yyyy')}
+            {isSameDay(selectedDate, gymToday()) ? 'Today' : format(selectedDate, 'EEEE, MMMM d, yyyy')}
           </CardTitle>
         </CardHeader>
         <CardContent>

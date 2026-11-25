@@ -22,13 +22,11 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { calculateHabitStreak, parseLocalDate } from "@/lib/utils";
 import { isLogDone } from "@/lib/habitLibrary";
-import { isScheduledOn } from "@/lib/programs";
+import { isScheduledOn, todayKey, gymToday } from "@/lib/programs";
 import ClientTodayCard from "@/components/programs/client/ClientTodayCard";
 import NextClassCard from "@/components/classes/member/NextClassCard";
 
-// Local calendar date (matches the Habits page). UTC would roll over to
-// "tomorrow" in the evening for US time zones.
-const todayStr = () => new Date().toLocaleDateString("sv-SE");
+const todayStr = todayKey;
 
 function greeting() {
   const h = new Date().getHours();
@@ -184,8 +182,8 @@ export default function ClientDashboard() {
   const habitsDoneToday = habits.filter(habitDoneToday).length;
 
   const workoutsThisWeek = workoutLogs.filter((l) => {
-    const d = new Date(l.date || l.created_date);
-    const now = new Date();
+    const d = parseLocalDate(l.date || l.created_date);
+    const now = gymToday();
     const weekStart = new Date(now);
     weekStart.setDate(now.getDate() - ((now.getDay() + 6) % 7)); // Monday
     weekStart.setHours(0, 0, 0, 0);
@@ -281,7 +279,7 @@ export default function ClientDashboard() {
       <div className="flex items-center justify-between pt-1 px-1">
         <div>
           <p className="text-sm text-muted-foreground">
-            {new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}
+            {gymToday().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}
           </p>
           <h1 className="text-2xl sm:text-3xl font-bold text-foreground">
             {greeting()}, {firstName}

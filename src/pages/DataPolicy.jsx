@@ -38,7 +38,7 @@ We use a small number of third-party providers to deliver specific features. Eac
 
 - **Cloudflare, Inc.** — hosting, database (D1), file storage (R2), and AI inference (Workers AI). Data processed: all Service data, as the underlying infrastructure.
 - **Cloudflare Workers AI** — generates AI suggestions and summaries. Data processed: the specific workout, roster, or journal text needed to produce a response. Not used to train models beyond serving your request.
-- **Resend** — transactional email delivery (client invitations, reminders). Data processed: recipient email address and message content.
+- **Mailwish** — transactional email delivery (client invitations, reminders). Data processed: recipient email address and message content.
 - **U.S. Department of Agriculture (USDA) FoodData Central** — nutrition/food lookups. Data sent: your **search terms only** (e.g., "chicken breast"). No account data is shared.
 - **ExerciseDB (via RapidAPI)** — exercise library, images, and videos. Data sent: your **search terms only**. No account data is shared.
 
@@ -52,7 +52,7 @@ We do **not** use analytics-advertising networks, data brokers, or cross-site tr
 - **You → Brigade Athletic Club:** data you enter is transmitted over HTTPS/TLS and written to Cloudflare D1 (or R2 for files).
 - **Trainer ↔ Client:** coaching data is shared only within an established trainer–client relationship. Server-side access controls prevent a trainer from reading another trainer's clients.
 - **AI features:** when you or your trainer trigger an AI feature, only the relevant slice of data is sent to the AI provider to generate a response, which is then returned and (where applicable) cached to your account.
-- **Email/search:** invitations and reminders are sent via Resend; food and exercise searches send only your query terms to the respective provider.
+- **Email/search:** invitations and reminders are sent through the gym's email provider; food and exercise searches send only your query terms to the respective provider.
 
 ---
 

@@ -7,10 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Camera, Upload, Trash2, Loader2, Image as ImageIcon } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { todayKey } from "@/lib/programs";
 
 export default function ProgressPhotos({ clientId }) {
   const [isUploading, setIsUploading] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(new Date().toLocaleDateString('sv-SE'));
+  const [selectedDate, setSelectedDate] = useState(todayKey());
   const [selectedPhoto, setSelectedPhoto] = useState(null);
   const queryClient = useQueryClient();
 

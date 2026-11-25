@@ -1,3 +1,4 @@
+import { todayKey } from "@/lib/programs";
 import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -31,7 +32,7 @@ export default function ESignDialog({ contract, open, onOpenChange, onSigned }) 
       const now = new Date();
       await base44.entities.Contract.update(contract.id, {
         status: "signed",
-        signed_date: now.toLocaleDateString("sv-SE"), // local date, not UTC
+        signed_date: todayKey(),
         signature_data: JSON.stringify({
           name: typedName.trim(),
           email: user?.email || contract.client_email || "",

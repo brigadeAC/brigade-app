@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Upload, File, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { todayKey } from "@/lib/programs";
 
 export default function MedicalReleaseUpload({ clientId, clientUserId, contractId, onUploadComplete }) {
   const [isUploading, setIsUploading] = useState(false);
@@ -24,7 +25,7 @@ export default function MedicalReleaseUpload({ clientId, clientUserId, contractI
         await base44.entities.Contract.update(contractId, {
           status: "signed",
           document_url: data.file_url,
-          signed_date: new Date().toLocaleDateString('sv-SE')
+          signed_date: todayKey()
         });
       } else {
         await base44.entities.Contract.create({
@@ -36,7 +37,7 @@ export default function MedicalReleaseUpload({ clientId, clientUserId, contractI
           content: "Medical Release Form - Uploaded by Client",
           status: "signed",
           document_url: data.file_url,
-          signed_date: new Date().toLocaleDateString('sv-SE')
+          signed_date: todayKey()
         });
       }
 

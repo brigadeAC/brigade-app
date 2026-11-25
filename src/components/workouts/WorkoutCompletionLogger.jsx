@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { CheckCircle2, Sparkles, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { todayKey } from "@/lib/programs";
 
 export default function WorkoutCompletionLogger({ workoutPlan, clientProfile, onComplete }) {
   const [notes, setNotes] = useState("");
@@ -42,7 +43,7 @@ export default function WorkoutCompletionLogger({ workoutPlan, clientProfile, on
     const workoutData = {
       workout_plan_id: workoutPlan.id,
       client_id: workoutPlan.client_id,
-      date: new Date().toLocaleDateString('sv-SE'),
+      date: todayKey(),
       completed: true,
       notes: notes.trim(),
       difficulty_rating: difficultyRating,

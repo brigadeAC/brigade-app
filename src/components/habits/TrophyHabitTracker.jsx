@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { format, subDays, addDays, startOfWeek } from "date-fns";
 import { calculateHabitStreak } from "@/lib/utils";
 import { isLogDone, formatTarget, isLimitHabit } from "@/lib/habitLibrary";
-import { isScheduledOn, addDays as addDayKey } from "@/lib/programs";
+import { isScheduledOn, addDays as addDayKey, todayKey, gymToday } from "@/lib/programs";
 import HabitPicker from "@/components/habits/HabitPicker";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, Flame, Trophy, ChevronLeft, ChevronRight, X, Check } from "lucide-react";
@@ -26,7 +26,7 @@ function getMedal(progress) {
 function WeekStrip({ selectedDate, onSelect }) {
   const [weekStart, setWeekStart] = useState(startOfWeek(selectedDate, { weekStartsOn: 1 }));
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
-  const today = format(new Date(), "yyyy-MM-dd");
+  const today = todayKey();
 
   return (
     <div className="flex items-center gap-1 justify-center">
@@ -58,7 +58,7 @@ function WeekStrip({ selectedDate, onSelect }) {
       </div>
       <button
         onClick={() => setWeekStart(d => addDays(d, 7))}
-        disabled={addDays(weekStart, 6) >= new Date()}
+        disabled={addDays(weekStart, 6) >= gymToday()}
         className="p-1 text-muted-foreground hover:text-foreground disabled:opacity-30"
       >
         <ChevronRight className="w-4 h-4" />
@@ -199,7 +199,7 @@ const weekKey = (d) => format(startOfWeek(d, { weekStartsOn: 1 }), "yyyy-MM-dd")
 function weeklyStreak(doneDates, perWeek) {
   const counts = {};
   doneDates.forEach((d) => { const k = weekKey(new Date(`${d}T00:00:00`)); counts[k] = (counts[k] || 0) + 1; });
-  let cursor = startOfWeek(new Date(), { weekStartsOn: 1 });
+  let cursor = startOfWeek(gymToday(), { weekStartsOn: 1 });
   let streak = 0;
   if ((counts[format(cursor, "yyyy-MM-dd")] || 0) >= perWeek) streak++;
   cursor = subDays(cursor, 7);
@@ -215,7 +215,7 @@ const hasSchedule = (h) =>
 // isn't broken by the weekend. Unscheduled habits keep calculateHabitStreak.
 function scheduledStreak(habit, doneDates) {
   const done = new Set(doneDates);
-  let cursor = format(new Date(), "yyyy-MM-dd");
+  let cursor = todayKey();
   // Today only counts once it's done; an open today doesn't break the streak.
   if (!done.has(cursor)) cursor = addDayKey(cursor, -1);
   let streak = 0;
@@ -241,7 +241,7 @@ function unscheduledReason(h, dateKey) {
 // canManage: add and remove habits (coaches; solo athletes for themselves)
 // canLog:    check habits off (the client, or a coach logging for them)
 export default function TrophyHabitTracker({ clientId, trainerId, canManage = false, canLog = true, isStaff = false }) {
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState(gymToday);
   const [addOpen, setAddOpen] = useState(false);
   const [allDoneTriggered, setAllDoneTriggered] = useState(false);
   const [amountHabit, setAmountHabit] = useState(null);
@@ -250,9 +250,9 @@ export default function TrophyHabitTracker({ clientId, trainerId, canManage = fa
 
   const queryClient = useQueryClient();
   const dateKey = format(selectedDate, "yyyy-MM-dd");
-  const todayKey = format(new Date(), "yyyy-MM-dd");
-  const isToday = dateKey === todayKey;
-  const isFuture = dateKey > todayKey;
+  const gymDay = todayKey();
+  const isToday = dateKey === gymDay;
+  const isFuture = dateKey > gymDay;
 
   const { data: allHabits = [] } = useQuery({
     queryKey: ["trophyHabits", clientId],
@@ -351,7 +351,7 @@ export default function TrophyHabitTracker({ clientId, trainerId, canManage = fa
     if (!window.confirm(`Remove "${habit.name}"? Past check-ins are kept.`)) return;
     queryClient.setQueryData(["trophyHabits", clientId], (old) => (old || []).map((h) => (h.id === habit.id ? { ...h, is_active: false } : h)));
     try {
-      await base44.entities.Habit.update(habit.id, { is_active: false, archived_date: todayKey });
+      await base44.entities.Habit.update(habit.id, { is_active: false, archived_date: gymDay });
     } catch (e) {
       toast.error(e?.message || "Couldn't remove the habit.");
     }

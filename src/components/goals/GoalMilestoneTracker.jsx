@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CheckCircle2, Circle, Target } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
+import { parseLocalDate } from "@/lib/utils";
 
 export default function GoalMilestoneTracker({ goal }) {
   if (!goal.milestones || goal.milestones.length === 0) return null;
@@ -39,7 +40,7 @@ export default function GoalMilestoneTracker({ goal }) {
               )}
               {milestone.achieved && milestone.achieved_date && (
                 <p className="text-xs text-primary mt-1">
-                  Completed {new Date(milestone.achieved_date).toLocaleDateString()}
+                  Completed {parseLocalDate(milestone.achieved_date).toLocaleDateString()}
                 </p>
               )}
             </div>

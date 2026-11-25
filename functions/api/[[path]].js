@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { smtpSend } from "../_lib/smtp.js";
 import { PASSKEY_SCHEMA, appOrigin, passkeyRoute, removePasskeys } from "../_lib/passkeys.js";
 // Brigade Athletic Club backend — single Cloudflare Pages Function handling all /api/* routes.
 // Bindings (wrangler.jsonc / Pages dashboard):
@@ -766,8 +767,25 @@ async function listEntities(env, type, { filter = {}, sort, limit, user }) {
 
 /* ------------------------------ functions ------------------------------- */
 
+// Email goes out through the gym's own mailbox (SMTP_USER and SMTP_PASS), or
+// through Resend if that is set up instead.
+const emailReady = (env) => !!(env.SMTP_USER && env.SMTP_PASS) || !!env.RESEND_API_KEY;
+
 async function sendEmail(env, { to, subject, html }) {
-  if (!env.RESEND_API_KEY) return { success: false, error: 'RESEND_API_KEY not configured' };
+  if (env.SMTP_USER && env.SMTP_PASS) {
+    try {
+      const { connect } = await import('cloudflare:sockets');
+      await smtpSend(connect, {
+        host: env.SMTP_HOST || 'my.mailbux.com', port: env.SMTP_PORT || 587, user: env.SMTP_USER, pass: env.SMTP_PASS,
+        from: env.EMAIL_FROM || `Brigade Athletic Club <${env.SMTP_USER}>`, to, subject, html,
+      });
+      return { success: true };
+    } catch (e) {
+      console.error('email failed', e?.message);
+      return { success: false, error: e?.message || 'The email could not be sent.' };
+    }
+  }
+  if (!env.RESEND_API_KEY) return { success: false, error: 'Email is not set up yet.' };
   const resp = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
@@ -2085,7 +2103,17 @@ async function runFunction(name, payload, ctx) {
       const beat = await getState(env, 'cron_last_ok');
       const { results } = await env.DB.prepare('SELECT id, day, source, message, page, hits, last_seen FROM app_errors ORDER BY last_seen DESC LIMIT 25').all();
       const mins = beat ? Math.round((Date.now() - Date.parse(beat.updated_date)) / 60000) : null;
-      return { success: true, cron_last_ok: beat?.updated_date || null, cron_minutes_ago: mins, cron_ok: mins !== null && mins <= CRON_STALE_MINUTES, email_enabled: !!env.RESEND_API_KEY, errors: results };
+      return { success: true, cron_last_ok: beat?.updated_date || null, cron_minutes_ago: mins, cron_ok: mins !== null && mins <= CRON_STALE_MINUTES, email_enabled: emailReady(env), errors: results };
+    }
+
+    case 'sendTestEmail': {
+      if (!user || user.role !== 'admin') return { success: false, error: 'Admins only.' };
+      const since = new Date(Date.now() - 3600000).toISOString();
+      const n = await env.DB.prepare(`SELECT COUNT(*) AS n FROM audit_log WHERE actor = ? AND action = 'test_email' AND created_date > ?`).bind(user.email, since).first();
+      if ((n?.n || 0) >= 10) return { success: false, error: 'Too many test emails. Try again in an hour.' };
+      await audit(env, { actor: user.email, action: 'test_email', request: null });
+      const sent = await sendEmail(env, { to: user.email, subject: 'Test email from the Brigade app', html: emailShell('Email is working', '<p>This is a test. Invites and password resets will arrive like this one.</p>') });
+      return sent.success ? { success: true, to: user.email } : sent;
     }
 
     case 'listTeam': {
@@ -2095,7 +2123,7 @@ async function runFunction(name, payload, ctx) {
         `SELECT email, full_name, expires_date FROM account_tokens WHERE kind = 'invite' AND user_type = 'trainer' AND used_date IS NULL AND expires_date > ? ORDER BY created_date DESC`
       ).bind(nowISO()).all();
       return {
-        success: true, email_enabled: !!env.RESEND_API_KEY,
+        success: true, email_enabled: emailReady(env),
         team: results.map(userRow).map((u) => ({ id: u.id, email: u.email, full_name: u.full_name, disabled: !!u.disabled, is_admin: resolveRole(env, u.email, u.role) === 'admin', is_me: u.id === user.id })),
         pending: pending.results,
       };
@@ -2382,7 +2410,7 @@ async function runFunction(name, payload, ctx) {
     case 'generateRecoveryPrescription': {
       if (!user) return { success: false, error: 'Not logged in' };
       const clientId = payload?.client_id || user.id;
-      const date = payload?.date || nowISO().split('T')[0];
+      const date = payload?.date || programToday();
 
       // Pull today's readiness logs for this client.
       const pick = async (type) => {
@@ -2540,7 +2568,7 @@ async function runFunction(name, payload, ctx) {
        and one focus tip — computed from real activity, cached per day. */
     case 'coachBriefing': {
       if (!user) return { success: false, error: 'Not logged in' };
-      const today = nowISO().split('T')[0];
+      const today = programToday();
 
       if (!payload?.force) {
         const cached = await env.DB.prepare(
@@ -2554,7 +2582,7 @@ async function runFunction(name, payload, ctx) {
       if (clients.length === 0) {
         return { success: true, briefing: null, empty: true };
       }
-      const since = new Date(Date.now() - 7 * 864e5).toISOString().split('T')[0];
+      const since = pAddDays(programToday(), -7);
       const [logs, progress, messages] = await Promise.all([
         listEntities(env, 'WorkoutLog', { filter: { trainer_id: user.id }, user }),
         listEntities(env, 'ProgressLog', { filter: { trainer_id: user.id }, user }),
@@ -3886,7 +3914,7 @@ export async function onRequest(context) {
         const body = await request.json().catch(() => ({}));
         const email = String(body.email || '').trim().toLowerCase();
         if (!email) return err('Enter your email.', 400);
-        if (!env.RESEND_API_KEY) return json({ success: true, email_enabled: false });
+        if (!emailReady(env)) return json({ success: true, email_enabled: false });
         const hourAgo = new Date(Date.now() - 3600000).toISOString();
         const ip = request.headers.get('cf-connecting-ip') || '';
         const recent = await env.DB.prepare(

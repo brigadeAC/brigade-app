@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Lock, CheckCircle2, Circle, ChevronRight, Plus, Trash2, Trophy } from "lucide-react";
 import { format } from "date-fns";
+import { todayKey } from "@/lib/programs";
 
 /**
  * LockInGoal – Inspired by lockin26's "One Year. One Goal." philosophy.
@@ -49,7 +50,7 @@ export default function LockInGoal({ goals = [], clientId, trainerId, readOnly =
   const toggleMilestone = (goal, milestoneIdx) => {
     const updatedMilestones = (goal.milestones || []).map((m, i) =>
       i === milestoneIdx
-        ? { ...m, achieved: !m.achieved, achieved_date: !m.achieved ? new Date().toISOString().split("T")[0] : null }
+        ? { ...m, achieved: !m.achieved, achieved_date: !m.achieved ? todayKey() : null }
         : m
     );
     const allDone = updatedMilestones.every(m => m.achieved);

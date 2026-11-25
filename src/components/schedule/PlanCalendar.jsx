@@ -3,9 +3,10 @@ import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, Dumbbell, Apple, CalendarDays, PartyPopper } from "lucide-react";
 import { startOfMonth, endOfMonth, eachDayOfInterval, format, isSameMonth, addMonths, subMonths } from "date-fns";
 import { cn } from "@/lib/utils";
+import { gymToday } from "@/lib/programs";
 
 export default function PlanCalendar({ workoutPlans = [], mealPlans = [], sessions = [] }) {
-  const [currentDate, setCurrentDate] = useState(new Date());
+  const [currentDate, setCurrentDate] = useState(gymToday);
   const [selectedDate, setSelectedDate] = useState(null);
 
   const monthStart = startOfMonth(currentDate);

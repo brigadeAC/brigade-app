@@ -9,6 +9,7 @@ import CoachBriefing from "@/components/dashboard/CoachBriefing";
 import { Responsive, WidthProvider } from "react-grid-layout";
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
+import { todayKey } from "@/lib/programs";
 
 const ResponsiveGridLayout = WidthProvider(Responsive);
 
@@ -46,7 +47,7 @@ export default function Dashboard() {
 
   const totalSessionsCount = sessions.length;
   const activeClientsCount = clients.filter(c => c.status === "active").length;
-  const upcomingSessionsCount = sessions.filter(s => new Date(s.date + 'T00:00:00') >= new Date() && s.status === "scheduled").length;
+  const upcomingSessionsCount = sessions.filter(s => s.date >= todayKey() && s.status === "scheduled").length;
 
   const adminViewMode = (() => { try { const v = localStorage.getItem('adminViewMode'); return v ? JSON.parse(v) : 'full'; } catch { return localStorage.getItem('adminViewMode') || 'full'; } })();
   const isAdmin = user?.role === 'admin' && adminViewMode !== 'trainer';

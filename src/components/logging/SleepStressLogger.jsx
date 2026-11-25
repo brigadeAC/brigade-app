@@ -7,6 +7,7 @@ import { Slider } from "@/components/ui/slider";
 import { Textarea } from "@/components/ui/textarea";
 import { Moon, Activity, Send, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { todayKey } from "@/lib/programs";
 
 export default function SleepStressLogger({ userId }) {
   const [hoursSlept, setHoursSlept] = useState([7]);
@@ -19,7 +20,7 @@ export default function SleepStressLogger({ userId }) {
   const logMutation = useMutation({
     mutationFn: async () => {
       // Local date — toISOString() would shift to tomorrow's date in the evening (UTC)
-      const today = new Date().toLocaleDateString('sv-SE');
+      const today = todayKey();
       
       // Log Sleep
       await base44.entities.SleepLog.create({

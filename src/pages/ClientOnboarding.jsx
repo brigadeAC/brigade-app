@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Progress } from "@/components/ui/progress";
+import { todayKey } from "@/lib/programs";
 import {
   CheckCircle2,
   ChevronRight,
@@ -144,7 +145,7 @@ export default function ClientOnboarding() {
       goals: formData.goals || null,
       status: "active",
       trainer_id: trainerId,
-      membership_start: new Date().toLocaleDateString('sv-SE'),
+      membership_start: todayKey(),
     };
 
     // Save user unit preference

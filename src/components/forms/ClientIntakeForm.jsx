@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { todayKey } from "@/lib/programs";
 
 export default function ClientIntakeForm({ clientId, clientUserId, clientName, onComplete }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -34,7 +35,7 @@ export default function ClientIntakeForm({ clientId, clientUserId, clientName, o
         type: "other",
         content: JSON.stringify(formData, null, 2),
         status: "signed",
-        signed_date: new Date().toLocaleDateString('sv-SE')
+        signed_date: todayKey()
       });
       onComplete(formData);
       toast.success("Intake form saved");

@@ -7,6 +7,7 @@ import { Sparkles, Send, User, Loader2, Plus, MessageSquare, Copy, Zap, CheckCir
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import ReactMarkdown from 'react-markdown';
+import { todayKey, addDays } from "@/lib/programs";
 
 const FunctionDisplay = ({ toolCall }) => {
     const [expanded, setExpanded] = useState(false);
@@ -199,7 +200,7 @@ const MessageBubble = ({ message, onSaveWorkout, onSaveMealPlan }) => {
 
 // Compact, recent picture of one client for the assistant's context.
 async function buildClientSnapshot(client, user) {
-  const since = new Date(Date.now() - 14 * 86400000).toISOString().slice(0, 10);
+  const since = addDays(todayKey(), -14);
   const ids = [client.id, client.user_id].filter(Boolean);
   const grab = async (type, sort = "-created_date", limit = 30) => {
     try {

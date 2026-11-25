@@ -2,6 +2,7 @@ import React from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Sparkles, TrendingUp, AlertCircle, RefreshCw, Loader2 } from "lucide-react";
+import { gymToday } from "@/lib/programs";
 
 /**
  * Coach's Briefing — a daily AI triage of the trainer's roster.
@@ -48,7 +49,7 @@ export default function CoachBriefing() {
           <div>
             <h2 className="font-semibold text-foreground leading-tight">Coach's briefing</h2>
             <p className="text-xs text-muted-foreground">
-              {new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}
+              {gymToday().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}
             </p>
           </div>
         </div>

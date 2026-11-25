@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
+import { todayKey } from "@/lib/programs";
 import {
   Plus,
   TrendingUp,
@@ -39,7 +40,7 @@ export default function ClientProgress() {
   const [measurementsOpen, setMeasurementsOpen] = useState(false);
   const [performanceOpen, setPerformanceOpen] = useState(false);
   const [formData, setFormData] = useState({
-    date: format(new Date(), "yyyy-MM-dd"),
+    date: todayKey(),
     weight_kg: "",
     body_fat_percentage: "",
     measurements: {
@@ -115,7 +116,7 @@ export default function ClientProgress() {
 
   const resetForm = () => {
     setFormData({
-      date: format(new Date(), "yyyy-MM-dd"),
+      date: todayKey(),
       weight_kg: "",
       body_fat_percentage: "",
       measurements: {

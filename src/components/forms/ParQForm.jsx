@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AlertCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { todayKey } from "@/lib/programs";
 
 export default function ParQForm({ clientId, clientUserId, clientName, onComplete }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -49,7 +50,7 @@ export default function ParQForm({ clientId, clientUserId, clientName, onComplet
         type: "waiver",
         content: JSON.stringify(formData, null, 2),
         status: "signed",
-        signed_date: new Date().toLocaleDateString('sv-SE')
+        signed_date: todayKey()
       });
       onComplete(formData);
       toast.success("PAR-Q form submitted");

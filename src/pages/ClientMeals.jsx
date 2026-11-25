@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { todayKey } from "@/lib/programs";
 import {
   Dialog,
   DialogContent,
@@ -151,7 +152,7 @@ export default function ClientMeals() {
   });
 
   // Sum of everything logged today (local date), for the Today's Nutrition ring.
-  const todayStr = new Date().toLocaleDateString('sv-SE');
+  const todayStr = todayKey();
   const todayTotals = mealLogs
     .filter((m) => m.date === todayStr)
     .reduce((t, m) => ({
@@ -228,7 +229,7 @@ export default function ClientMeals() {
           await base44.entities.MealLog.create({
             client_id: clientProfile.id,
             trainer_id: clientProfile.trainer_id,
-            date: new Date().toLocaleDateString('sv-SE'),
+            date: todayKey(),
             meal_type: meal_type,
             meal_name: data.meal_name || (data.food_description || '').split(/[,.]/)[0].slice(0, 60) || 'Scanned meal',
             calories: data.calories || 0,

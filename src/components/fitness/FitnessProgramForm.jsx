@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { base44 } from "@/api/base44Client";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useUnitSystem } from "@/components/hooks/useUnitSystem";
+import { gymToday, fromKey, toKey } from "@/lib/programs";
 
 const defaultExercise = () => ({ name: "", reps: "", weight_lbs: "", weeks: "", frequency: "", start: "" });
 const defaultSection = () => [defaultExercise(), defaultExercise(), defaultExercise(), defaultExercise()];
@@ -362,19 +363,19 @@ function WeeklyTracking({ formData, setFormData }) {
 
   const addWeek = () => {
     const weekNum = weeks.length + 1;
-    const startDate = formData.start_date ? new Date(formData.start_date) : new Date();
+    const startDate = formData.start_date ? fromKey(formData.start_date.slice(0, 10)) : gymToday();
     startDate.setDate(startDate.getDate() + (weekNum - 1) * 7);
     const endDate = new Date(startDate);
     endDate.setDate(startDate.getDate() + 5);
     const newWeek = {
       week_number: weekNum,
-      week_start: startDate.toISOString().split("T")[0],
-      week_end: endDate.toISOString().split("T")[0],
+      week_start: toKey(startDate),
+      week_end: toKey(endDate),
       days: Array.from({ length: 6 }, (_, d) => {
         const dayDate = new Date(startDate);
         dayDate.setDate(startDate.getDate() + d);
         return {
-          date: dayDate.toISOString().split("T")[0],
+          date: toKey(dayDate),
           warmup: formData.warmup.map(() => ({ actual_reps: "", actual_wts: "" })),
           strength: formData.strength.map(() => ({ actual_reps: "", actual_wts: "" })),
           cardio: formData.cardio.map(() => ({ actual_reps: "", actual_wts: "" })),

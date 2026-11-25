@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { Plus } from "lucide-react";
+import { todayKey } from "@/lib/programs";
 
 const guessMealType = () => {
   const h = new Date().getHours();
@@ -40,7 +41,7 @@ export default function ManualMealLogger({ clientProfile, onSaved }) {
       await base44.entities.MealLog.create({
         client_id: clientProfile.id,
         trainer_id: clientProfile.trainer_id,
-        date: new Date().toLocaleDateString("sv-SE"),
+        date: todayKey(),
         meal_type: form.meal_type,
         meal_name: form.meal_name.trim(),
         calories: Number(form.calories) || 0,

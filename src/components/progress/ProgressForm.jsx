@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { todayKey } from "@/lib/programs";
 import {
   Dialog,
   DialogContent,
@@ -16,7 +17,7 @@ export default function ProgressForm({ open, onOpenChange, client, log, onSubmit
   const { system, convertWeightValue, parseWeight, convertHeightValue, parseHeight, weightUnit, heightUnit } = useUnitSystem();
   const fileInputRef = useRef(null);
   const [formData, setFormData] = useState({
-    date: new Date().toLocaleDateString('sv-SE'),
+    date: todayKey(),
     weight_kg: convertWeightValue(client?.weight_kg) || "",
     body_fat_percentage: client?.body_fat_percentage || "",
     measurements: {
@@ -68,7 +69,7 @@ export default function ProgressForm({ open, onOpenChange, client, log, onSubmit
       });
     } else {
       setFormData({
-        date: new Date().toLocaleDateString('sv-SE'),
+        date: todayKey(),
         weight_kg: convertWeightValue(client?.weight_kg) || "",
         body_fat_percentage: client?.body_fat_percentage || "",
         measurements: {

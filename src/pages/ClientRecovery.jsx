@@ -7,6 +7,7 @@ import SleepStressLogger from "@/components/logging/SleepStressLogger";
 import AIRecoveryPlan from "@/components/ai/AIRecoveryPlan";
 import { format } from "date-fns";
 import ReactMarkdown from "react-markdown";
+import { todayKey } from "@/lib/programs";
 
 export default function ClientRecovery() {
   const [user, setUser] = useState(null);
@@ -36,7 +37,7 @@ export default function ClientRecovery() {
 
   const clientId = clientProfile?.id || user?.id;
 
-  const today = format(new Date(), 'yyyy-MM-dd'); // local date, not UTC
+  const today = todayKey(); // local date, not UTC
 
   const { data: prescriptionNote, isLoading } = useQuery({
     queryKey: ["recoveryPrescription", clientId, today],

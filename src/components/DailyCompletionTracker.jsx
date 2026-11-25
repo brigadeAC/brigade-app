@@ -3,8 +3,9 @@ import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Label } from "@/components/ui/label";
 import { CheckCircle2 } from "lucide-react";
+import { todayKey } from "@/lib/programs";
 
-export default function DailyCompletionTracker({ clientId, trainerId, type, date = new Date().toLocaleDateString('sv-SE'), isTrainer = false }) {
+export default function DailyCompletionTracker({ clientId, trainerId, type, date = todayKey(), isTrainer = false }) {
   const queryClient = useQueryClient();
 
   const { data: completions = [] } = useQuery({

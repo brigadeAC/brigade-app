@@ -144,7 +144,7 @@ All genuinely optional — the only thing affected is the feature each one power
 | Variable | Powers | Where to get it | Without it |
 |---|---|---|---|
 | `BETA_KEYS` | Invite keys for trainer signup | You choose — format below | Trainer self-signup is closed; only `ADMIN_EMAILS` can create trainers |
-| `RESEND_API_KEY`<br>`EMAIL_FROM` | Client invitations, session reminders, resource emails | [resend.com](https://resend.com) — free tier | Emails no-op; invite clients by sharing the link yourself |
+| `SMTP_USER`<br>`SMTP_PASS`<br>optional `SMTP_HOST`, `SMTP_PORT`, `EMAIL_FROM` | Invites, password resets, resource emails | Any mailbox (defaults to Mailwish/Mailbux: my.mailbux.com, 587). `RESEND_API_KEY` works instead | Emails no-op; invite clients by sharing the link yourself |
 | `USDA_API_KEY` | Real food and macro lookup in the meal planner | [fdc.nal.usda.gov](https://fdc.nal.usda.gov/api-key-signup.html) — free | Food search returns nothing; macros must be entered by hand |
 | `EXERCISEDB_API_KEY` | Exercise library with demo images and video | [RapidAPI → ExerciseDB](https://rapidapi.com) | Exercise search returns nothing; exercises must be typed in |
 | `VAPID_PUBLIC_KEY`<br>`VAPID_PRIVATE_KEY`<br>`VAPID_SUBJECT` | Web push notifications | Generate your own: `npx web-push generate-vapid-keys` | No push notifications; in-app notifications still work |

@@ -6,6 +6,7 @@ import { createPageUrl } from "@/utils";
 import { CheckCircle2, Dumbbell, Utensils, Upload, Camera, Loader2, PlaySquare, Target, Users2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { calculateHabitStreak, parseLocalDate } from "@/lib/utils";
+import { todayKey } from "@/lib/programs";
 
 export default function IndependentDashboard() {
   const navigate = useNavigate();
@@ -55,7 +56,7 @@ export default function IndependentDashboard() {
     setIsUploadingPhoto(true);
     try {
       const { data } = await base44.integrations.Core.UploadFile({ file });
-      const today = new Date().toLocaleDateString('sv-SE');
+      const today = todayKey();
       
       let log = progressLogs.find(l => l.date === today);
       

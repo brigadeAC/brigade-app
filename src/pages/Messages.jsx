@@ -10,6 +10,7 @@ import VideoCallRoom from "@/components/video/VideoCallRoom";
 import { cn } from "@/lib/utils";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
+import { todayKey } from "@/lib/programs";
 
 const safeDateParse = (d) => {
   if (!d) return new Date();
@@ -241,11 +242,8 @@ export default function Messages() {
         client_id: clientId, trainer_id: trainerId, type: "video_call", status: "scheduled"
       });
       return sessions.filter(s => {
-        const sessionDate = safeDateParse(s.date);
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        return sessionDate >= today;
-      }).sort((a, b) => safeDateParse(a.date) - safeDateParse(b.date));
+        return String(s.date || "").slice(0, 10) >= todayKey();
+      }).sort((a, b) => String(a.date).localeCompare(String(b.date)));
     },
     enabled: !!selectedConversation && !!user,
     refetchInterval: 60000,

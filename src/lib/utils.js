@@ -1,5 +1,6 @@
 import { clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
+import { gymToday } from "./programs"
 
 export function cn(...inputs) {
   return twMerge(clsx(inputs))
@@ -18,8 +19,7 @@ export function calculateHabitStreak(habitLogs = []) {
   if (completedDates.size === 0) return 0;
 
   const toKey = (d) => d.toLocaleDateString("sv-SE"); // local yyyy-MM-dd
-  const cursor = new Date();
-  cursor.setHours(0, 0, 0, 0);
+  const cursor = gymToday();
 
   if (!completedDates.has(toKey(cursor))) {
     cursor.setDate(cursor.getDate() - 1);

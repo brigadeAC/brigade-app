@@ -8,6 +8,7 @@ import { BookOpen, Sparkles, Send, Loader2 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
+import { todayKey } from "@/lib/programs";
 
 export default function ClientJournal() {
   const [content, setContent] = useState("");
@@ -54,7 +55,7 @@ export default function ClientJournal() {
     if (!content.trim()) return;
     saveEntryMutation.mutate({
       client_id: user.id,
-      date: new Date().toLocaleDateString('sv-SE'),
+      date: todayKey(),
       content,
       ai_prompt_used: prompt
     });
