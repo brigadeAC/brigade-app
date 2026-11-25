@@ -4,10 +4,11 @@ import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ChevronLeft, ChevronRight, Loader2, RefreshCw, Settings2, Users } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2, Plus, RefreshCw, Settings2, Users } from "lucide-react";
 import { toast } from "sonner";
 import { todayKey, addDays, fromKey } from "@/lib/programs";
 import RosterSheet from "@/components/classes/coach/RosterSheet";
+import OneOffClassDialog from "@/components/classes/coach/OneOffClassDialog";
 import { fetchSchedule, runClassTick, errorMessage, fmtTime } from "@/components/classes/coach/api";
 
 export default function Classes() {
@@ -16,6 +17,7 @@ export default function Classes() {
   const [date, setDate] = useState(today);
   const [openId, setOpenId] = useState(null);
   const [generating, setGenerating] = useState(false);
+  const [adding, setAdding] = useState(false);
 
   // Day strip: the week (Mon-Sun) containing the selected date.
   const strip = useMemo(() => {
@@ -57,12 +59,15 @@ export default function Classes() {
           <h1 className="text-2xl font-bold text-foreground">Classes</h1>
           <p className="text-sm text-muted-foreground mt-0.5">Check people in and manage the roster for each class.</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" className="gap-1.5" onClick={generate} disabled={generating}>
-            {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />} Generate schedule now
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" className="gap-1.5" onClick={() => setAdding(true)}>
+            <Plus className="w-4 h-4" /> Add class
           </Button>
           <Button variant="outline" size="sm" className="gap-1.5" asChild>
             <Link to={createPageUrl("ClassSetup")}><Settings2 className="w-4 h-4" /> Class setup</Link>
+          </Button>
+          <Button variant="outline" size="sm" className="gap-1.5" onClick={generate} disabled={generating}>
+            {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />} Generate schedule now
           </Button>
         </div>
       </div>
@@ -86,7 +91,7 @@ export default function Classes() {
           </div>
           <Button variant="outline" size="icon" aria-label="Next week" onClick={() => setDate(addDays(date, 7))}><ChevronRight className="w-4 h-4" /></Button>
         </div>
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-base font-semibold text-foreground">{heading}</h2>
           <div className="flex items-center gap-2">
             {date !== today && <Button variant="ghost" size="sm" onClick={() => setDate(today)}>Today</Button>}
@@ -102,7 +107,7 @@ export default function Classes() {
       ) : list.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border p-8 text-center">
           <p className="text-sm font-medium text-foreground">No classes on this day.</p>
-          <p className="text-sm text-muted-foreground mt-1">If the weekly schedule is set up, use Generate schedule now to create upcoming sessions.</p>
+          <p className="text-sm text-muted-foreground mt-1">If the weekly schedule is set up, use Generate schedule now to create upcoming sessions. For a one-time class, use Add class.</p>
         </div>
       ) : (
         <ul className="space-y-2">
@@ -141,6 +146,7 @@ export default function Classes() {
         </ul>
       )}
 
+      <OneOffClassDialog open={adding} onOpenChange={setAdding} defaultDate={date} onCreated={setDate} />
       <RosterSheet session={openSession} open={!!openSession} onOpenChange={(v) => !v && setOpenId(null)} />
     </div>
   );
