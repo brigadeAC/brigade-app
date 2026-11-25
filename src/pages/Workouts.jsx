@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useLocation, Link, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { 
   Plus, 
@@ -14,7 +14,6 @@ import {
   Trash2,
   Copy,
   Play,
-  Pause,
   CheckCircle,
   LayoutTemplate,
   Clock
@@ -48,7 +47,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import WorkoutForm from "@/components/workouts/WorkoutForm";
 import AIWorkoutGenerator from "@/components/ai/AIWorkoutGenerator";
-import { cn } from "@/lib/utils";
 import EmptyState from "@/components/ui/empty-state";
 import { toast } from "sonner";
 

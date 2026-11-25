@@ -7,7 +7,6 @@ import {
   MessageCircle,
   Library,
   FileText,
-  DollarSign,
   Users2,
   Settings,
   Menu,
@@ -18,7 +17,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
-import { base44 } from "@/api/base44Client";
 
 const ADMIN_MENU_ITEMS = [
   { name: "Dashboard", icon: LayoutDashboard, page: "Dashboard" },

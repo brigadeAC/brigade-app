@@ -1,7 +1,7 @@
 import React from "react";
-import { BrandIcon, BrandWordmark, BrandLockup, BrandWordmarkImage } from "@/components/BrandMark";
+import { BrandWordmarkImage } from "@/components/BrandMark";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, Dumbbell } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { createPageUrl } from "@/utils";
 import ReactMarkdown from "react-markdown";
 

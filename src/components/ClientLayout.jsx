@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { BrandIcon, BrandWordmark, BrandLockup, BrandWordmarkImage } from "@/components/BrandMark";
+import { BrandWordmark, BrandLockup } from "@/components/BrandMark";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { base44 } from "@/api/base44Client";
@@ -16,30 +16,13 @@ import {
   CheckSquare,
   X,
   LogOut,
-  ChevronRight,
-  UserCircle,
-  MessageCircle,
-  Zap,
-  Users2,
   Library,
   Menu,
-  Map,
   Flame,
   ArrowLeft,
   Bug,
-  Target,
   Settings,
-  BookOpen,
-  Trophy,
-  HeartPulse,
-  ShoppingBasket,
-  GitMerge,
-  Component,
   Eye,
-  CreditCard,
-  ChefHat,
-  Bot,
-  Sparkles,
   FileSignature
 } from "lucide-react";
 import { Button } from "@/components/ui/button";

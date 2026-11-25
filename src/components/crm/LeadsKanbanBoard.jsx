@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { UserPlus, MoreVertical, Edit, Trash2, Mail, Phone, Calendar as CalendarIcon, AlignLeft } from "lucide-react";
+import { UserPlus, MoreVertical, Edit, Trash2, Mail, Phone, AlignLeft } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
 import { BookOpen } from "lucide-react";
 import { createPageUrl } from "@/utils";

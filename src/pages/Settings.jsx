@@ -8,22 +8,16 @@ import {
   Save,
   Camera,
   Bell,
-  CreditCard,
-  CheckCircle,
-  AlertCircle,
-  Key,
   Trash2,
   AlertTriangle,
   MonitorSmartphone,
   LayoutDashboard,
   Shield,
-  Plug,
   Download,
   Loader2,
   Sun,
   Moon } from
 "lucide-react";
-// Beta keys are managed via the BetaKey entity
 import { Button } from "@/components/ui/button";
 import InstallGuide from "@/components/InstallGuide";
 import NotificationSettings from "@/components/NotificationSettings";
@@ -48,20 +42,11 @@ import { useUnitSystem } from "@/components/hooks/useUnitSystem";
 import { useTheme } from "@/components/hooks/useTheme";
 import ClientPortalSettings from "@/components/settings/ClientPortalSettings";
 import ComplianceSettings from "@/components/settings/ComplianceSettings";
-import BillingSettings from "@/components/settings/BillingSettings";
+import ChangePassword from "@/components/settings/ChangePassword";
 
 export default function Settings() {
   const [user, setUser] = useState(null);
   const [isClient, setIsClient] = useState(false);
-  // Billing is a trainer concern; a trainer who also has a client record still needs it.
-  const isTrainer = user?.user_type === "trainer" || user?.role === "admin";
-  // Beta-key trainers are comped for life, so billing is irrelevant to them —
-  // hide the tab entirely rather than showing a plan they will never buy.
-  const isCompedTrainer = !!(
-    user?.beta_key_used || user?.data?.beta_key_used ||
-    user?.beta_key_verified || user?.data?.beta_key_verified
-  );
-  const showBilling = isTrainer && !isCompedTrainer;
   const { system, setUnitSystem } = useUnitSystem();
   const { theme, setTheme } = useTheme();
   const [formData, setFormData] = useState({
@@ -84,9 +69,6 @@ export default function Settings() {
     new_plans: true,
     trainer_feedback: true
   });
-  const [betaKey, setBetaKey] = useState("");
-  const [betaKeyVerified, setBetaKeyVerified] = useState(false);
-  const [betaKeyError, setBetaKeyError] = useState("");
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
@@ -115,7 +97,6 @@ export default function Settings() {
           require_onboarding_forms: userData.data?.require_onboarding_forms ?? userData.require_onboarding_forms ?? true,
           payout_method: userData.data?.payout_method || userData.payout_method || "stripe"
         });
-        setBetaKeyVerified(userData.data?.beta_key_verified || userData?.beta_key_verified || false);
 
         const userNotes = userData.data?.notifications || {};
         setNotifications({
@@ -186,34 +167,6 @@ export default function Settings() {
 
   const handleChange = (field, value) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const handleBetaKeyVerify = async () => {
-    setBetaKeyError("");
-    if (!betaKey.trim()) {
-      setBetaKeyError("Please enter a beta key");
-      return;
-    }
-
-    try {
-      // Checked and claimed on the server; keys are never readable from the app.
-      const { data } = await base44.functions.invoke('claimBetaKey', { key: betaKey.trim() });
-      if (!data?.success) {
-        setBetaKeyError(data?.error || "That beta key didn't work. Check it and try again.");
-        return;
-      }
-      setBetaKeyVerified(true);
-      setBetaKey("");
-
-      const updatedUser = await base44.auth.me();
-      setUser(updatedUser);
-      window.dispatchEvent(new Event('profileUpdated'));
-
-      toast.success("Beta key verified successfully.");
-    } catch (error) {
-      console.error(error);
-      setBetaKeyError("Failed to verify beta key. Please try again.");
-    }
   };
 
   const handleAvatarUpload = async (e) => {
@@ -324,11 +277,6 @@ export default function Settings() {
             <TabsTrigger value="profile" className="flex-1 sm:flex-none text-xs sm:text-sm gap-1.5 sm:gap-2 whitespace-nowrap">
               <User className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Profile
             </TabsTrigger>
-            {!isClient && !betaKeyVerified &&
-            <TabsTrigger value="beta" className="flex-1 sm:flex-none text-xs sm:text-sm gap-1.5 sm:gap-2 whitespace-nowrap">
-                <Key className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Beta Access
-              </TabsTrigger>
-            }
             {!isClient &&
             <TabsTrigger value="portal" className="flex-1 sm:flex-none text-xs sm:text-sm gap-1.5 sm:gap-2 whitespace-nowrap">
                 <LayoutDashboard className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Client Portal
@@ -340,11 +288,6 @@ export default function Settings() {
             <TabsTrigger value="pwa" className="flex-1 sm:flex-none text-xs sm:text-sm gap-1.5 sm:gap-2 whitespace-nowrap">
               <MonitorSmartphone className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> App
             </TabsTrigger>
-            {showBilling && (
-              <TabsTrigger value="billing" className="flex-1 sm:flex-none text-xs sm:text-sm gap-1.5 sm:gap-2 whitespace-nowrap">
-                <CreditCard className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Billing
-              </TabsTrigger>
-            )}
             {!isClient && (
               <TabsTrigger value="compliance" className="flex-1 sm:flex-none text-xs sm:text-sm gap-1.5 sm:gap-2 whitespace-nowrap">
                 <Shield className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Compliance
@@ -543,47 +486,6 @@ export default function Settings() {
           </div>
         </TabsContent>
 
-        {!isClient && !betaKeyVerified &&
-        <TabsContent value="beta" className="space-y-6">
-            <div className="glass-card rounded-2xl p-6">
-              <h3 className="text-lg font-semibold text-foreground mb-2">Beta Access Required</h3>
-              <p className="text-sm text-foreground mb-6">
-                This is a beta feature. Enter your beta key to unlock full access.
-              </p>
-              
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="beta_key" className="text-muted-foreground">Beta Key</Label>
-                  <div className="relative">
-                    <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-foreground" />
-                    <Input
-                    id="beta_key"
-                    placeholder="e.g., JSMITH-4K7X8Q2P"
-                    className="pl-10 uppercase input-frosted"
-                    value={betaKey}
-                    onChange={(e) => {
-                      setBetaKey(e.target.value);
-                      setBetaKeyError("");
-                    }}
-                    onKeyPress={(e) => e.key === 'Enter' && handleBetaKeyVerify()} />
-
-                  </div>
-                  {betaKeyError &&
-                <p className="text-sm text-red-600 mt-1">{betaKeyError}</p>
-                }
-                </div>
-
-                <Button
-                onClick={handleBetaKeyVerify}
-                className="bg-gradient-to-r from-primary to-primary hover:from-primary hover:to-primary w-full">
-
-                  Verify Beta Key
-                </Button>
-              </div>
-            </div>
-          </TabsContent>
-        }
-
         {!isClient &&
         <TabsContent value="portal" className="space-y-6">
           <ClientPortalSettings />
@@ -738,12 +640,6 @@ export default function Settings() {
           <InstallGuide />
         </TabsContent>
 
-        {showBilling && (
-          <TabsContent value="billing" className="space-y-6">
-            <BillingSettings />
-          </TabsContent>
-        )}
-
         {!isClient && (
           <TabsContent value="compliance" className="space-y-6">
             <ComplianceSettings />
@@ -751,6 +647,8 @@ export default function Settings() {
         )}
 
         <TabsContent value="account" className="space-y-6">
+          <ChangePassword />
+
           {/* Right of access — download everything we hold on this account */}
           <div className="glass-card rounded-2xl p-6">
             <h3 className="text-lg font-semibold text-foreground mb-2">Export My Data</h3>

@@ -71,7 +71,7 @@ export default function PublicHome() {
             </button>
           </div>
           <p className="mt-4 text-sm text-muted-foreground max-w-[520px]">
-            New member? Your coach adds you first. Then create your account with the same email you gave us.
+            New member? Your coach sends you a link to create your account.
           </p>
         </Column>
 

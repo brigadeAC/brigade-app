@@ -1,105 +1,60 @@
-/**
- * pages.config.js - Page routing configuration
- * 
- * This file is AUTO-GENERATED. Do not add imports or modify PAGES manually.
- * Pages are auto-registered when you create files in the ./pages/ folder.
- * 
- * THE ONLY EDITABLE VALUE: mainPage
- * This controls which page is the landing page (shown when users visit the app).
- * 
- * Example file structure:
- * 
- *   import HomePage from './pages/HomePage';
- *   import Dashboard from './pages/Dashboard';
- *   import Settings from './pages/Settings';
- *   
- *   export const PAGES = {
- *       "HomePage": HomePage,
- *       "Dashboard": Dashboard,
- *       "Settings": Settings,
- *   }
- *   
- *   export const pagesConfig = {
- *       mainPage: "HomePage",
- *       Pages: PAGES,
- *   };
- * 
- * Example with Layout (wraps all pages):
- *
- *   import Home from './pages/Home';
- *   import Settings from './pages/Settings';
- *   import __Layout from './Layout.jsx';
- *
- *   export const PAGES = {
- *       "Home": Home,
- *       "Settings": Settings,
- *   }
- *
- *   export const pagesConfig = {
- *       mainPage: "Home",
- *       Pages: PAGES,
- *       Layout: __Layout,
- *   };
- *
- * To change the main page from HomePage to Dashboard, use find_replace:
- *   Old: mainPage: "HomePage",
- *   New: mainPage: "Dashboard",
- *
- * The mainPage value must match a key in the PAGES object exactly.
- */
-import About from './pages/About';
-import AdminBugs from './pages/AdminBugs';
-import AdminContactMessages from './pages/AdminContactMessages';
-import BusinessHub from './pages/BusinessHub';
-import CRM from './pages/CRM';
-import ClientCommunity from './pages/ClientCommunity';
-import ClientDashboard from './pages/ClientDashboard';
-import ClientHabits from './pages/ClientHabits';
-import ClientJournal from './pages/ClientJournal';
-import ClientDocuments from './pages/ClientDocuments';
-import ClientMeals from './pages/ClientMeals';
-import ClientOnboarding from './pages/ClientOnboarding';
-import ClientProfile from './pages/ClientProfile';
-import ClientProgress from './pages/ClientProgress';
-import ClientRecovery from './pages/ClientRecovery';
-import ClientResources from './pages/ClientResources';
-import ClientSchedule from './pages/ClientSchedule';
-import ClientWorkouts from './pages/ClientWorkouts';
-import Clients from './pages/Clients';
-import Contact from './pages/Contact';
-import Contracts from './pages/Contracts';
-import Dashboard from './pages/Dashboard';
-import DataPolicy from './pages/DataPolicy';
-import FitnessTools from './pages/FitnessTools';
+// Page routes. Each page loads on demand, so the first open stays small.
+import { lazy } from 'react';
 import Home from './pages/Home';
-import IndependentOnboarding from './pages/IndependentOnboarding';
-import Meals from './pages/Meals';
-import Messages from './pages/Messages';
-import OnboardingWalkthrough from './pages/OnboardingWalkthrough';
-import PrivacyPolicy from './pages/PrivacyPolicy';
-import Progress from './pages/Progress';
-import PublicHome from './pages/PublicHome';
-import Recipes from './pages/Recipes';
-import ReportBug from './pages/ReportBug';
-import Resources from './pages/Resources';
-import HabitLibrary from './pages/HabitLibrary';
-import LessonLibrary from './pages/LessonLibrary';
-import Programs from './pages/Programs';
-import Classes from './pages/Classes';
-import ClassSetup from './pages/ClassSetup';
-import ClientClasses from './pages/ClientClasses';
-import ProgramBuilder from './pages/ProgramBuilder';
-import ClientProgram from './pages/ClientProgram';
-import Schedule from './pages/Schedule';
-import Settings from './pages/Settings';
-import Terms from './pages/Terms';
-import TrainerAssistant from './pages/TrainerAssistant';
-import TrainerCommunity from './pages/TrainerCommunity';
-import TrainerExpenses from './pages/TrainerExpenses';
-import TrainerJournalInsights from './pages/TrainerJournalInsights';
-import WaitingList from './pages/WaitingList';
-import Workouts from './pages/Workouts';
 import __Layout from './Layout.jsx';
+
+const About = lazy(() => import('./pages/About'));
+const AdminBugs = lazy(() => import('./pages/AdminBugs'));
+const AdminContactMessages = lazy(() => import('./pages/AdminContactMessages'));
+const BusinessHub = lazy(() => import('./pages/BusinessHub'));
+const CRM = lazy(() => import('./pages/CRM'));
+const ClientCommunity = lazy(() => import('./pages/ClientCommunity'));
+const ClientDashboard = lazy(() => import('./pages/ClientDashboard'));
+const ClientHabits = lazy(() => import('./pages/ClientHabits'));
+const ClientJournal = lazy(() => import('./pages/ClientJournal'));
+const ClientDocuments = lazy(() => import('./pages/ClientDocuments'));
+const ClientMeals = lazy(() => import('./pages/ClientMeals'));
+const ClientOnboarding = lazy(() => import('./pages/ClientOnboarding'));
+const ClientProfile = lazy(() => import('./pages/ClientProfile'));
+const ClientProgress = lazy(() => import('./pages/ClientProgress'));
+const ClientRecovery = lazy(() => import('./pages/ClientRecovery'));
+const ClientResources = lazy(() => import('./pages/ClientResources'));
+const ClientSchedule = lazy(() => import('./pages/ClientSchedule'));
+const ClientWorkouts = lazy(() => import('./pages/ClientWorkouts'));
+const Clients = lazy(() => import('./pages/Clients'));
+const Contact = lazy(() => import('./pages/Contact'));
+const Contracts = lazy(() => import('./pages/Contracts'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const DataPolicy = lazy(() => import('./pages/DataPolicy'));
+const FitnessTools = lazy(() => import('./pages/FitnessTools'));
+const IndependentOnboarding = lazy(() => import('./pages/IndependentOnboarding'));
+const Meals = lazy(() => import('./pages/Meals'));
+const Messages = lazy(() => import('./pages/Messages'));
+const OnboardingWalkthrough = lazy(() => import('./pages/OnboardingWalkthrough'));
+const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
+const Progress = lazy(() => import('./pages/Progress'));
+const PublicHome = lazy(() => import('./pages/PublicHome'));
+const Recipes = lazy(() => import('./pages/Recipes'));
+const ReportBug = lazy(() => import('./pages/ReportBug'));
+const Resources = lazy(() => import('./pages/Resources'));
+const HabitLibrary = lazy(() => import('./pages/HabitLibrary'));
+const LessonLibrary = lazy(() => import('./pages/LessonLibrary'));
+const Programs = lazy(() => import('./pages/Programs'));
+const Classes = lazy(() => import('./pages/Classes'));
+const ClassSetup = lazy(() => import('./pages/ClassSetup'));
+const ClientClasses = lazy(() => import('./pages/ClientClasses'));
+const ProgramBuilder = lazy(() => import('./pages/ProgramBuilder'));
+const ClientProgram = lazy(() => import('./pages/ClientProgram'));
+const Schedule = lazy(() => import('./pages/Schedule'));
+const Settings = lazy(() => import('./pages/Settings'));
+const Team = lazy(() => import('./pages/Team'));
+const Terms = lazy(() => import('./pages/Terms'));
+const TrainerAssistant = lazy(() => import('./pages/TrainerAssistant'));
+const TrainerCommunity = lazy(() => import('./pages/TrainerCommunity'));
+const TrainerExpenses = lazy(() => import('./pages/TrainerExpenses'));
+const TrainerJournalInsights = lazy(() => import('./pages/TrainerJournalInsights'));
+const WaitingList = lazy(() => import('./pages/WaitingList'));
+const Workouts = lazy(() => import('./pages/Workouts'));
 
 
 export const PAGES = {
@@ -148,6 +103,7 @@ export const PAGES = {
     "Resources": Resources,
     "Schedule": Schedule,
     "Settings": Settings,
+    "Team": Team,
     "Terms": Terms,
     "TrainerAssistant": TrainerAssistant,
     "TrainerCommunity": TrainerCommunity,

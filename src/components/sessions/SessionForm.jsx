@@ -16,7 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Calendar, Clock, Loader2, Video } from "lucide-react";
+import { Calendar, Loader2 } from "lucide-react";
 import { showSuccess } from "@/components/ui/success-toast";
 
 const EMPTY_SESSION = {

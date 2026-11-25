@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { BrandIcon, BrandWordmark, BrandLockup, BrandWordmarkImage } from "@/components/BrandMark";
+import React, { useState, useEffect } from "react";
+import { BrandWordmark, BrandLockup } from "@/components/BrandMark";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { createPageUrl } from "./utils";
 import { base44 } from "@/api/base44Client";
@@ -14,38 +14,26 @@ import {
   LayoutDashboard,
   Users,
   CalendarDays,
-  Dumbbell,
-  Utensils,
   Settings,
   Menu,
   X,
   LogOut,
-  ChevronRight,
-  Zap,
   MessageCircle,
   Library,
   ListChecks,
   FileText,
-  DollarSign,
   Users2,
-  Map,
   Flame,
   Mail,
   ArrowLeft,
   Bug,
-  Target,
-  Briefcase,
   BookOpen,
   Bot,
   Eye,
   EyeOff,
-  TrendingDown,
-  BarChart3,
-  Share2,
   Upload,
   CalendarCheck,
-  SlidersHorizontal,
-  Package as PackageIcon
+  SlidersHorizontal
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -67,11 +55,10 @@ const navGroups = [
     ]
   },
   {
-    title: "Clients & CRM",
+    title: "Clients",
     items: [
       { name: "Clients", icon: Users, page: "Clients" },
       { name: "Messages", icon: MessageCircle, page: "Messages" },
-      { name: "CRM", icon: Target, page: "CRM" },
       { name: "Notebooks", icon: BookOpen, page: "ClientNotebooks" },
       { name: "Contracts", icon: FileText, page: "Contracts" },
       { name: "Schedule", icon: CalendarDays, page: "Schedule" }
@@ -95,12 +82,6 @@ const navGroups = [
     ]
   },
   {
-    title: "Business",
-    items: [
-      { name: "Business Hub", icon: Briefcase, page: "BusinessHub" }
-    ]
-  },
-  {
     title: "Growth",
     items: [
       { name: "Community", icon: Users2, page: "TrainerCommunity" },
@@ -111,6 +92,7 @@ const navGroups = [
   {
     title: "Admin Tools",
     items: [
+      { name: "Team", icon: Users, page: "Team" },
       { name: "Contact Msgs", icon: Mail, page: "AdminContactMessages" },
       { name: "Bugs", icon: Bug, page: "AdminBugs" }
     ]
@@ -137,6 +119,7 @@ const adminNavGroups = [
   {
     title: 'Platform',
     items: [
+      { name: 'Team', icon: Users, page: 'Team' },
       { name: 'Messages', icon: MessageCircle, page: 'Messages' },
       { name: 'Contact Messages', icon: Mail, page: 'AdminContactMessages' },
       { name: 'Bug Reports', icon: Bug, page: 'AdminBugs' },
@@ -172,7 +155,6 @@ export default function Layout({ children, currentPageName }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isClient, setIsClient] = useState(false);
   const [isTrainer, setIsTrainer] = useState(false);
-  const [isBetaTrainer, setIsBetaTrainer] = useState(false);
   const [adminViewMode, setAdminViewMode] = useState(() => {
     try {
       const saved = localStorage.getItem('adminViewMode');
@@ -243,9 +225,8 @@ export default function Layout({ children, currentPageName }) {
   const { data: isClientUserCheck, isLoading: isClientCheckLoading } = useQuery({
     queryKey: ["userRoleCheck", user?.id, adminViewMode],
     queryFn: async () => {
-      if (!user) return { isClientUser: false, isTrainerUser: false, hasBetaKey: false };
+      if (!user) return { isClientUser: false, isTrainerUser: false };
 
-      const hasBetaKey = user.beta_key_used === true;
       const customId = user?.data?.custom_id || user?.custom_id;
 
       let isClientUser = false;
@@ -292,7 +273,7 @@ export default function Layout({ children, currentPageName }) {
         }
       }
 
-      return { isClientUser, isTrainerUser, hasBetaKey };
+      return { isClientUser, isTrainerUser };
     },
     enabled: !!user,
     staleTime: 300000,
@@ -302,7 +283,6 @@ export default function Layout({ children, currentPageName }) {
     if (isClientUserCheck) {
       setIsClient(isClientUserCheck.isClientUser);
       setIsTrainer(isClientUserCheck.isTrainerUser);
-      setIsBetaTrainer(isClientUserCheck.hasBetaKey);
     }
   }, [isClientUserCheck]);
 
@@ -526,6 +506,7 @@ export default function Layout({ children, currentPageName }) {
             const visibleItems = group.items.filter(item => {
               if (item.page === "AdminContactMessages" && user?.role !== 'admin') return false;
               if (item.page === "AdminBugs" && user?.role !== 'admin') return false;
+              if (item.page === "Team" && user?.role !== 'admin') return false;
               if (item.page === "ReportBug" && user?.role === 'admin') return false;
               return true;
             });
@@ -538,10 +519,7 @@ export default function Layout({ children, currentPageName }) {
                 {visibleItems.map((item) => {
                   let pageName = item.page;
                   let displayName = item.name;
-                  const pageGroups = {
-                    'BusinessHub': ['BusinessHub']
-                  };
-                  const isActive = currentPageName === pageName || (pageGroups[pageName] && pageGroups[pageName].includes(currentPageName));
+                  const isActive = currentPageName === pageName;
                   
                   return (
                     <Link

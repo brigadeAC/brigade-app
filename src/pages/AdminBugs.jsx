@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Bug } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
+import SystemStatus from "@/components/accounts/SystemStatus";
+
 export default function AdminBugs() {
   const queryClient = useQueryClient();
 
@@ -29,6 +31,8 @@ export default function AdminBugs() {
           Bug Reports
         </h1>
       </div>
+
+      <SystemStatus />
 
       <Card className="glass-card">
         <CardHeader>

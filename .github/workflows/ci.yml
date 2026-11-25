@@ -1,0 +1,26 @@
+name: Checks
+
+# Lint, build and the API tests. Publishing stays a manual step:
+#   npm run check && npx wrangler pages deploy dist --project-name brigade-app --branch main
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+      - run: npm test

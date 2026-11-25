@@ -29,7 +29,12 @@ export const fromKey = (key) => {
   return new Date(y, m - 1, d);
 };
 
-export const todayKey = () => toKey(new Date());
+// Today at the gym (Chattanooga), whatever time zone the phone is in.
+const GYM_DAY = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" });
+export const todayKey = (now = new Date()) => {
+  const p = Object.fromEntries(GYM_DAY.formatToParts(now).map((x) => [x.type, x.value]));
+  return `${p.year}-${p.month}-${p.day}`;
+};
 
 export const addDays = (key, n) => {
   const d = fromKey(key);

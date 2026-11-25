@@ -20,7 +20,6 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { User, Loader2, Zap, Target, Activity, HeartPulse } from "lucide-react";
 import { useUnitSystem } from "@/components/hooks/useUnitSystem";
 
@@ -237,22 +236,8 @@ export default function TrainerClientOnboarding({ open, onOpenChange, client, on
       
       await onSubmit(dataToSubmit);
       
-      if (!client && formData.email) {
-        await base44.users.inviteUser(formData.email, "user");
-        
-        try {
-          const signupLink = `${window.location.origin}/app/ClientOnboarding`;
-          await base44.functions.invoke('sendInviteEmail', {
-            clientEmail: formData.email,
-            clientName: formData.full_name,
-            trainerName: user?.full_name || 'Your Trainer',
-            signupLink
-          });
-        } catch (e) {
-          console.error('Failed to send invite email:', e);
-        }
-        
-        showSuccess("Client Onboarded.", `Invitation sent to ${formData.email}`);
+      if (!client) {
+        showSuccess("Client added", "Send them their app link next.");
       } else {
         showSuccess("Profile Saved", "Client profile updated successfully");
       }

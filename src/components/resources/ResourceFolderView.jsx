@@ -2,8 +2,7 @@ import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Folder, FileText, ChevronRight } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Folder, FileText } from "lucide-react";
 
 export default function ResourceFolderView({ resources }) {
   const [selectedFolder, setSelectedFolder] = useState(null);

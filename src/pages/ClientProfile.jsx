@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { parseLocalDate } from "@/lib/utils";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router-dom";
+import AppAccessDialog from "@/components/accounts/AppAccessDialog";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,6 +19,7 @@ import {
   Phone,
   Calendar as CalendarIcon,
   Edit,
+  KeyRound,
   Plus,
   Trash2,
   MoreVertical,
@@ -49,7 +51,6 @@ import ItemCompletionTracker from "@/components/ItemCompletionTracker";
 import ProgressChartForm from "@/components/forms/ProgressChartForm";
 import ParQForm from "@/components/forms/ParQForm";
 import ClientIntakeForm from "@/components/forms/ClientIntakeForm";
-import MedicalReleaseForm from "@/components/forms/MedicalReleaseForm";
 import MedicalReleaseFormPrintable from "@/components/forms/MedicalReleaseFormPrintable";
 import TrainerClientOnboarding from "@/components/clients/TrainerClientOnboarding";
 import ClientDocuments from "@/components/clients/ClientDocuments";
@@ -115,6 +116,7 @@ export default function ClientProfile() {
   const [showIntake, setShowIntake] = useState(false);
   const [showMedicalRelease, setShowMedicalRelease] = useState(false);
   const [showClientEdit, setShowClientEdit] = useState(false);
+  const [showAccess, setShowAccess] = useState(false);
 
   const queryClient = useQueryClient();
 
@@ -495,6 +497,15 @@ export default function ClientProfile() {
                 <Zap className="w-4 h-4" />
                 <span className="hidden sm:inline">Fitness Tools</span>
               </Link>
+              <Button
+                variant="outline"
+                className="border-border text-foreground hover:bg-accent"
+                onClick={() => setShowAccess(true)}
+                aria-label="App access"
+              >
+                <KeyRound className="w-4 h-4 sm:mr-2" />
+                <span className="hidden sm:inline">App access</span>
+              </Button>
               <Button
                 variant="outline"
                 className="border-border text-foreground hover:bg-accent"
@@ -1301,7 +1312,8 @@ export default function ClientProfile() {
           log={editingProgress}
           onSubmit={handleSubmitProgress} />
 
-          <TrainerClientOnboarding
+          <AppAccessDialog client={client} open={showAccess} onOpenChange={setShowAccess} />
+      <TrainerClientOnboarding
             open={showClientEdit}
             onOpenChange={setShowClientEdit}
             client={client}

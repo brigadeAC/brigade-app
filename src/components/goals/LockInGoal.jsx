@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Lock, Target, CheckCircle2, Circle, Flame, ChevronRight, Plus, Trash2, Trophy } from "lucide-react";
+import { Lock, CheckCircle2, Circle, ChevronRight, Plus, Trash2, Trophy } from "lucide-react";
 import { format } from "date-fns";
 
 /**

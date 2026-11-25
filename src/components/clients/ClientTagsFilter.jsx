@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const COMMON_TAGS = ["beginner", "athlete", "weight loss", "strength", "endurance", "flexibility", "nutrition", "injury recovery", "senior", "youth"];

@@ -1,5 +1,5 @@
 import React from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Users, TrendingUp, Award, Calendar } from "lucide-react";
 
 export default function ClientMetrics({ clients, sessions, progressLogs }) {

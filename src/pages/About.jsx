@@ -125,7 +125,7 @@ export default function About() {
         <div className="bg-primary/5 border border-primary/20 p-10 rounded-2xl text-center">
           <h2 className="text-2xl md:text-3xl font-bold mb-3 text-foreground">Ready to get started?</h2>
           <p className="text-muted-foreground mb-7 max-w-2xl mx-auto">
-            Create a free solo account, join as a client, or sign in as a trainer with your beta key.
+            Accounts are by invitation. Ask your coach for a link, then sign in here.
           </p>
           <Button
             className="font-semibold px-8 py-6 text-base text-primary-foreground bg-primary hover:bg-primary/90 rounded-xl"

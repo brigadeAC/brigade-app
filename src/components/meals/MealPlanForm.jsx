@@ -18,14 +18,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Apple, Plus, Trash2, Loader2, Search, ChevronDown } from "lucide-react";
+import { Apple, Plus, Trash2, Loader2, ChevronDown } from "lucide-react";
 import { showSuccess } from "@/components/ui/success-toast";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Badge } from "@/components/ui/badge";
 import {
   Collapsible,
   CollapsibleContent,

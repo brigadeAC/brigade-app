@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
@@ -7,18 +8,28 @@ import { BrowserRouter as Router, Route, Routes, useLocation } from 'react-route
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
-import BulkImport from './pages/BulkImport';
-import IndependentDashboard from './pages/IndependentDashboard';
-import ClientNotebooks from './pages/ClientNotebooks';
 import Login from './pages/Login';
+import PageBoundary from './lib/PageBoundary';
+
+const BulkImport = lazy(() => import('./pages/BulkImport'));
+const IndependentDashboard = lazy(() => import('./pages/IndependentDashboard'));
+const ClientNotebooks = lazy(() => import('./pages/ClientNotebooks'));
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
 const MainPage = mainPageKey ? Pages[mainPageKey] : <></>;
 
-const LayoutWrapper = ({ children, currentPageName }) => Layout ?
-  <Layout currentPageName={currentPageName}>{children}</Layout>
-  : <>{children}</>;
+const PageLoading = () => (
+  <div className="flex justify-center py-24" role="status" aria-label="Loading">
+    <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+  </div>
+);
+
+// Suspense sits inside the layout, so the menu stays put while a page loads.
+const LayoutWrapper = ({ children, currentPageName }) => {
+  const page = <PageBoundary key={currentPageName}><Suspense fallback={<PageLoading />}>{children}</Suspense></PageBoundary>;
+  return Layout ? <Layout currentPageName={currentPageName}>{page}</Layout> : page;
+};
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();

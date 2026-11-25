@@ -1,10 +1,8 @@
 import React from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { format } from "date-fns";
-import { CheckCircle2, Circle } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
 
 export default function DailyCompletionTracker({ clientId, trainerId, type, date = new Date().toLocaleDateString('sv-SE'), isTrainer = false }) {
   const queryClient = useQueryClient();

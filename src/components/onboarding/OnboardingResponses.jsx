@@ -6,8 +6,6 @@ import {
   Activity,
   Target,
   Calendar,
-  Heart,
-  Sparkles,
   CheckCircle2
 } from "lucide-react";
 

@@ -1,0 +1,416 @@
+import test, { before, after } from 'node:test';
+import assert from 'node:assert/strict';
+import { startServer, client, eastern, addDays, tokenOf, ADMIN, CRON_SECRET } from './server.mjs';
+
+let srv; let api; let admin; let coach;
+const members = {}; // name -> { token, client, email, password }
+let crossfit; let openGym; let unlimited;
+const PW = 'member-pass-1';
+let seq = 0;
+
+async function addMember(name, { plan = unlimited, membership = {} } = {}) {
+  const email = `${name}@example.test`;
+  const c = await api.create('Client', { full_name: `${name} Tester`, email, status: 'active' }, coach.token);
+  const inv = await api.fn('createInvite', { client_id: c.id }, coach.token);
+  const reg = await api.call('POST', 'auth/register', { token: tokenOf(inv.link), full_name: `${name} Tester`, password: PW });
+  assert.equal(reg.status, 200, JSON.stringify(reg.data));
+  if (plan) await api.create('Membership', { client_id: c.id, plan_id: plan.id, start_date: addDays(eastern().date, -30), status: 'active', ...membership }, coach.token);
+  members[name] = { token: reg.data.token, client: c, email, id: reg.data.user.id };
+  return members[name];
+}
+// A one-off class; `hoursOut` from now in gym time.
+const makeClass = (hoursOut, extra = {}) => {
+  const { date, time } = eastern(Date.now() + hoursOut * 3600000);
+  seq += 1;
+  return api.create('ClassSession', { class_type_id: crossfit.id, class_type_name: `Class ${seq}`, date, start_time: time, duration_min: 60, slot_id: null, ...extra }, coach.token);
+};
+const book = (m, s, extra = {}) => api.fn('bookClass', { session_id: s.id, ...extra }, m.token);
+const roster = async (s) => (await api.fn('classRoster', { session_id: s.id }, coach.token));
+
+before(async () => {
+  srv = await startServer();
+  api = client(srv.base);
+  const first = await api.call('POST', 'auth/register', { email: ADMIN.email, password: ADMIN.password, full_name: 'Ada Admin' });
+  assert.equal(first.status, 200, JSON.stringify(first.data));
+  admin = { token: first.data.token, id: first.data.user.id };
+  const inv = await api.fn('createInvite', { email: 'coach@example.test', full_name: 'Cody Coach' }, admin.token);
+  const reg = await api.call('POST', 'auth/register', { token: tokenOf(inv.link), full_name: 'Cody Coach', password: 'coach-pass-1' });
+  coach = { token: reg.data.token, id: reg.data.user.id };
+  crossfit = await api.create('ClassType', { name: 'CrossFit', reservable: true, default_capacity: 20, default_duration_min: 60, is_active: true }, coach.token);
+  openGym = await api.create('ClassType', { name: 'Open Gym', reservable: false, default_capacity: null, default_duration_min: 60, is_active: true }, coach.token);
+  unlimited = await api.create('MembershipPlan', { name: 'Unlimited', kind: 'unlimited', class_type_ids: [], is_active: true }, coach.token);
+  await api.create('GymSettings', { waiver_required: false }, coach.token);
+  for (const n of ['alice', 'bob', 'cara']) await addMember(n);
+});
+after(() => srv?.stop());
+
+/* ---------------- accounts ---------------- */
+test('strangers cannot create an account of any type', async () => {
+  for (const body of [
+    { email: 'x1@example.test', password: PW, user_type: 'independent' },
+    { email: 'x2@example.test', password: PW, user_type: 'client' },
+    { email: 'x3@example.test', password: PW, user_type: 'trainer', beta_key: 'ANY' },
+    { email: 'alice@example.test', password: PW, user_type: 'client' },
+  ]) assert.equal((await api.call('POST', 'auth/register', body)).status, 403, body.email);
+});
+test('an unclaimed admin email cannot be registered by a stranger', async () => {
+  const r = await api.call('POST', 'auth/register', { email: 'second.admin@example.test', password: PW });
+  assert.equal(r.status, 403);
+});
+test('invite links: wrong, used, replaced and tampered links fail', async () => {
+  assert.equal((await api.call('POST', 'auth/link-info', { token: 'nope' })).status, 410);
+  assert.equal((await api.call('POST', 'auth/register', { token: { $ne: 1 }, password: PW })).status, 410);
+  const c = await api.create('Client', { full_name: 'Link Test', email: 'link@example.test', status: 'active' }, coach.token);
+  const one = await api.fn('createInvite', { client_id: c.id }, coach.token);
+  const two = await api.fn('createInvite', { client_id: c.id }, coach.token);
+  assert.equal((await api.call('POST', 'auth/link-info', { token: tokenOf(one.link) })).status, 410, 'old link off');
+  const info = await api.call('POST', 'auth/link-info', { token: tokenOf(two.link) });
+  assert.equal(info.data.email, 'link@example.test');
+  // The link decides who the account is for, not the request.
+  const reg = await api.call('POST', 'auth/register', { token: tokenOf(two.link), email: ADMIN.email, user_type: 'trainer', role: 'admin', password: PW });
+  assert.equal(reg.data.user.email, 'link@example.test');
+  assert.equal(reg.data.user.user_type, 'client');
+  assert.notEqual(reg.data.user.role, 'admin');
+  assert.equal((await api.call('POST', 'auth/register', { token: tokenOf(two.link), password: PW })).status, 410, 'works once');
+  const linked = (await api.call('GET', `entities/Client/${c.id}`, undefined, coach.token)).data;
+  assert.equal(linked.user_id, reg.data.user.id, 'client record is tied to the login');
+});
+test('two people opening one invite at once: only one account', async () => {
+  const c = await api.create('Client', { full_name: 'Race', email: 'race@example.test', status: 'active' }, coach.token);
+  const t = tokenOf((await api.fn('createInvite', { client_id: c.id }, coach.token)).link);
+  const rs = await Promise.all([1, 2, 3].map(() => api.call('POST', 'auth/register', { token: t, password: PW })));
+  assert.equal(rs.filter((r) => r.status === 200).length, 1);
+});
+test('short passwords are refused and do not use up the link', async () => {
+  const c = await api.create('Client', { full_name: 'Shorty', email: 'short@example.test', status: 'active' }, coach.token);
+  const t = tokenOf((await api.fn('createInvite', { client_id: c.id }, coach.token)).link);
+  assert.equal((await api.call('POST', 'auth/register', { token: t, password: 'short' })).status, 400);
+  assert.equal((await api.call('POST', 'auth/register', { token: t, password: PW })).status, 200);
+});
+test('who may invite and reset', async () => {
+  const a = members.alice;
+  assert.equal((await api.fn('createInvite', { client_id: a.client.id }, a.token)).success, false, 'member');
+  assert.equal((await api.fn('createInvite', { email: 'n@example.test' }, coach.token)).success, false, 'coach inviting coach');
+  assert.equal((await api.fn('createInvite', { client_id: a.client.id }, coach.token)).code, 'has_account');
+  assert.equal((await api.fn('createResetLink', { client_id: a.client.id }, coach.token)).success, false, 'coach reset');
+  assert.equal((await api.fn('createResetLink', { user_id: admin.id }, a.token)).success, false, 'member reset');
+  assert.equal((await api.fn('listTeam', {}, coach.token)).success, false);
+  assert.equal((await api.call('POST', 'functions/createInvite', { email: 'n@example.test' })).status, 401, 'signed out');
+});
+test('password reset: works once, signs out old sessions', async () => {
+  const m = await addMember('reset');
+  const old = m.token;
+  await new Promise((r) => setTimeout(r, 1100));
+  const link = (await api.fn('createResetLink', { client_id: m.client.id }, admin.token)).link;
+  const t = tokenOf(link);
+  assert.equal((await api.call('POST', 'auth/register', { token: t, password: PW })).status, 410, 'a reset link is not an invite');
+  const r = await api.call('POST', 'auth/reset', { token: t, password: 'brand-new-pass' });
+  assert.equal(r.status, 200);
+  assert.equal((await api.call('GET', 'auth/me', undefined, old)).status, 401, 'old session');
+  assert.equal((await api.call('GET', 'auth/me', undefined, r.data.token)).status, 200, 'new session');
+  assert.equal((await api.call('POST', 'auth/reset', { token: t, password: 'another-pass' })).status, 410);
+  assert.equal((await api.call('POST', 'auth/login', { email: m.email, password: PW })).status, 401);
+  assert.equal((await api.call('POST', 'auth/login', { email: m.email, password: 'brand-new-pass' })).status, 200);
+});
+test('change password needs the current one', async () => {
+  const m = await addMember('change');
+  assert.equal((await api.call('POST', 'auth/change-password', { current_password: 'wrong', password: 'next-pass-1' }, m.token)).status, 400);
+  assert.equal((await api.call('POST', 'auth/change-password', { current_password: PW, password: 'x' }, m.token)).status, 400);
+  const ok = await api.call('POST', 'auth/change-password', { current_password: PW, password: 'next-pass-1' }, m.token);
+  assert.equal(ok.status, 200);
+  assert.equal((await api.call('GET', 'auth/me', undefined, ok.data.token)).status, 200);
+  assert.equal((await api.call('POST', 'auth/change-password', { current_password: 'a', password: 'next-pass-2' })).status, 401);
+});
+test('lockout after 10 wrong passwords, cleared by a reset', async () => {
+  const m = await addMember('locked');
+  for (let i = 0; i < 10; i += 1) await api.call('POST', 'auth/login', { email: m.email, password: 'nope' });
+  assert.equal((await api.call('POST', 'auth/login', { email: m.email, password: PW })).status, 429);
+  const t = tokenOf((await api.fn('createResetLink', { client_id: m.client.id }, admin.token)).link);
+  await api.call('POST', 'auth/reset', { token: t, password: 'after-lock-1' });
+  assert.equal((await api.call('POST', 'auth/login', { email: m.email, password: 'after-lock-1' })).status, 200);
+});
+test('forgot password gives the same answer for any email', async () => {
+  const a = await api.call('POST', 'auth/forgot', { email: members.alice.email });
+  const b = await api.call('POST', 'auth/forgot', { email: 'nobody@example.test' });
+  assert.deepEqual(a, b);
+});
+test('turning off a coach signs them out; admins are protected', async () => {
+  const inv = await api.fn('createInvite', { email: 'temp@example.test', full_name: 'Temp' }, admin.token);
+  const reg = (await api.call('POST', 'auth/register', { token: tokenOf(inv.link), full_name: 'Temp', password: PW })).data;
+  assert.equal((await api.fn('setCoachAccess', { user_id: reg.user.id, disabled: true }, coach.token)).success, false, 'coach cannot');
+  assert.equal((await api.fn('setCoachAccess', { user_id: reg.user.id, disabled: true }, admin.token)).success, true);
+  assert.equal((await api.call('GET', 'entities/Client', undefined, reg.token)).status, 401);
+  assert.equal((await api.call('POST', 'auth/login', { email: 'temp@example.test', password: PW })).status, 403);
+  assert.equal((await api.fn('setCoachAccess', { user_id: admin.id, disabled: true }, admin.token)).success, false);
+  assert.equal((await api.fn('setCoachAccess', { user_id: reg.user.id, disabled: false }, admin.token)).success, true);
+  assert.equal((await api.call('POST', 'auth/login', { email: 'temp@example.test', password: PW })).status, 200);
+});
+test('members cannot raise their own privileges', async () => {
+  const a = members.alice;
+  await api.call('PUT', 'auth/me', { role: 'admin', user_type: 'trainer', email: ADMIN.email, billing: { plan: 'studio' }, disabled: false, sessions_valid_from: 0, id: admin.id }, a.token);
+  const me = (await api.call('GET', 'auth/me', undefined, a.token)).data;
+  assert.equal(me.user_type, 'client'); assert.notEqual(me.role, 'admin'); assert.equal(me.email, a.email); assert.equal(me.id, a.id); assert.equal(me.billing, undefined);
+  assert.equal((await api.call('PUT', `entities/User/${a.id}`, { role: 'admin' }, a.token)).status, 405);
+  const users = await api.list('User', a.token);
+  assert.deepEqual(users.map((u) => u.id), [a.id]);
+});
+test('server functions need a sign-in', async () => {
+  for (const n of ['sendInviteEmail', 'sendResourceEmail', 'sendSessionReminder', 'aiPersonalizedPlans', 'generateJournalPrompt', 'parseRecipeFromText', 'searchFoods', 'bookClass', 'classRoster']) {
+    assert.equal((await api.call('POST', `functions/${n}`, {})).status, 401, n);
+  }
+  assert.equal((await api.fn('sendResourceEmail', { to: 'x@example.test' }, members.alice.token)).success, false);
+  for (const p of ['entities/Client', 'audit', 'auth/export']) assert.equal((await api.call('GET', p)).status, 401, p);
+  assert.equal((await api.call('GET', 'audit', undefined, coach.token)).status, 403);
+});
+
+/* ---------------- privacy ---------------- */
+test("members see only their own records", async () => {
+  const { alice, bob } = members;
+  const note = await api.create('ProgressLog', { client_id: bob.client.id, date: eastern().date, weight: 200 }, bob.token);
+  const clients = await api.list('Client', alice.token);
+  assert.deepEqual([...new Set(clients.map((c) => c.email))], [alice.email]);
+  assert.equal((await api.call('GET', `entities/Client/${bob.client.id}`, undefined, alice.token)).status, 404);
+  assert.ok(note?.id, 'bob saved his own log');
+  assert.equal((await api.call('GET', `entities/ProgressLog/${note.id}`, undefined, alice.token)).status, 404);
+  assert.notEqual((await api.call('PUT', `entities/ProgressLog/${note.id}`, { weight: 1 }, alice.token)).status, 200);
+  assert.notEqual((await api.call('DELETE', `entities/ProgressLog/${note.id}`, undefined, alice.token)).status, 200);
+  assert.equal((await api.fn('classRoster', { session_id: 'x' }, alice.token)).success, false);
+  for (const t of ['Membership', 'Reservation', 'Message', 'Notification']) {
+    const rows = await api.list(t, alice.token);
+    for (const r of rows) assert.ok(!JSON.stringify(r).includes(bob.client.id), t);
+  }
+});
+test('members cannot write gym records', async () => {
+  const a = members.alice;
+  const s = await makeClass(48);
+  for (const [t, body] of [['ClassSession', { class_type_id: crossfit.id, date: eastern().date, start_time: '10:00' }], ['ClassSlot', { class_type_id: crossfit.id }], ['ClassType', { name: 'x' }], ['MembershipPlan', { name: 'x' }], ['GymSettings', { booking_open_hours: 9999 }], ['Membership', { client_id: a.client.id, plan_id: unlimited.id }], ['Reservation', { session_id: s.id, client_id: a.client.id, status: 'checked_in' }]]) {
+    assert.equal((await api.call('POST', `entities/${t}`, body, a.token)).status, 403, t);
+  }
+  assert.equal((await api.update('ClassSession', s.id, { capacity: 1 }, a.token)).status, 403);
+});
+
+/* ---------------- booking rules ---------------- */
+test('booking window: default, class override and single-class override', async () => {
+  const a = members.alice;
+  assert.equal((await book(a, await makeClass(24 * 3))).success, true);
+  assert.equal((await book(a, await makeClass(24 * 10))).code, 'booking_not_open');
+  assert.equal((await book(a, await makeClass(24 * 10, { booking_open_hours: 336 }))).success, true);
+  const s = await makeClass(24 * 3 + 2, { booking_open_hours: 24 });
+  assert.equal((await book(a, s)).code, 'booking_not_open');
+  await api.update('ClassSession', s.id, { overrides: { booking_open_hours: 120 } }, coach.token);
+  assert.equal((await book(a, s)).success, true);
+});
+test('booking closes an hour before class', async () => {
+  assert.equal((await book(members.alice, await makeClass(0.75))).code, 'booking_closed');
+  assert.equal((await book(members.alice, await makeClass(1.5))).success, true);
+});
+test('no double booking', async () => {
+  const s = await makeClass(30);
+  await Promise.all([book(members.alice, s), book(members.alice, s), book(members.alice, s)]);
+  assert.equal((await roster(s)).session.reserved_count, 1);
+});
+test('last spot: one gets in, the rest are waitlisted in order, cancel promotes', async () => {
+  const s = await makeClass(40, { capacity: 1 });
+  const rs = await Promise.all(['alice', 'bob', 'cara'].map((n) => book(members[n], s)));
+  assert.equal(rs.filter((r) => r.status === 'reserved').length, 1, JSON.stringify(rs.map((r) => r.status || r.error)));
+  assert.equal(rs.filter((r) => r.status === 'waitlisted').length, 2);
+  const first = rs.findIndex((r) => r.status === 'reserved');
+  const names = ['alice', 'bob', 'cara'];
+  const c = await api.fn('cancelReservation', { reservation_id: rs[first].reservation.id }, members[names[first]].token);
+  assert.equal(c.success, true);
+  const now = await roster(s);
+  assert.equal(now.session.reserved_count, 1);
+  assert.equal(now.session.waitlist_count, 1);
+});
+test('late cancel does not promote the waitlist', async () => {
+  const s = await makeClass(4, { capacity: 1 });
+  const a = await book(members.alice, s);
+  assert.equal((await book(members.bob, s)).status, 'waitlisted');
+  await api.fn('cancelReservation', { reservation_id: a.reservation.id }, members.alice.token);
+  const r = await roster(s);
+  assert.equal(r.session.reserved_count, 0);
+  assert.equal(r.session.waitlist_count, 1);
+});
+test('a member cannot cancel or book for someone else', async () => {
+  const s = await makeClass(50);
+  const a = await book(members.alice, s);
+  assert.equal((await api.fn('cancelReservation', { reservation_id: a.reservation.id }, members.bob.token)).success, false);
+  assert.equal((await book(members.bob, s, { client_id: members.cara.client.id })).success, false);
+});
+test('weekly limit: 2 a week, counted per week, staff can override', async () => {
+  const plan = await api.create('MembershipPlan', { name: 'Two a week', kind: 'limited', limit_count: 2, limit_period: 'week', class_type_ids: [], is_active: true }, coach.token);
+  const m = await addMember('limited', { plan });
+  // Three classes on one day, so they always share a Monday-to-Sunday week.
+  const day = 24 * 2;
+  const s = [await makeClass(day), await makeClass(day), await makeClass(day)];
+  assert.equal((await book(m, s[0])).success, true);
+  assert.equal((await book(m, s[1])).success, true);
+  assert.equal((await book(m, s[2])).success, false);
+  const forced = await api.fn('bookClass', { session_id: s[2].id, client_id: m.client.id }, coach.token);
+  assert.equal(forced.can_override, true);
+  assert.equal((await api.fn('bookClass', { session_id: s[2].id, client_id: m.client.id, override: true }, coach.token)).success, true);
+});
+test('racing the weekly limit cannot beat it', async () => {
+  const plan = await api.create('MembershipPlan', { name: 'One a week', kind: 'limited', limit_count: 1, limit_period: 'week', class_type_ids: [], is_active: true }, coach.token);
+  const m = await addMember('racer', { plan });
+  const s = await Promise.all([1, 2, 3].map(() => makeClass(48)));
+  const rs = await Promise.all(s.map((x) => book(m, x)));
+  assert.equal(rs.filter((r) => r.success).length, 1);
+});
+test('punch card: used at check-in, returned on undo, stops at zero', async () => {
+  const plan = await api.create('MembershipPlan', { name: 'Punch', kind: 'punch', limit_count: 1, limit_period: 'total', duration_days: 90, class_type_ids: [], is_active: true }, coach.token);
+  const m = await addMember('puncher', { plan });
+  const used = async () => (await api.list('Membership', coach.token)).find((x) => x.client_id === m.client.id).sessions_used;
+  const s = await makeClass(0.2);
+  const inn = await api.fn('checkIn', { session_id: s.id, client_id: m.client.id }, coach.token);
+  assert.equal(inn.success, true, inn.error);
+  assert.equal(await used(), 1);
+  assert.equal((await book(m, await makeClass(30))).success, false, 'no visits left');
+  assert.equal((await api.fn('undoCheckIn', { reservation_id: inn.reservation.id }, coach.token)).success, true);
+  assert.equal(await used(), 0);
+});
+test('no membership, expired membership and wrong class type are refused', async () => {
+  const none = await addMember('nomember', { plan: null });
+  assert.equal((await book(none, await makeClass(30))).success, false);
+  const old = await addMember('expired', { membership: { end_date: addDays(eastern().date, -1) } });
+  assert.equal((await book(old, await makeClass(30))).success, false);
+  const plan = await api.create('MembershipPlan', { name: 'Open gym only', kind: 'unlimited', class_type_ids: [openGym.id], is_active: true }, coach.token);
+  const og = await addMember('ogonly', { plan });
+  assert.equal((await book(og, await makeClass(30))).success, false);
+});
+test('waiver: required when on, accepted once signed', async () => {
+  const gs = (await api.list('GymSettings', coach.token))[0];
+  await api.update('GymSettings', gs.id, { waiver_required: true }, coach.token);
+  const m = await addMember('waiver');
+  const s = await makeClass(30);
+  assert.equal((await book(m, s)).code, 'waiver_required');
+  await api.create('Contract', { client_id: m.client.id, type: 'waiver', title: 'Liability Waiver', status: 'signed' }, coach.token);
+  assert.equal((await book(m, s)).success, true);
+  await api.update('GymSettings', gs.id, { waiver_required: false }, coach.token);
+});
+
+/* ---------------- check-in ---------------- */
+test('self check-in opens 30 minutes before class', async () => {
+  assert.equal((await api.fn('checkIn', { session_id: (await makeClass(2)).id }, members.alice.token)).code, 'checkin_not_open');
+  const s = await makeClass(0.2);
+  assert.equal((await api.fn('checkIn', { session_id: s.id }, members.alice.token)).success, true);
+  assert.equal((await api.fn('checkIn', { session_id: s.id }, members.alice.token)).already, true);
+  assert.equal((await roster(s)).session.checked_in_count, 1);
+});
+test('self check-in closes 30 minutes after start', async () => {
+  assert.equal((await api.fn('checkIn', { session_id: (await makeClass(-0.75)).id }, members.alice.token)).code, 'checkin_closed');
+});
+test('coach: check in, undo, no-show, walk-in; not for a future day', async () => {
+  const early = await makeClass(0.3);
+  const eb = await api.fn('bookClass', { session_id: early.id, client_id: members.cara.client.id }, coach.token);
+  assert.equal((await api.fn('markNoShow', { reservation_id: eb.reservation.id }, coach.token)).code, 'class_not_started');
+  const s = await makeClass(-0.3);
+  const b = await api.fn('bookClass', { session_id: s.id, client_id: members.alice.client.id }, coach.token);
+  const args = { session_id: s.id, client_id: members.alice.client.id, reservation_id: b.reservation.id };
+  assert.equal((await api.fn('checkIn', args, coach.token)).success, true);
+  assert.equal((await api.fn('undoCheckIn', args, coach.token)).success, true);
+  assert.equal((await api.fn('markNoShow', args, coach.token)).success, true);
+  assert.equal((await api.fn('checkIn', args, coach.token)).success, true, 'no-show then arrives');
+  assert.equal((await api.fn('checkIn', { session_id: s.id, client_id: members.bob.client.id }, coach.token)).success, true, 'walk-in');
+  assert.equal((await roster(s)).session.checked_in_count, 2);
+  assert.equal((await api.fn('markNoShow', args, members.bob.token)).success, false, 'member cannot');
+  assert.equal((await api.fn('checkIn', { session_id: (await makeClass(50)).id, client_id: members.bob.client.id }, coach.token)).code, 'checkin_not_open');
+});
+test('open gym takes check-ins, not reservations', async () => {
+  const s = await makeClass(0.2, { class_type_id: openGym.id });
+  assert.equal((await book(members.alice, s)).code, 'not_reservable');
+  assert.equal((await api.fn('checkIn', { session_id: s.id }, members.alice.token)).success, true);
+});
+test('cancelling a class releases everyone and tells them', async () => {
+  const s = await makeClass(60);
+  await book(members.alice, s); await book(members.bob, s);
+  const r = await api.fn('cancelClassSession', { session_id: s.id, reason: 'Holiday' }, coach.token);
+  assert.equal(r.affected, 2);
+  assert.equal((await book(members.cara, s)).code, 'class_cancelled');
+  const notes = await api.list('Notification', members.alice.token);
+  assert.ok(notes.some((n) => n.type === 'class' && /Holiday|cancel/i.test(`${n.title} ${n.message}`)));
+  assert.equal((await api.fn('cancelClassSession', { session_id: s.id }, members.alice.token)).success, false);
+});
+
+/* ---------------- schedule ---------------- */
+test('weekly slot: makes classes once, follows edits, keeps booked ones', async () => {
+  const today = eastern().date;
+  const target = addDays(today, 2);
+  const dow = new Date(`${target}T12:00:00Z`).getUTCDay();
+  const slot = await api.create('ClassSlot', { class_type_id: crossfit.id, day_of_week: dow, start_time: '09:30', duration_min: 60, start_date: today, is_active: true }, coach.token);
+  const mine = async () => (await api.fn('classSchedule', { from: today, to: addDays(today, 60) }, coach.token)).sessions.filter((s) => s.slot_id === slot.id);
+  const first = await mine();
+  assert.equal(first.length, 3);
+  await api.fn('classTick', {}, coach.token); await api.fn('classTick', {}, coach.token);
+  assert.equal((await mine()).length, 3, 'no duplicates');
+  await book(members.alice, first[0]);
+  const edit = await api.update('ClassSlot', slot.id, { start_time: '08:30' }, coach.token);
+  assert.equal(edit.data.class_sync.booked_kept, 1);
+  const after = await mine();
+  assert.equal(after[0].start_time, '09:30', 'booked class keeps its time');
+  assert.equal(after[1].start_time, '08:30');
+  await api.update('ClassSlot', slot.id, { booking_open_hours: 30 * 24 }, coach.token);
+  const far = await mine();
+  assert.ok(far.at(-1).date >= addDays(today, 24), 'calendar reaches the booking window');
+  await api.update('ClassSlot', slot.id, { is_active: false }, coach.token);
+  assert.equal((await mine()).filter((s) => s.status === 'scheduled').length, 1, 'only the booked class stays');
+});
+test('class times stay put across the clock change', async () => {
+  // 9:30 in Chattanooga is 13:30 UTC in summer and 14:30 in winter.
+  const mk = (date) => api.create('ClassSession', { class_type_id: crossfit.id, date, start_time: '09:30', duration_min: 60, slot_id: null }, coach.token);
+  assert.equal((await mk('2027-03-13')).start_at, '2027-03-13T14:30:00.000Z');
+  assert.equal((await mk('2027-03-14')).start_at, '2027-03-14T13:30:00.000Z');
+  assert.equal((await mk('2027-11-06')).start_at, '2027-11-06T13:30:00.000Z');
+  assert.equal((await mk('2027-11-07')).start_at, '2027-11-07T14:30:00.000Z');
+});
+test('a one-time class never repeats', async () => {
+  const s = await makeClass(70);
+  await api.fn('classTick', {}, coach.token);
+  const all = (await api.fn('classSchedule', { from: eastern().date, to: addDays(eastern().date, 60) }, coach.token)).sessions;
+  assert.equal(all.filter((x) => x.class_type_name === s.class_type_name).length, 1);
+});
+
+/* ---------------- programs and the scheduled job ---------------- */
+test('scheduled job needs its secret and reports a heartbeat', async () => {
+  assert.equal((await api.call('POST', 'cron/program-tick', {})).status, 401);
+  assert.equal((await api.call('POST', 'cron/program-tick', {}, null, { 'x-cron-secret': 'wrong-cron-secre' })).status, 401);
+  assert.equal((await api.call('POST', 'cron/program-tick', {}, null, { 'x-cron-secret': CRON_SECRET })).status, 200);
+  const st = await api.fn('systemStatus', {}, admin.token);
+  assert.equal(st.cron_ok, true);
+  assert.equal((await api.fn('systemStatus', {}, coach.token)).success, false);
+});
+test('programs: today shows today, messages send once, nothing goes early', async () => {
+  const p = await api.create('Program', { name: 'Reset', duration_weeks: 1, status: 'published', kind: 'program' }, coach.token);
+  const l1 = await api.create('Lesson', { title: 'Day one lesson' }, coach.token);
+  const l2 = await api.create('Lesson', { title: 'Day two lesson' }, coach.token);
+  await api.create('ProgramItem', { program_id: p.id, day: 1, type: 'lesson', lesson_id: l1.id, sort: 0 }, coach.token);
+  await api.create('ProgramItem', { program_id: p.id, day: 2, type: 'lesson', lesson_id: l2.id, sort: 0 }, coach.token);
+  await api.create('ProgramItem', { program_id: p.id, day: 1, type: 'message', text: 'Welcome to day one', send_time: '00:00', sort: 1 }, coach.token);
+  await api.create('ProgramItem', { program_id: p.id, day: 2, type: 'message', text: 'This is day two', send_time: '00:00', sort: 1 }, coach.token);
+  const cara = members.cara;
+  await api.update('Client', cara.client.id, { trainer_id: coach.id }, coach.token);
+  const enroll = { program_id: p.id, client_id: cara.client.id, start_date: eastern().date };
+  assert.equal((await api.fn('enrollInProgram', enroll, members.alice.token)).success, false, 'member cannot');
+  const e = await api.fn('enrollInProgram', enroll, coach.token);
+  assert.equal(e.success, true, e.error);
+  assert.equal((await api.fn('enrollInProgram', enroll, coach.token)).success, false, 'no double enroll');
+  const today = JSON.stringify(await api.fn('programTodayForMe', {}, cara.token));
+  assert.ok(today.includes('Day one lesson'));
+  assert.ok(!JSON.stringify(await api.fn('programTodayForMe', {}, members.bob.token)).includes('Day one lesson'), 'not for others');
+  await Promise.all([1, 2, 3].map(() => api.call('POST', 'cron/program-tick', {}, null, { 'x-cron-secret': CRON_SECRET })));
+  const msgs = (await api.list('Message', cara.token)).map((m) => m.content);
+  assert.equal(msgs.filter((m) => m === 'Welcome to day one').length, 1, 'sent exactly once');
+  assert.equal(msgs.filter((m) => m === 'This is day two').length, 0, 'tomorrow is not sent early');
+});
+
+/* ---------------- errors ---------------- */
+test('app errors are recorded, counted and shown to admins', async () => {
+  const body = { source: 'page', message: 'Boom in test', page: '/Classes' };
+  assert.equal((await api.call('POST', 'client-error', body)).status, 401);
+  await api.call('POST', 'client-error', body, members.alice.token);
+  await api.call('POST', 'client-error', body, members.alice.token);
+  const st = await api.fn('systemStatus', {}, admin.token);
+  assert.equal(st.errors.find((x) => x.message === 'Boom in test').hits, 2);
+  const notes = (await api.list('Notification', admin.token)).filter((n) => n.title === 'App error');
+  assert.equal(notes.length, 1);
+});

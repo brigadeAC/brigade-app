@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Sparkles, Send, MessageCircle, User, Loader2, Plus, MessageSquare, Copy, Zap, CheckCircle2, AlertCircle, ChevronRight, Clock, Bot, Dumbbell, Utensils } from "lucide-react";
+import { Sparkles, Send, User, Loader2, Plus, MessageSquare, Copy, Zap, CheckCircle2, AlertCircle, ChevronRight, Clock, Bot, Dumbbell, Utensils } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import ReactMarkdown from 'react-markdown';

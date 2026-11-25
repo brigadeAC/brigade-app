@@ -1,7 +1,7 @@
-import React, { useState } from "react";
+import React from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Activity, AlertTriangle, BrainCircuit, HeartPulse, RefreshCw, Thermometer, Wind, ScanFace } from "lucide-react";
+import { Activity, AlertTriangle, BrainCircuit, HeartPulse, RefreshCw, Thermometer, Wind } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 
 export default function ReadinessAnalyzer({ client, progressLogs }) {

@@ -3,9 +3,8 @@ import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Edit2, Trash2, Mail, Users } from "lucide-react";
+import { Edit2, Mail } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { cn } from "@/lib/utils";
 
 export default function TrainerManagement({ trainers, onRefresh, title = "Manage Trainers", emptyMessage = "No trainers found", entityType = "trainer" }) {
   const [editingTrainer, setEditingTrainer] = useState(null);

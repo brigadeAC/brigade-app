@@ -17,25 +17,6 @@ export default function Home() {
           try {
             const user = await base44.auth.me();
             if (user) {
-              // Check if user is trying to register as a trainer with a beta key
-              const betaKey = sessionStorage.getItem("trainerBetaKey");
-              if (betaKey) {
-                try {
-                  const res = await base44.functions.invoke('claimBetaKey', { key: betaKey });
-                  sessionStorage.removeItem("trainerBetaKey");
-                  
-                  if (res.data && res.data.success) {
-                    navigate(createPageUrl('Dashboard'), { replace: true });
-                    // Force a reload to get new role/type
-                    window.location.reload();
-                    return;
-                  }
-                } catch (e) {
-                  console.error("Beta key claim failed", e);
-                  sessionStorage.removeItem("trainerBetaKey");
-                }
-              }
-
               // Admins and trainers go to trainer dashboard
               const effectiveUserType = user.user_type 
                 || user.data?.user_type 

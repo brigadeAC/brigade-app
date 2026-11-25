@@ -1,9 +1,8 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
-import { ArrowRight, LogOut, Monitor } from "lucide-react";
+import { ArrowRight, Monitor } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import TrainerManagement from "./TrainerManagement";
 
 export default function AdminFullDashboard({ 

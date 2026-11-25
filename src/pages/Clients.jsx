@@ -10,7 +10,6 @@ import {
   Users,
   Grid3X3,
   List,
-  SlidersHorizontal,
   Sheet
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -40,6 +39,7 @@ import WorkoutForm from "@/components/workouts/WorkoutForm";
 import MealPlanForm from "@/components/meals/MealPlanForm";
 import GoogleSheetsImporter from "@/components/imports/GoogleSheetsImporter";
 import EnrollDialog from "@/components/programs/client/EnrollDialog";
+import AppAccessDialog from "@/components/accounts/AppAccessDialog";
 import { cn } from "@/lib/utils";
 import EmptyState from "@/components/ui/empty-state";
 import SkeletonList from "@/components/ui/skeleton-list";
@@ -51,6 +51,7 @@ export default function Clients() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [viewMode, setViewMode] = useState("grid");
   const [showClientForm, setShowClientForm] = useState(false);
+  const [accessFor, setAccessFor] = useState(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showSessionForm, setShowSessionForm] = useState(false);
   const [showWorkoutForm, setShowWorkoutForm] = useState(false);
@@ -97,13 +98,15 @@ export default function Clients() {
       if (editingClient) {
         await updateClientMutation.mutateAsync({ id: editingClient.id, data });
       } else {
-        await createClientMutation.mutateAsync(data);
+        const created = await createClientMutation.mutateAsync(data);
+        // Next step for a new client: send them their link.
+        if (created?.id && created.email) setAccessFor(created);
       }
       setEditingClient(null);
       setShowClientForm(false);
     } catch (error) {
-      console.error("Client submission error:", error);
-      alert(error.message || "Failed to save client");
+      // The form shows the message and stays open.
+      throw error;
     }
   };
 
@@ -241,6 +244,7 @@ export default function Clients() {
               onWorkout={(c) => { setSelectedClient(c); setShowWorkoutForm(true); }}
               onMealPlan={(c) => { setSelectedClient(c); setShowMealPlanForm(true); }}
               onAssignProgram={(c) => setAssignFor(c)}
+              onAppAccess={(c) => setAccessFor(c)}
             />
           ))}
         </div>
@@ -270,6 +274,8 @@ export default function Clients() {
         client={selectedClient}
         onSubmit={handleSubmitClient}
       />
+
+      <AppAccessDialog client={accessFor} open={!!accessFor} onOpenChange={(v) => !v && setAccessFor(null)} />
 
       <ClientForm
         open={showClientForm}

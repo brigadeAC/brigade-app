@@ -1,14 +1,9 @@
 import React, { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { CheckCircle2, FileText, Download, Eye, PenLine } from "lucide-react";
-import ParQForm from "@/components/forms/ParQForm";
-import ClientIntakeForm from "@/components/forms/ClientIntakeForm";
-import MedicalReleaseFormPrintable from "@/components/forms/MedicalReleaseFormPrintable";
+import { FileText, Download, Eye, PenLine } from "lucide-react";
 import MedicalReleaseUpload from "@/components/forms/MedicalReleaseUpload";
 import ESignDialog from "@/components/contracts/ESignDialog";
 

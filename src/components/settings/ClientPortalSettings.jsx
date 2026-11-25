@@ -2,12 +2,10 @@ import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
 import { showSuccess } from "@/components/ui/success-toast";
-import {
-  LayoutDashboard, Map, Dumbbell, Utensils, LineChart,
-  CalendarDays, CheckSquare, ShoppingBasket, Library,
-  Users2, MessageCircle, Save, ChefHat
+import { Dumbbell, Utensils, LineChart,
+  CalendarDays, CheckSquare, Library,
+  Users2, MessageCircle, Save
 } from "lucide-react";
 
 const PORTAL_FEATURES = [

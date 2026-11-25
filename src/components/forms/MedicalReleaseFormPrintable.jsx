@@ -1,6 +1,6 @@
 import React, { useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Printer, Download } from "lucide-react";
+import { Printer } from "lucide-react";
 
 export default function MedicalReleaseFormPrintable({ clientName, trainerName, businessName }) {
   const printRef = useRef();

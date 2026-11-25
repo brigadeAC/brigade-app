@@ -96,6 +96,21 @@ const auth = {
     setToken(res.token);
     return res.user;
   },
+  async linkInfo(token) {
+    return api('auth/link-info', { method: 'POST', body: { token } });
+  },
+  async forgot(email) {
+    return api('auth/forgot', { method: 'POST', body: { email } });
+  },
+  async resetPassword(token, password) {
+    const res = await api('auth/reset', { method: 'POST', body: { token, password } });
+    setToken(res.token);
+    return res.user;
+  },
+  async changePassword(current_password, password) {
+    const res = await api('auth/change-password', { method: 'POST', body: { current_password, password } });
+    setToken(res.token);
+  },
   async isAuthenticated() {
     if (!getToken()) return false;
     try {

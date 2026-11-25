@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Play, Pause, RotateCcw, ChevronRight, ChevronLeft, CheckCircle2 } from "lucide-react";
+import { ChevronRight, ChevronLeft, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 
 export default function LiveWorkoutMode({ workoutSession, setWorkoutSession, onComplete }) {

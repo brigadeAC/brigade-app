@@ -2,16 +2,10 @@ import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { base44 } from "@/api/base44Client";
 import { toast } from "sonner";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+
+
 import { ResponsiveSelect } from "@/components/ui/responsive-select";
 import {
   Dialog,
@@ -19,7 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { User, Mail, Phone, Calendar, Target, AlertCircle, Loader2, Ruler, Weight, Activity } from "lucide-react";
+import { User, Mail, Phone, Calendar, Loader2 } from "lucide-react";
 
 export default function ClientForm({ open, onOpenChange, client, onSubmit }) {
   const defaultFormData = {
@@ -90,25 +84,7 @@ export default function ClientForm({ open, onOpenChange, client, onSubmit }) {
       
       await onSubmit(dataToSubmit);
       
-      // Send invitation email if new client
-      if (!client && formData.email) {
-        await base44.users.inviteUser(formData.email, "user");
-        
-        try {
-          const signupLink = `${window.location.origin}/app/ClientOnboarding`;
-          await base44.functions.invoke('sendInviteEmail', {
-            clientEmail: formData.email,
-            clientName: formData.full_name,
-            trainerName: user?.full_name || 'Your Trainer',
-            signupLink
-          });
-        } catch (e) {
-          console.error('Failed to send invite email:', e);
-        }
-        
-        toast.success(`Client added and invitation sent to ${formData.email}`);
-      }
-      
+      toast.success(client ? "Client saved" : "Client added");
       onOpenChange(false);
     } catch (error) {
       toast.error(error.message || "Failed to save client");

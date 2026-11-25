@@ -1,11 +1,11 @@
 import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { CheckCircle2, Clock, Sparkles, Loader2 } from "lucide-react";
+import { CheckCircle2, Sparkles, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 export default function WorkoutCompletionLogger({ workoutPlan, clientProfile, onComplete }) {

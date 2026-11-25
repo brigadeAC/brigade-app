@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { CalendarDays, Clock, Video } from "lucide-react";
+import { CalendarDays, Video } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function ScheduleVideoModal({ open, onOpenChange, clientId, clientName, trainerId, onSuccess }) {

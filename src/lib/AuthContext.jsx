@@ -89,6 +89,15 @@ export const AuthProvider = ({ children }) => {
     return created;
   };
 
+  const resetPassword = async (token, password) => {
+    const signedIn = await base44.auth.resetPassword(token, password);
+    applyUserPrefs(signedIn);
+    setUser(signedIn);
+    setIsAuthenticated(true);
+    setAuthError(null);
+    return signedIn;
+  };
+
   const logout = (shouldRedirect = true) => {
     setUser(null);
     setIsAuthenticated(false);
@@ -109,6 +118,7 @@ export const AuthProvider = ({ children }) => {
     appPublicSettings,
     login,
     register,
+    resetPassword,
     logout,
     navigateToLogin,
     checkUserAuth,

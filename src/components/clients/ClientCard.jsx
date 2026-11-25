@@ -1,5 +1,5 @@
 import React from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,7 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
-import { Mail, Phone, MoreVertical, Edit, Trash2, Calendar, Dumbbell, Eye, ClipboardList, Utensils, BookOpen, GraduationCap } from "lucide-react";
+import { Mail, Phone, MoreVertical, Edit, Trash2, Calendar, Dumbbell, ClipboardList, Utensils, BookOpen, GraduationCap, KeyRound } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createPageUrl } from "@/utils";
 
@@ -19,7 +19,7 @@ const statusStyles = {
   paused: "bg-amber-100 text-amber-700 border-amber-200"
 };
 
-export default function ClientCard({ client, onEdit, onDelete, onSchedule, onWorkout, onMealPlan, onEditOnboarding, onAssignProgram }) {
+export default function ClientCard({ client, onEdit, onDelete, onSchedule, onWorkout, onMealPlan, onEditOnboarding, onAssignProgram, onAppAccess }) {
   const navigate = useNavigate();
   return (
     <div 
@@ -79,6 +79,11 @@ export default function ClientCard({ client, onEdit, onDelete, onSchedule, onWor
             {onAssignProgram && (
               <DropdownMenuItem onClick={(e) => { e.preventDefault(); e.stopPropagation(); onAssignProgram(client); }} className="gap-2">
                 <GraduationCap className="w-4 h-4" /> Assign Program
+              </DropdownMenuItem>
+            )}
+            {onAppAccess && (
+              <DropdownMenuItem onClick={(e) => { e.preventDefault(); e.stopPropagation(); onAppAccess(client); }} className="gap-2">
+                <KeyRound className="w-4 h-4" /> App access
               </DropdownMenuItem>
             )}
             <DropdownMenuItem onClick={(e) => { e.preventDefault(); e.stopPropagation(); onSchedule?.(client); }} className="gap-2">

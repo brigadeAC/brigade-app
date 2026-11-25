@@ -44,9 +44,7 @@ import {
   Loader2,
   Send,
   ShoppingCart,
-  Play,
-  Pause,
-  Archive
+  Play
 } from "lucide-react";
 
 const statusStyles = {

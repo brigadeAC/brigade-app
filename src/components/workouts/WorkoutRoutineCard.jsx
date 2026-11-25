@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronUp, Dumbbell, Clock, RotateCcw, CheckCircle2, Circle } from "lucide-react";
+import { ChevronDown, ChevronUp, Dumbbell, Clock, CheckCircle2, Circle } from "lucide-react";
 import ItemCompletionTracker from "@/components/ItemCompletionTracker";
 
 /**

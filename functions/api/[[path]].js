@@ -138,8 +138,85 @@ async function currentUser(request, env) {
   if (!payload) return null;
   const row = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(payload.sub).first();
   const u = userRow(row);
-  if (u) u.role = resolveRole(env, u.email, u.role);
+  if (!u || u.disabled) return null;
+  // A password change or reset signs out every session issued before it.
+  if (u.sessions_valid_from && (payload.iat || 0) < u.sessions_valid_from) return null;
+  u.role = resolveRole(env, u.email, u.role);
   return u;
+}
+
+/* ---------------------------- account links ------------------------------ */
+// One-time links for joining (invite) and resetting a password (reset). Only a
+// hash of the token is stored, in its own table, so no entity route can read it.
+const INVITE_HOURS = 14 * 24;
+const STAFF_RESET_HOURS = 24;
+const EMAIL_RESET_HOURS = 1;
+const BAD_LINK = 'This link has expired or was already used. Ask for a new one.';
+
+async function sha256Hex(text) {
+  const d = await crypto.subtle.digest('SHA-256', enc.encode(text));
+  return [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+// The token goes in the URL fragment, which browsers never send to servers.
+async function createAccountLink(env, url, { kind, email, user_type = null, client_id = null, full_name = '', created_by = null, hours }) {
+  const token = b64url(crypto.getRandomValues(new Uint8Array(32)));
+  const addr = email.trim().toLowerCase();
+  await env.DB.batch([
+    // A new link replaces any earlier unused one.
+    env.DB.prepare('DELETE FROM account_tokens WHERE kind = ? AND email = ? AND used_date IS NULL').bind(kind, addr),
+    env.DB.prepare(
+      'INSERT INTO account_tokens (token_hash, kind, email, user_type, client_id, full_name, created_by, created_date, expires_date) VALUES (?,?,?,?,?,?,?,?,?)'
+    ).bind(await sha256Hex(token), kind, addr, user_type, client_id, full_name || '', created_by, nowISO(), new Date(Date.now() + hours * 3600000).toISOString()),
+  ]);
+  return `${url.origin}/Login#${kind}=${token}`;
+}
+
+async function findAccountLink(env, token, kind) {
+  if (!token || typeof token !== 'string') return null;
+  const row = await env.DB.prepare(
+    'SELECT * FROM account_tokens WHERE token_hash = ? AND used_date IS NULL AND expires_date > ?'
+  ).bind(await sha256Hex(token), nowISO()).first();
+  return row && (!kind || row.kind === kind) ? row : null;
+}
+
+// Claims the link; false if someone else just used it.
+async function useAccountLink(env, row) {
+  const res = await env.DB.prepare(
+    'UPDATE account_tokens SET used_date = ? WHERE token_hash = ? AND used_date IS NULL AND expires_date > ?'
+  ).bind(nowISO(), row.token_hash, nowISO()).run();
+  return !!res?.meta?.changes;
+}
+
+async function setPassword(env, userId, password) {
+  const row = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(userId).first();
+  const data = JSON.parse(row.data || '{}');
+  data.sessions_valid_from = Math.floor(Date.now() / 1000);
+  await env.DB.prepare('UPDATE users SET password_hash = ?, data = ?, updated_date = ? WHERE id = ?')
+    .bind(await hashPassword(password), JSON.stringify(data), nowISO(), userId).run();
+  await env.DB.prepare(`DELETE FROM account_tokens WHERE kind = 'reset' AND email = ? AND used_date IS NULL`).bind(row.email).run();
+}
+
+const passwordProblem = (pw) => {
+  const v = String(pw || '');
+  if (v.length < 8) return 'Password must be at least 8 characters.';
+  if (v.length > 200) return 'Password is too long.';
+  return null;
+};
+
+const escHtml = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+async function emailAccountLink(env, { kind, to, name, link }) {
+  const invite = kind === 'invite';
+  return sendEmail(env, {
+    to,
+    subject: invite ? 'Join the Brigade Athletic Club app' : 'Reset your Brigade password',
+    html: emailShell(invite ? 'You\'re invited.' : 'Reset your password', `
+      <p>Hi ${escHtml(name || 'there')},</p>
+      <p>${invite ? 'Create your Brigade account to book classes, follow your program and message your coach.' : 'Use this link to choose a new password.'}</p>
+      <p style="margin:24px 0"><a href="${escHtml(link)}" style="background:#4B91DD;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600">${invite ? 'Create your account' : 'Choose a new password'}</a></p>
+      <p>This link works once and expires in ${invite ? '14 days' : `${EMAIL_RESET_HOURS} hour`}. If you didn't expect it, you can ignore this email.</p>`),
+  });
 }
 
 /* ------------------------------ entities -------------------------------- */
@@ -163,9 +240,9 @@ function fieldExpr(field) {
 }
 
 // Entity types every authenticated user of the app may read (shared/global content).
-// Readable by every signed-in user. BetaKey and WaitingList are deliberately
-// NOT here: keys are claimed server-side (claimBetaKey) and the waiting list
-// holds prospects' emails, so both are admin-only.
+// Readable by every signed-in user. WaitingList is deliberately
+// NOT here: the waiting list holds
+// prospects' emails, so it is admin-only.
 const SHARED_TYPES = new Set([
   'CommunityPost', 'TrainerCommunityPost', 'Recipe',
   'FitnessTemplate', 'MealPlanTemplate', 'CoachingExercise',
@@ -1865,10 +1942,66 @@ const emailShell = (title, bodyHtml) => `
   <div style="font-family:Inter,Arial,sans-serif;background:#F5F7FA;padding:32px">
     <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:16px;border:1px solid #E4E9F0;padding:32px">
       <h2 style="margin:0 0 4px;color:#0F172A">Brigade Athletic Club</h2>
-      <h3 style="margin:0 0 16px;color:#059669">${title}</h3>
+      <h3 style="margin:0 0 16px;color:#4B91DD">${title}</h3>
       <div style="color:#334155;font-size:15px;line-height:1.6">${bodyHtml}</div>
     </div>
   </div>`;
+
+/* ---- health: errors, heartbeat, admin alerts ---- */
+const CRON_STALE_MINUTES = 60; // the scheduled job runs every 15
+
+async function getState(env, key) {
+  return env.DB.prepare('SELECT value, updated_date FROM app_state WHERE key = ?').bind(key).first();
+}
+async function setState(env, key, value) {
+  await env.DB.prepare(
+    'INSERT INTO app_state (key, value, updated_date) VALUES (?1,?2,?3) ON CONFLICT(key) DO UPDATE SET value = ?2, updated_date = ?3'
+  ).bind(key, String(value), nowISO()).run();
+}
+// True for one caller per window: stops the same alert going out repeatedly.
+async function claimAlert(env, key, hours) {
+  const cutoff = new Date(Date.now() - hours * 3600000).toISOString();
+  const res = await env.DB.prepare(
+    `INSERT INTO app_state (key, value, updated_date) VALUES (?1,'1',?2)
+     ON CONFLICT(key) DO UPDATE SET updated_date = ?2 WHERE app_state.updated_date < ?3`
+  ).bind(`alert_${key}`, nowISO(), cutoff).run();
+  return !!res?.meta?.changes;
+}
+async function alertAdmins(env, title, message) {
+  const { results } = await env.DB.prepare('SELECT id, email, role FROM users').all();
+  for (const u of results.filter((x) => resolveRole(env, x.email, x.role) === 'admin')) {
+    await insertEntity(env, 'Notification', { user_id: u.id, type: 'system', title, message, link: '/AdminBugs', read: false }, 'system');
+    await sendPushToUser(env, u.id, { title, body: message.slice(0, 140), url: '/AdminBugs', tag: 'system' });
+  }
+}
+// Same error on the same day counts up on one row; admins hear about new ones,
+// at most one alert an hour.
+async function recordError(env, { source, message, page = '', detail = '' }) {
+  try {
+    const day = programToday();
+    const msg = String(message || 'Unknown error').slice(0, 300);
+    const id = (await sha256Hex(`${day}|${source}|${page}|${msg}`)).slice(0, 24);
+    const now = nowISO();
+    await env.DB.prepare(
+      `INSERT INTO app_errors (id, day, source, message, page, detail, first_seen, last_seen) VALUES (?1,?2,?3,?4,?5,?6,?7,?7)
+       ON CONFLICT(id) DO UPDATE SET hits = hits + 1, last_seen = ?7`
+    ).bind(id, day, source, msg, String(page).slice(0, 120), String(detail).slice(0, 600), now).run();
+    const row = await env.DB.prepare('SELECT hits FROM app_errors WHERE id = ?').bind(id).first();
+    if (row?.hits === 1 && (await claimAlert(env, 'error', 1))) await alertAdmins(env, 'App error', `${page ? `${page}: ` : ''}${msg}`);
+    await env.DB.prepare('DELETE FROM app_errors WHERE last_seen < ?').bind(new Date(Date.now() - 30 * 86400000).toISOString()).run();
+  } catch (e) { console.error('recordError failed', e?.message); }
+}
+// A stopped job can't report itself, so staff opening the app check on it.
+async function checkHeartbeat(env) {
+  const beat = await getState(env, 'cron_last_ok');
+  if (!beat) return;
+  const mins = (Date.now() - Date.parse(beat.updated_date)) / 60000;
+  if (mins > CRON_STALE_MINUTES && (await claimAlert(env, 'cron', 6))) {
+    await alertAdmins(env, 'Scheduled job stopped', `The 15-minute job last ran ${Math.round(mins)} minutes ago. Program messages and new classes are paused.`);
+  }
+}
+
+const PUBLIC_FUNCTIONS = new Set(['getAppLogo', 'submitContact']);
 
 async function runFunction(name, payload, ctx) {
   const { env, user, url } = ctx;
@@ -1905,73 +2038,104 @@ async function runFunction(name, payload, ctx) {
       return { success: true };
     }
 
-    /* ---- Beta keys ---- */
-    case 'claimBetaKey': {
-      if (!user) return { success: false, error: 'Not logged in' };
-      const key = String(payload?.key || payload?.betaKey || '').trim().toUpperCase();
-      if (!key) return { success: false, error: 'No key provided' };
-      const row = await env.DB.prepare(
-        `SELECT * FROM entities WHERE entity_type='BetaKey' AND upper(json_extract(data,'$.key')) = ? LIMIT 1`
-      ).bind(key).first();
-      if (!row) return { success: false, error: 'Invalid beta key' };
-      const data = JSON.parse(row.data);
-      if (data.status === 'assigned' && data.trainer_id && data.trainer_id !== user.id) {
-        return { success: false, error: 'This key is already in use by another account' };
+    /* ---- accounts: invites, resets, team ---- */
+    // Staff invite a client to the app; admins invite coaches. Returns the link
+    // to share, and emails it when email is set up.
+    case 'createInvite': {
+      if (!isStaff(user)) return { success: false, error: 'Only coaches can invite people.' };
+      let target;
+      if (payload?.client_id) {
+        const client = await getEntityById(env, 'Client', payload.client_id);
+        if (!client) return { success: false, error: 'Client not found.' };
+        if (!client.email) return { success: false, error: 'Add an email address to this client first.' };
+        target = { email: client.email, full_name: client.full_name || '', user_type: 'client', client_id: client.id };
+      } else {
+        if (user.role !== 'admin') return { success: false, error: 'Only an admin can invite coaches.' };
+        target = { email: String(payload?.email || ''), full_name: String(payload?.full_name || '').trim(), user_type: 'trainer' };
       }
-      if (data.assigned_email && data.assigned_email.toLowerCase() !== user.email.toLowerCase()) {
-        return { success: false, error: 'This key is reserved for a different email address' };
+      target.email = target.email.trim().toLowerCase();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(target.email)) return { success: false, error: 'That email address does not look right.' };
+      const existing = await env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(target.email).first();
+      if (existing) return { success: false, error: 'This person already has an account.', code: 'has_account' };
+      const link = await createAccountLink(env, url, { ...target, kind: 'invite', hours: INVITE_HOURS, created_by: user.email });
+      await audit(env, { actor: user.email, action: 'invite_created', target: target.user_type, targetId: target.client_id || target.email, request: null });
+      const sent = payload?.send_email === false ? { success: false } : await emailAccountLink(env, { kind: 'invite', to: target.email, name: target.full_name, link });
+      return { success: true, link, emailed: !!sent.success, email: target.email, expires_days: INVITE_HOURS / 24 };
+    }
+
+    // Admin only: whoever holds this link can take over the account.
+    case 'createResetLink': {
+      if (!user || user.role !== 'admin') return { success: false, error: 'Only an admin can reset someone else\'s password.' };
+      let row = null;
+      if (payload?.client_id) {
+        const login = await clientLogin(env, await getEntityById(env, 'Client', payload.client_id));
+        if (login) row = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(login.id).first();
+      } else if (payload?.user_id) {
+        row = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(payload.user_id).first();
       }
-      const updated = { ...data, status: 'assigned', trainer_id: user.id, claimed_date: nowISO() };
-      await env.DB.prepare('UPDATE entities SET data=?, updated_date=? WHERE id=?')
-        .bind(JSON.stringify(updated), nowISO(), row.id).run();
-      // Mark on the user
-      const urow = await env.DB.prepare('SELECT * FROM users WHERE id=?').bind(user.id).first();
-      const udata = JSON.parse(urow.data || '{}');
-      udata.beta_key_used = true;
-      udata.beta_key_verified = true;
-      udata.beta_key = key;
-      await env.DB.prepare('UPDATE users SET data=?, updated_date=? WHERE id=?')
-        .bind(JSON.stringify(udata), nowISO(), user.id).run();
-      return { success: true, message: 'Beta access granted.' };
+      if (!row) return { success: false, error: 'This person has no account yet. Send an invite instead.', code: 'no_account' };
+      const link = await createAccountLink(env, url, { kind: 'reset', email: row.email, full_name: row.full_name, hours: STAFF_RESET_HOURS, created_by: user.email });
+      await audit(env, { actor: user.email, action: 'reset_link_created', target: 'Account', targetId: row.id, request: null });
+      return { success: true, link, email: row.email, expires_hours: STAFF_RESET_HOURS };
+    }
+
+    case 'systemStatus': {
+      if (!user || user.role !== 'admin') return { success: false, error: 'Admins only.' };
+      const beat = await getState(env, 'cron_last_ok');
+      const { results } = await env.DB.prepare('SELECT id, day, source, message, page, hits, last_seen FROM app_errors ORDER BY last_seen DESC LIMIT 25').all();
+      const mins = beat ? Math.round((Date.now() - Date.parse(beat.updated_date)) / 60000) : null;
+      return { success: true, cron_last_ok: beat?.updated_date || null, cron_minutes_ago: mins, cron_ok: mins !== null && mins <= CRON_STALE_MINUTES, email_enabled: !!env.RESEND_API_KEY, errors: results };
+    }
+
+    case 'listTeam': {
+      if (!user || user.role !== 'admin') return { success: false, error: 'Only an admin can see the team.' };
+      const { results } = await env.DB.prepare(`SELECT * FROM users WHERE user_type = 'trainer' ORDER BY full_name`).all();
+      const pending = await env.DB.prepare(
+        `SELECT email, full_name, expires_date FROM account_tokens WHERE kind = 'invite' AND user_type = 'trainer' AND used_date IS NULL AND expires_date > ? ORDER BY created_date DESC`
+      ).bind(nowISO()).all();
+      return {
+        success: true, email_enabled: !!env.RESEND_API_KEY,
+        team: results.map(userRow).map((u) => ({ id: u.id, email: u.email, full_name: u.full_name, disabled: !!u.disabled, is_admin: resolveRole(env, u.email, u.role) === 'admin', is_me: u.id === user.id })),
+        pending: pending.results,
+      };
+    }
+
+    case 'setCoachAccess': {
+      if (!user || user.role !== 'admin') return { success: false, error: 'Only an admin can change access.' };
+      const row = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(payload?.user_id || '').first();
+      if (!row) return { success: false, error: 'Account not found.' };
+      if (row.id === user.id || resolveRole(env, row.email, row.role) === 'admin') return { success: false, error: 'Admin accounts can\'t be turned off here.' };
+      const data = JSON.parse(row.data || '{}');
+      data.disabled = !!payload.disabled;
+      await env.DB.prepare('UPDATE users SET data = ?, updated_date = ? WHERE id = ?').bind(JSON.stringify(data), nowISO(), row.id).run();
+      await audit(env, { actor: user.email, action: data.disabled ? 'access_off' : 'access_on', target: 'Account', targetId: row.id, request: null });
+      return { success: true, disabled: data.disabled };
     }
 
     /* ---- Email ---- */
-    case 'sendInviteEmail': {
-      const to = payload?.clientEmail || payload?.email;
-      if (!to) return { success: false, error: 'No recipient' };
-      const signup = payload?.signupLink || url.origin + '/Login';
-      return sendEmail(env, {
-        to,
-        subject: `${payload?.trainerName || 'Your trainer'} invited you to Brigade Athletic Club`,
-        html: emailShell('You\'re invited.', `
-          <p>Hi ${payload?.clientName || 'there'},</p>
-          <p><strong>${payload?.trainerName || 'Your trainer'}</strong> has invited you to train together on Brigade Athletic Club — workouts, nutrition, habits, and progress tracking in one place.</p>
-          <p style="margin:24px 0"><a href="${signup}" style="background:#059669;color:#fff;padding:12px 24px;border-radius:10px;text-decoration:none;font-weight:600">Create your account</a></p>
-          <p>See you in the app.</p>`),
-      });
-    }
-
     case 'sendResourceEmail': {
+      if (!isStaff(user)) return { success: false, error: 'Only coaches can send this.' };
       const to = payload?.to || payload?.clientEmail || payload?.email;
       if (!to) return { success: false, error: 'No recipient' };
       return sendEmail(env, {
         to,
         subject: payload?.subject || 'New resource from your trainer',
-        html: emailShell(payload?.title || 'New resource', `
-          <p>${payload?.message || 'Your trainer shared a resource with you.'}</p>
-          ${payload?.link ? `<p><a href="${payload.link}" style="color:#059669">Open resource</a></p>` : ''}`),
+        html: emailShell(escHtml(payload?.title || 'New resource'), `
+          <p>${escHtml(payload?.message || 'Your trainer shared a resource with you.')}</p>
+          ${/^https?:\/\//.test(payload?.link || '') ? `<p><a href="${escHtml(payload.link)}" style="color:#4B91DD">Open resource</a></p>` : ''}`),
       });
     }
 
     case 'sendSessionReminder': {
+      if (!isStaff(user)) return { success: false, error: 'Only coaches can send this.' };
       const to = payload?.clientEmail || payload?.to;
       if (!to) return { success: false, error: 'No recipient' };
       return sendEmail(env, {
         to,
         subject: 'Session reminder — Brigade Athletic Club',
         html: emailShell('Upcoming session', `
-          <p>Reminder: you have a training session on <strong>${payload?.date || ''} ${payload?.time || ''}</strong>.</p>
-          ${payload?.notes ? `<p>${payload.notes}</p>` : ''}`),
+          <p>Reminder: you have a training session on <strong>${escHtml(payload?.date || '')} ${escHtml(payload?.time || '')}</strong>.</p>
+          ${payload?.notes ? `<p>${escHtml(payload.notes)}</p>` : ''}`),
       });
     }
 
@@ -3261,51 +3425,23 @@ async function ensureSchema(env) {
     `CREATE TABLE IF NOT EXISTS audit_log (
       id TEXT PRIMARY KEY, actor TEXT, action TEXT NOT NULL, target TEXT,
       target_id TEXT, detail TEXT, ip TEXT, created_date TEXT NOT NULL)`,
+    `CREATE TABLE IF NOT EXISTS account_tokens (
+      token_hash TEXT PRIMARY KEY, kind TEXT NOT NULL, email TEXT NOT NULL, user_type TEXT,
+      client_id TEXT, full_name TEXT, created_by TEXT, created_date TEXT NOT NULL,
+      expires_date TEXT NOT NULL, used_date TEXT)`,
+    `CREATE TABLE IF NOT EXISTS app_errors (
+      id TEXT PRIMARY KEY, day TEXT NOT NULL, source TEXT NOT NULL, message TEXT NOT NULL, page TEXT, detail TEXT,
+      hits INTEGER NOT NULL DEFAULT 1, first_seen TEXT NOT NULL, last_seen TEXT NOT NULL)`,
+    `CREATE INDEX IF NOT EXISTS idx_app_errors_seen ON app_errors(last_seen)`,
+    `CREATE TABLE IF NOT EXISTS app_state (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_date TEXT NOT NULL)`,
+    `CREATE INDEX IF NOT EXISTS idx_account_tokens_email ON account_tokens(email, kind)`,
     `CREATE INDEX IF NOT EXISTS idx_audit_actor ON audit_log(actor, created_date)`,
   ];
   for (const s of stmts) await env.DB.prepare(s).run();
-  await seedBetaKeys(env);
   await seedCoachingContent(env);
   schemaReady = true;
 }
 
-// Beta keys gate trainer signup, so they are credentials — they live in the
-// BETA_KEYS secret, never in source (this repository is public).
-// Format: a JSON array, or a comma-separated list of KEY or KEY:Name:email
-//   npx wrangler pages secret put BETA_KEYS --project-name=brigade-app
-// Already-seeded keys stay in the database, so leaving this unset in an
-// existing deployment changes nothing.
-function betaKeysFromEnv(env) {
-  const raw = (env.BETA_KEYS || '').trim();
-  if (!raw) return [];
-  let list = [];
-  if (raw.startsWith('[')) {
-    try { list = JSON.parse(raw); } catch { return []; }
-  } else {
-    list = raw.split(',').map((entry) => {
-      const [key, assigned_name, assigned_email] = entry.split(':').map((s) => (s || '').trim());
-      return { key, ...(assigned_name ? { assigned_name } : {}), ...(assigned_email ? { assigned_email } : {}) };
-    });
-  }
-  return list
-    .filter((k) => k && k.key)
-    .map((k, i) => ({ ...k, id: k.id || `betakey${String(i + 1).padStart(17, '0')}` }));
-}
-
-async function seedBetaKeys(env) {
-  const now = nowISO();
-  for (const k of betaKeysFromEnv(env)) {
-    const data = {
-      key: k.key,
-      status: k.assigned_name || k.assigned_email ? 'reserved' : 'available',
-      ...(k.assigned_name ? { assigned_name: k.assigned_name } : {}),
-      ...(k.assigned_email ? { assigned_email: k.assigned_email } : {}),
-    };
-    await env.DB.prepare(
-      `INSERT OR IGNORE INTO entities (id, entity_type, data, created_by, created_date, updated_date) VALUES (?,?,?,?,?,?)`
-    ).bind(k.id, 'BetaKey', JSON.stringify(data), 'system', now, now).run();
-  }
-}
 
 /* -------------------- coaching content (self-seeding) -------------------- */
 // A movement-pattern exercise catalog and a set of ready-to-ship program
@@ -3647,7 +3783,7 @@ const COACHING_TEMPLATES = [
 const slugify = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
 
 // Idempotent, migration-free seed run on boot (INSERT OR IGNORE with
-// deterministic ids), mirroring seedBetaKeys. Global content, so created_by is
+// deterministic ids). Global content, so created_by is
 // the same 'system' value the other boot seeds use.
 async function seedCoachingContent(env) {
   const now = nowISO();
@@ -3684,78 +3820,135 @@ export async function onRequest(context) {
     });
   }
 
+  if (!env.AUTH_SECRET && !/^(localhost|127\.0\.0\.1)$/.test(url.hostname)) return err('Server is missing AUTH_SECRET.', 500);
+
   try {
     /* ---- auth ---- */
     if (segs[0] === 'auth') {
       const action = segs[1];
 
-      if (action === 'register' && method === 'POST') {
-        const body = await request.json();
-        const email = (body.email || '').trim().toLowerCase();
-        if (!email || !body.password) return err('Email and password are required.', 400);
-        if (String(body.password).length < 8) return err('Password must be at least 8 characters.', 400);
-        const existing = await env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(email).first();
-        if (existing) return err('An account with this email already exists.', 409);
+      // What a join or reset link is for (the link itself is the proof).
+      if (action === 'link-info' && method === 'POST') {
+        const body = await request.json().catch(() => ({}));
+        const link = await findAccountLink(env, body.token);
+        if (!link) return err(BAD_LINK, 410);
+        return json({ kind: link.kind, email: link.email, full_name: link.full_name || '', user_type: link.user_type });
+      }
 
-        // Signup rules:
-        //  - trainers must present a valid beta key
-        //  - clients must have been invited (a Client record with their email exists)
-        //  - independents (solo) sign up freely
-        //  - ADMIN_EMAILS bypass all gates (they may register as any type)
-        const user_type = body.user_type || 'independent';
-        const isAllowlistedAdmin = resolveRole(env, email, 'user') === 'admin';
-        let claimedKeyRow = null;
-        // Admins skip the trainer beta-key gate, but a client account still
-        // needs a Client record (the coach's invite): without one every
-        // client page has no profile to load and the app looks broken.
-        if (isAllowlistedAdmin && user_type !== 'client') {
-          // no gate
-        } else if (user_type === 'trainer') {
-          const key = String(body.beta_key || '').trim().toUpperCase();
-          if (!key) return err('A beta key is required to sign up as a trainer.', 403);
-          claimedKeyRow = await env.DB.prepare(
-            `SELECT * FROM entities WHERE entity_type='BetaKey' AND upper(json_extract(data,'$.key')) = ? LIMIT 1`
-          ).bind(key).first();
-          if (!claimedKeyRow) return err('Invalid beta key.', 403);
-          const kd = JSON.parse(claimedKeyRow.data);
-          if (kd.status === 'assigned' && kd.trainer_id) return err('This beta key has already been used.', 403);
-          if (kd.assigned_email && kd.assigned_email.toLowerCase() !== email) {
-            return err('This beta key is reserved for a different email address.', 403);
+      // Joining needs an invite link, which proves the person controls (or was
+      // handed) the invited address. The one exception: the first admin on an
+      // empty database, so a fresh install can be set up.
+      if (action === 'register' && method === 'POST') {
+        const body = await request.json().catch(() => ({}));
+        const bad = passwordProblem(body.password);
+        let link = null; let email; let user_type;
+        if (body.token) {
+          link = await findAccountLink(env, body.token, 'invite');
+          if (!link) return err(BAD_LINK, 410);
+          email = link.email; user_type = link.user_type || 'client';
+        } else {
+          email = String(body.email || '').trim().toLowerCase();
+          const any = await env.DB.prepare('SELECT id FROM users LIMIT 1').first();
+          if (any || !email || resolveRole(env, email, 'user') !== 'admin') {
+            return err('Brigade accounts are by invitation. Ask your coach or the front desk for your link.', 403);
           }
-        } else if (user_type === 'client') {
-          const invited = await env.DB.prepare(
-            `SELECT id FROM entities WHERE entity_type='Client' AND lower(json_extract(data,'$.email')) = ? LIMIT 1`
-          ).bind(email).first();
-          if (!invited) {
-            return err('Client accounts are invite-only. Ask your trainer to add you, then sign up with the same email they used.', 403);
-          }
+          user_type = 'trainer';
         }
+        if (bad) return err(bad, 400);
+        const existing = await env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(email).first();
+        if (existing) return err('You already have an account. Sign in, or reset your password.', 409);
+        if (link && !(await useAccountLink(env, link))) return err(BAD_LINK, 410);
 
         const id = uid();
         const now = nowISO();
         const role = 'user'; // admins come exclusively from the ADMIN_EMAILS allowlist
-        const userData = claimedKeyRow ? { beta_key_used: true, beta_key_verified: true, beta_key: JSON.parse(claimedKeyRow.data).key } : {};
-        // Trainers get a free trial from the moment they sign up; beta-key
-        // trainers are comped indefinitely and never hit the paywall.
-        if (user_type === 'trainer') {
-          userData.billing = {
-            status: 'none',
-            trial_ends_at: new Date(Date.now() + TRIAL_DAYS * 86400000).toISOString(),
-          };
-        }
+        const full_name = String(body.full_name || link?.full_name || '').trim().slice(0, 120);
         await env.DB.prepare(
           'INSERT INTO users (id,email,password_hash,full_name,role,user_type,data,created_date,updated_date) VALUES (?,?,?,?,?,?,?,?,?)'
-        ).bind(id, email, await hashPassword(body.password), body.full_name || '', role, user_type, JSON.stringify(userData), now, now).run();
-        if (claimedKeyRow) {
-          const kd = JSON.parse(claimedKeyRow.data);
-          await env.DB.prepare('UPDATE entities SET data=?, updated_date=? WHERE id=?')
-            .bind(JSON.stringify({ ...kd, status: 'assigned', trainer_id: id, claimed_date: now }), now, claimedKeyRow.id).run();
+        ).bind(id, email, await hashPassword(body.password), full_name, role, user_type, '{}', now, now).run();
+        if (link?.client_id && user_type === 'client') {
+          const client = await getEntityById(env, 'Client', link.client_id);
+          if (client) await patchEntity(env, client, { user_id: id });
         }
+        await audit(env, { actor: email, action: 'account_created', target: 'Account', targetId: id, detail: user_type, request });
         const row = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(id).first();
         const token = await signToken({ sub: id, email }, env.AUTH_SECRET || 'dev-insecure-secret');
         const u = userRow(row);
         u.role = resolveRole(env, u.email, u.role);
         return json({ token, user: u });
+      }
+
+      // "Email me a link": a reset for an account, or the join link for an
+      // invited member without one. The answer never says which, or neither.
+      if (action === 'forgot' && method === 'POST') {
+        const body = await request.json().catch(() => ({}));
+        const email = String(body.email || '').trim().toLowerCase();
+        if (!email) return err('Enter your email.', 400);
+        if (!env.RESEND_API_KEY) return json({ success: true, email_enabled: false });
+        const hourAgo = new Date(Date.now() - 3600000).toISOString();
+        const ip = request.headers.get('cf-connecting-ip') || '';
+        const recent = await env.DB.prepare(
+          `SELECT SUM(CASE WHEN actor = ? THEN 1 ELSE 0 END) AS mine, SUM(CASE WHEN ip = ? THEN 1 ELSE 0 END) AS here
+           FROM audit_log WHERE action = 'link_requested' AND created_date > ?`
+        ).bind(email, ip, hourAgo).first();
+        await audit(env, { actor: email, action: 'link_requested', request });
+        if ((recent?.mine || 0) < 3 && (!ip || (recent?.here || 0) < 30)) {
+          const work = (async () => {
+            const row = await env.DB.prepare('SELECT * FROM users WHERE email = ?').bind(email).first();
+            if (row) {
+              if (userRow(row).disabled) return;
+              const link = await createAccountLink(env, url, { kind: 'reset', email, hours: EMAIL_RESET_HOURS, created_by: 'self' });
+              await emailAccountLink(env, { kind: 'reset', to: email, name: row.full_name, link });
+              return;
+            }
+            const c = parseRow(await env.DB.prepare(
+              `SELECT * FROM entities WHERE entity_type='Client' AND lower(json_extract(data,'$.email')) = ? AND COALESCE(json_extract(data,'$.status'),'active') != 'archived' LIMIT 1`
+            ).bind(email).first());
+            if (!c) return;
+            const link = await createAccountLink(env, url, { kind: 'invite', email, user_type: 'client', client_id: c.id, full_name: c.full_name, hours: INVITE_HOURS, created_by: 'self' });
+            await emailAccountLink(env, { kind: 'invite', to: email, name: c.full_name, link });
+          })().catch((e) => console.error('account link email failed', e?.message));
+          // After the response, so timing doesn't reveal whether the email is on file.
+          if (env.__waitUntil) env.__waitUntil(work); else await work;
+        }
+        return json({ success: true, email_enabled: true });
+      }
+
+      if (action === 'reset' && method === 'POST') {
+        const body = await request.json().catch(() => ({}));
+        const link = await findAccountLink(env, body.token, 'reset');
+        if (!link) return err(BAD_LINK, 410);
+        const bad = passwordProblem(body.password);
+        if (bad) return err(bad, 400);
+        const row = await env.DB.prepare('SELECT * FROM users WHERE email = ?').bind(link.email).first();
+        if (!row || userRow(row).disabled || !(await useAccountLink(env, link))) return err(BAD_LINK, 410);
+        await setPassword(env, row.id, body.password);
+        await audit(env, { actor: link.email, action: 'password_reset', target: 'Account', targetId: row.id, request });
+        const token = await signToken({ sub: row.id, email: row.email }, env.AUTH_SECRET || 'dev-insecure-secret');
+        const u = userRow(await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(row.id).first());
+        u.role = resolveRole(env, u.email, u.role);
+        return json({ token, user: u });
+      }
+
+      if (action === 'change-password' && method === 'POST') {
+        const user = await currentUser(request, env);
+        if (!user) return err('You must be logged in.', 401);
+        const body = await request.json().catch(() => ({}));
+        const since = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+        const fails = await env.DB.prepare(
+          `SELECT COUNT(*) AS n FROM audit_log WHERE actor = ? AND action = 'password_change_failed' AND created_date > ?`
+        ).bind(user.email, since).first();
+        if ((fails?.n || 0) >= 10) return err('Too many attempts. Please try again in 15 minutes.', 429);
+        const row = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(user.id).first();
+        if (!(await verifyPassword(body.current_password || '', row.password_hash))) {
+          await audit(env, { actor: user.email, action: 'password_change_failed', request });
+          return err('Your current password is not right.', 400);
+        }
+        const bad = passwordProblem(body.password);
+        if (bad) return err(bad, 400);
+        await setPassword(env, user.id, body.password);
+        await audit(env, { actor: user.email, action: 'password_changed', target: 'Account', targetId: user.id, request });
+        return json({ success: true, token: await signToken({ sub: row.id, email: row.email }, env.AUTH_SECRET || 'dev-insecure-secret') });
       }
 
       if (action === 'login' && method === 'POST') {
@@ -3766,8 +3959,10 @@ export async function onRequest(context) {
         // out for 15 minutes after 10 failed attempts in that window. Counted
         // from the audit log, so no extra storage is needed.
         const since = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+        // A completed password reset clears the count.
         const fails = await env.DB.prepare(
-          `SELECT COUNT(*) AS n FROM audit_log WHERE actor = ? AND action = 'login_failed' AND created_date > ?`
+          `SELECT COUNT(*) AS n FROM audit_log WHERE actor = ?1 AND action = 'login_failed' AND created_date > ?2
+           AND created_date > COALESCE((SELECT MAX(created_date) FROM audit_log WHERE actor = ?1 AND action = 'password_reset'), '')`
         ).bind(email, since).first();
         if ((fails?.n || 0) >= 10) {
           await audit(env, { actor: email, action: 'login_blocked', detail: 'rate limited', request });
@@ -3779,6 +3974,7 @@ export async function onRequest(context) {
           await audit(env, { actor: email, action: 'login_failed', request });
           return err('Invalid email or password.', 401);
         }
+        if (userRow(row).disabled) return err('This account is turned off. Contact the gym.', 403);
         await audit(env, { actor: email, action: 'login', request });
         const token = await signToken({ sub: row.id, email }, env.AUTH_SECRET || 'dev-insecure-secret');
         const u = userRow(row);
@@ -3790,6 +3986,10 @@ export async function onRequest(context) {
         const user = await currentUser(request, env);
         if (!user) return err('You must be logged in.', 401);
         if (method === 'GET') {
+          if (isStaff(user)) {
+            const p = checkHeartbeat(env).catch(() => {});
+            if (env.__waitUntil) env.__waitUntil(p); else await p;
+          }
           // Auto-provision a Client record for client/independent users so the
           // portals always have a profile to load (Base44 did this via backend jobs).
           if (user.user_type === 'client' || user.user_type === 'independent') {
@@ -3821,7 +4021,7 @@ export async function onRequest(context) {
           // account itself. Admin status comes solely from the ADMIN_EMAILS
           // allowlist; account type is fixed at registration (gated by beta key
           // / invite), so self-service changes would bypass those gates.
-          const PROTECTED = ['id', 'email', 'role', 'user_type', 'password_hash', 'beta_key_used', 'beta_key_verified', 'created_date', 'updated_date'];
+          const PROTECTED = ['id', 'email', 'role', 'user_type', 'password_hash', 'beta_key_used', 'beta_key_verified', 'beta_key', 'billing', 'disabled', 'sessions_valid_from', 'created_date', 'updated_date'];
           for (const [k, v] of Object.entries(body)) {
             if (PROTECTED.includes(k)) continue;
             if (k in cols) cols[k] = v;
@@ -3951,36 +4151,6 @@ export async function onRequest(context) {
         if (method === 'POST') {
           const body = await request.json();
           const list = Array.isArray(body) ? body : [body];
-
-          // Enforce the plan's client cap. Admins and comped (beta-key)
-          // trainers are exempt; a limit of 0 on an ACTIVE plan means unlimited.
-          if (type === 'Client' && user.role !== 'admin') {
-            const state = subscriptionState(user);
-
-            // No active plan and no running trial: existing clients stay
-            // reachable, but no new ones until they subscribe.
-            if (!state.active) {
-              return err(
-                'Your free trial has ended. Choose a plan in Settings → Billing to add more clients — your existing clients are unaffected.',
-                402,
-                { code: 'subscription_required' }
-              );
-            }
-
-            if (state.clientLimit > 0) {
-              const row = await env.DB.prepare(
-                `SELECT COUNT(*) AS n FROM entities WHERE entity_type='Client' AND created_by = ? AND COALESCE(json_extract(data,'$.status'),'active') != 'archived'`
-              ).bind(user.email).first();
-              const current = row?.n || 0;
-              if (current + list.length > state.clientLimit) {
-                return err(
-                  `Your ${state.planName} plan covers ${state.clientLimit} active clients and you have ${current}. Upgrade in Settings → Billing to add more.`,
-                  402,
-                  { code: 'client_limit_reached', limit: state.clientLimit, current }
-                );
-              }
-            }
-          }
 
           const created = [];
           const prepared = [];
@@ -4252,12 +4422,26 @@ export async function onRequest(context) {
       const programs = await runProgramTick(env, {});
       let classes;
       try { classes = await runClassTick(env); } catch (e) { classes = { success: false, error: String(e?.message || e).slice(0, 200) }; }
+      if (classes?.success === false) await recordError(env, { source: 'job', message: classes.error, page: 'classes' });
+      if (programs?.success === false) await recordError(env, { source: 'job', message: programs.error, page: 'programs' });
+      await setState(env, 'cron_last_ok', 'ok');
       return json({ ...programs, classes });
+    }
+
+    if (segs[0] === 'client-error' && method === 'POST') {
+      const user = await currentUser(request, env);
+      if (!user) return err('Authentication required.', 401);
+      const body = await request.json().catch(() => ({}));
+      await recordError(env, { source: body.source === 'page' ? 'page' : 'screen', message: body.message, page: body.page, detail: body.stack });
+      return json({ success: true });
     }
 
     if (segs[0] === 'functions') {
       const name = segs[1];
       const user = await currentUser(request, env);
+      // Only these run without signing in; everything else can read data, send
+      // email or spend AI credits.
+      if (!user && !PUBLIC_FUNCTIONS.has(name)) return err('Authentication required.', 401);
       const payload = method === 'POST' ? await request.json().catch(() => ({})) : {};
       const result = await runFunction(name, payload, { env, user, url });
       if (result && result.__unimplemented) {
@@ -4292,6 +4476,8 @@ export async function onRequest(context) {
 
     return err('Not found.', 404);
   } catch (e) {
+    const p = recordError(env, { source: 'server', message: e?.message, page: `/api/${segs.slice(0, 2).join('/')}`, detail: e?.stack });
+    if (env.__waitUntil) env.__waitUntil(p); else await p;
     return err(e.message || 'Server error', 500);
   }
 }

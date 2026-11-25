@@ -15,11 +15,10 @@ You must be at least **18 years of age**, or the age of legal majority in your j
 ---
 
 ## 3. Accounts and Access Tiers
-The Service offers three account types:
+Accounts are by invitation from Brigade Athletic Club. There are two types:
 
-- **Solo athlete** — an individual who self-directs their own training. Open registration.
-- **Client** — an individual invited by a trainer. Client accounts are **invite-only** and may only be created using the email address a trainer used to add you.
-- **Trainer** — a coaching professional. Trainer accounts require a valid **beta access key** issued by Brigade Athletic Club.
+- **Member** — a person the gym has invited, using the email address the gym has on file.
+- **Coach** — a member of the gym's staff, invited by an administrator.
 
 You are responsible for safeguarding your login credentials and for all activity that occurs under your account. Notify us immediately at **support@brigade-app.pages.dev** of any unauthorized use. We may refuse, suspend, or terminate accounts at our discretion, including for violation of these Terms.
 

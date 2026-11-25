@@ -1,6 +1,6 @@
 /* Brigade service worker — offline shell + Web Push. */
 
-const CACHE = 'brigade-v2';
+const CACHE = 'brigade-v3';
 const SHELL = ['/', '/manifest.json', '/brand/icon-192.png'];
 
 self.addEventListener('install', (event) => {
@@ -28,8 +28,11 @@ self.addEventListener('fetch', (event) => {
         (hit) =>
           hit ||
           fetch(event.request).then((res) => {
-            const copy = res.clone();
-            caches.open(CACHE).then((c) => c.put(event.request, copy));
+            // A missing file comes back as the app page; never keep that as a script.
+            if (res.ok && !(res.headers.get('content-type') || '').includes('text/html')) {
+              const copy = res.clone();
+              caches.open(CACHE).then((c) => c.put(event.request, copy));
+            }
             return res;
           })
       )
