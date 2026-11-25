@@ -1,6 +1,7 @@
 import test, { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { startServer, client, eastern, addDays, tokenOf, ADMIN, CRON_SECRET } from './server.mjs';
+import { makeAuthenticator } from './authenticator.mjs';
 
 let srv; let api; let admin; let coach;
 const members = {}; // name -> { token, client, email, password }
@@ -401,6 +402,83 @@ test('programs: today shows today, messages send once, nothing goes early', asyn
   const msgs = (await api.list('Message', cara.token)).map((m) => m.content);
   assert.equal(msgs.filter((m) => m === 'Welcome to day one').length, 1, 'sent exactly once');
   assert.equal(msgs.filter((m) => m === 'This is day two').length, 0, 'tomorrow is not sent early');
+});
+
+/* ---------------- passkeys ---------------- */
+test('passkeys: set up, sign in, and every way it must refuse', async () => {
+  const { origin, hostname } = new URL(srv.base);
+  const A = members.alice; const B = members.bob;
+  const add = async (key, token, over = {}) => {
+    const o = (await api.call('POST', 'auth/passkeys/add-options', {}, token)).data;
+    return api.call('POST', 'auth/passkeys/add', { response: key.create(o, { origin, rp: hostname, ...over }) }, token);
+  };
+  const signIn = async (key, over = {}) => {
+    const o = (await api.call('POST', 'auth/passkeys/login-options', {})).data;
+    const response = key.get(o, { origin, rp: hostname, ...over });
+    return { response, res: await api.call('POST', 'auth/passkeys/login', { response }) };
+  };
+  assert.equal((await api.call('POST', 'auth/passkeys/add-options', {})).status, 401, 'signed out');
+  const key = makeAuthenticator();
+  assert.equal((await add(key, A.token, { origin: 'https://evil.test' })).status, 400, 'wrong site');
+  assert.equal((await add(key, A.token, { uv: false })).status, 400, 'no face or fingerprint');
+  const first = await add(key, A.token);
+  assert.equal(first.status, 200, JSON.stringify(first.data));
+  assert.ok((await api.list('Notification', A.token)).some((n) => n.title === 'New sign-in method added'));
+
+  const ok = await signIn(key);
+  assert.equal(ok.res.status, 200, JSON.stringify(ok.res.data));
+  assert.equal(ok.res.data.user.email, A.email);
+  assert.equal((await api.call('GET', 'auth/me', undefined, ok.res.data.token)).status, 200);
+  assert.equal((await api.call('POST', 'auth/passkeys/login', { response: ok.response })).status, 401, 'no replay');
+  assert.equal((await signIn(key, { origin: 'https://evil.test' })).res.status, 401, 'wrong site');
+  assert.equal((await signIn(key, { uv: false })).res.status, 401, 'no face or fingerprint');
+  assert.equal((await signIn(makeAuthenticator())).res.status, 401, 'unknown key');
+  const impostor = makeAuthenticator(); impostor.id = key.id;
+  assert.equal((await signIn(impostor)).res.status, 401, 'right id, wrong key');
+  assert.equal((await api.call('POST', 'auth/passkeys/login', {})).status, 401);
+  assert.equal((await api.call('POST', 'auth/passkeys/login', { response: { id: key.id } })).status, 401);
+
+  // Challenges belong to one person and one purpose.
+  const bobs = (await api.call('POST', 'auth/passkeys/add-options', {}, B.token)).data;
+  const stolen = makeAuthenticator().create(bobs, { origin, rp: hostname });
+  assert.equal((await api.call('POST', 'auth/passkeys/add', { response: stolen }, A.token)).status, 400, "someone else's challenge");
+  const loginO = (await api.call('POST', 'auth/passkeys/login-options', {})).data;
+  assert.equal((await api.call('POST', 'auth/passkeys/add', { response: makeAuthenticator().create(loginO, { origin, rp: hostname }) }, A.token)).status, 400, 'login challenge');
+
+  const listA = (await api.call('GET', 'auth/passkeys/list', undefined, A.token)).data.passkeys;
+  assert.equal(listA.length, 1);
+  assert.deepEqual(Object.keys(listA[0]).sort(), ['created_date', 'id', 'last_used', 'name']);
+  assert.equal((await api.call('GET', 'auth/passkeys/list', undefined, B.token)).data.passkeys.length, 0);
+  assert.equal((await api.call('DELETE', `auth/passkeys/list/${listA[0].id}`, undefined, B.token)).status, 404, 'not yours');
+  assert.equal((await add(key, B.token)).status, 409, 'a key has one owner');
+  assert.equal((await signIn(key)).res.data.user.email, A.email);
+  assert.equal((await api.call('DELETE', `auth/passkeys/list/${listA[0].id}`, undefined, A.token)).status, 200);
+  assert.equal((await signIn(key)).res.status, 401, 'removed');
+});
+test('passkeys: a password reset removes them, and turned-off accounts stay out', async () => {
+  const { origin, hostname } = new URL(srv.base);
+  const key = makeAuthenticator();
+  const inv = await api.fn('createInvite', { email: 'pk.coach@example.test', full_name: 'Pat Coach' }, admin.token);
+  assert.ok(inv.link, JSON.stringify(inv));
+  const pat = (await api.call('POST', 'auth/register', { token: tokenOf(inv.link), full_name: 'Pat Coach', password: PW })).data;
+  const add = async (token) => {
+    const o = (await api.call('POST', 'auth/passkeys/add-options', {}, token)).data;
+    assert.equal((await api.call('POST', 'auth/passkeys/add', { response: key.create(o, { origin, rp: hostname }) }, token)).status, 200);
+  };
+  const signIn = async () => {
+    const o = (await api.call('POST', 'auth/passkeys/login-options', {})).data;
+    return (await api.call('POST', 'auth/passkeys/login', { response: key.get(o, { origin, rp: hostname }) })).status;
+  };
+  await add(pat.token);
+  assert.equal(await signIn(), 200);
+  const off = await api.fn('setCoachAccess', { user_id: pat.user.id, disabled: true }, admin.token);
+  assert.equal(off.success, true, JSON.stringify(off));
+  assert.equal(await signIn(), 403, 'turned off');
+  await api.fn('setCoachAccess', { user_id: pat.user.id, disabled: false }, admin.token);
+  assert.equal(await signIn(), 200, 'turned back on');
+  const link = (await api.fn('createResetLink', { user_id: pat.user.id }, admin.token)).link;
+  assert.equal((await api.call('POST', 'auth/reset', { token: tokenOf(link), password: 'pat-new-pass' })).status, 200);
+  assert.equal(await signIn(), 401, 'reset removes passkeys');
 });
 
 /* ---------------- errors ---------------- */

@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { PASSKEY_SCHEMA, appOrigin, passkeyRoute, removePasskeys } from "../_lib/passkeys.js";
 // Brigade Athletic Club backend — single Cloudflare Pages Function handling all /api/* routes.
 // Bindings (wrangler.jsonc / Pages dashboard):
 //   env.DB          D1 database
@@ -169,7 +170,7 @@ async function createAccountLink(env, url, { kind, email, user_type = null, clie
       'INSERT INTO account_tokens (token_hash, kind, email, user_type, client_id, full_name, created_by, created_date, expires_date) VALUES (?,?,?,?,?,?,?,?,?)'
     ).bind(await sha256Hex(token), kind, addr, user_type, client_id, full_name || '', created_by, nowISO(), new Date(Date.now() + hours * 3600000).toISOString()),
   ]);
-  return `${url.origin}/Login#${kind}=${token}`;
+  return `${appOrigin(env, url)}/Login#${kind}=${token}`;
 }
 
 async function findAccountLink(env, token, kind) {
@@ -3436,6 +3437,7 @@ async function ensureSchema(env) {
     `CREATE TABLE IF NOT EXISTS app_state (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_date TEXT NOT NULL)`,
     `CREATE INDEX IF NOT EXISTS idx_account_tokens_email ON account_tokens(email, kind)`,
     `CREATE INDEX IF NOT EXISTS idx_audit_actor ON audit_log(actor, created_date)`,
+    ...PASSKEY_SCHEMA,
   ];
   for (const s of stmts) await env.DB.prepare(s).run();
   await seedCoachingContent(env);
@@ -3923,6 +3925,8 @@ export async function onRequest(context) {
         const row = await env.DB.prepare('SELECT * FROM users WHERE email = ?').bind(link.email).first();
         if (!row || userRow(row).disabled || !(await useAccountLink(env, link))) return err(BAD_LINK, 410);
         await setPassword(env, row.id, body.password);
+        // A reset is how a lost phone or a stranger gets locked out.
+        await removePasskeys(env, row.id);
         await audit(env, { actor: link.email, action: 'password_reset', target: 'Account', targetId: row.id, request });
         const token = await signToken({ sub: row.id, email: row.email }, env.AUTH_SECRET || 'dev-insecure-secret');
         const u = userRow(await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(row.id).first());
@@ -4098,11 +4102,27 @@ export async function onRequest(context) {
           await env.DB.prepare('UPDATE entities SET data=?, updated_date=? WHERE id=?')
             .bind(JSON.stringify(data), nowISO(), row.id).run();
         }
+        await removePasskeys(env, user.id);
         await env.DB.prepare('DELETE FROM users WHERE id = ?').bind(user.id).run();
         // The audit trail deliberately outlives the account (HIPAA requires
         // retaining access logs for 6 years); it stores no PHI, only actions.
         await audit(env, { actor: user.email, action: 'account_deleted', target: 'Account', targetId: user.id, detail: `${removed} records`, request });
         return json({ success: true, deleted_records: removed });
+      }
+
+      if (action === 'passkeys') {
+        return passkeyRoute({ request, env, url, method, step: segs[2], id: segs[3] }, {
+          json, err, audit, currentUser,
+          issue: async (row) => {
+            const u = userRow(row);
+            u.role = resolveRole(env, u.email, u.role);
+            return { token: await signToken({ sub: row.id, email: row.email }, env.AUTH_SECRET || 'dev-insecure-secret'), user: u };
+          },
+          notify: (u, name) => insertEntity(env, 'Notification', {
+            user_id: u.id, type: 'system', title: 'New sign-in method added', read: false, link: '/Settings?tab=account',
+            message: `Face ID, fingerprint or screen lock sign-in was set up on: ${name}. If this wasn't you, reset your password.`,
+          }, u.email),
+        });
       }
 
       if (action === 'isAuthenticated') {

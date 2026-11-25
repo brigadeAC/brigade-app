@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { base44, getToken, setToken } from '@/api/base44Client';
+import { signInWithPasskey } from '@/lib/passkeys';
 
 const AuthContext = createContext();
 
@@ -81,6 +82,15 @@ export const AuthProvider = ({ children }) => {
     return loggedIn;
   };
 
+  const loginWithPasskey = async () => {
+    const loggedIn = await signInWithPasskey();
+    applyUserPrefs(loggedIn);
+    setUser(loggedIn);
+    setIsAuthenticated(true);
+    setAuthError(null);
+    return loggedIn;
+  };
+
   const register = async (payload) => {
     const created = await base44.auth.register(payload);
     setUser(created);
@@ -117,6 +127,7 @@ export const AuthProvider = ({ children }) => {
     authError,
     appPublicSettings,
     login,
+    loginWithPasskey,
     register,
     resetPassword,
     logout,

@@ -111,6 +111,29 @@ const auth = {
     const res = await api('auth/change-password', { method: 'POST', body: { current_password, password } });
     setToken(res.token);
   },
+  async passkeysEnabled() {
+    return !!(await api('auth/passkeys/enabled')).enabled;
+  },
+  async passkeyLoginOptions() {
+    return api('auth/passkeys/login-options', { method: 'POST', body: {} });
+  },
+  async passkeyLogin(response) {
+    const res = await api('auth/passkeys/login', { method: 'POST', body: { response } });
+    setToken(res.token);
+    return res.user;
+  },
+  async passkeyAddOptions() {
+    return api('auth/passkeys/add-options', { method: 'POST', body: {} });
+  },
+  async passkeyAdd(response) {
+    return api('auth/passkeys/add', { method: 'POST', body: { response } });
+  },
+  async listPasskeys() {
+    return (await api('auth/passkeys/list')).passkeys;
+  },
+  async removePasskey(id) {
+    return api(`auth/passkeys/list/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  },
   async isAuthenticated() {
     if (!getToken()) return false;
     try {

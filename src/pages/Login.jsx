@@ -4,6 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
+import { addPasskey, dismissOffer, passkeyError, passkeyName, passkeysReady, shouldOffer } from '@/lib/passkeys';
+import { ScanFace } from 'lucide-react';
 
 // One page for signing in, joining from an invite link (/Login#invite=...),
 // choosing a new password (/Login#reset=...) and asking for an emailed link.
@@ -46,10 +48,11 @@ const TITLES = {
   invite: 'Create your Brigade account',
   reset: 'Choose a new password',
   badlink: 'This link no longer works',
+  offer: 'Sign in faster next time',
 };
 
 export default function Login() {
-  const { login, register, resetPassword } = useAuth();
+  const { login, loginWithPasskey, register, resetPassword } = useAuth();
   const navigate = useNavigate();
   const [link, setLink] = useState(readLink);
   const [info, setInfo] = useState(null);
@@ -61,8 +64,16 @@ export default function Login() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(false);
+  const [canPasskey, setCanPasskey] = useState(false);
+  const [after, setAfter] = useState(null);
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
   const go = (m) => { setMode(m); setError(''); setNotice(''); };
+
+  useEffect(() => {
+    let live = true;
+    passkeysReady().then((ok) => { if (live) setCanPasskey(ok); });
+    return () => { live = false; };
+  }, []);
 
   // Opening a second link while this page is already showing.
   useEffect(() => {
@@ -107,13 +118,41 @@ export default function Login() {
       if (mode === 'invite') user = await register({ token: link.token, full_name: form.full_name, password: form.password });
       else if (mode === 'reset') user = await resetPassword(link.token, form.password);
       else user = await login(form.email, form.password);
-      navigate(safeNext() || routeForUser(user), { replace: true });
+      const next = safeNext() || routeForUser(user);
+      if (await shouldOffer()) { setAfter(next); setForm((f) => ({ ...f, password: '', confirm: '' })); go('offer'); return; }
+      navigate(next, { replace: true });
     } catch (err) {
       setError(err?.message || 'Something went wrong. Please try again.');
     } finally {
       setLoading(false);
     }
   };
+
+  const passkeySignIn = async () => {
+    setError(''); setNotice(''); setLoading(true);
+    try {
+      const user = await loginWithPasskey();
+      navigate(safeNext() || routeForUser(user), { replace: true });
+    } catch (err) {
+      setError(passkeyError(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const setUpPasskey = async () => {
+    setError(''); setLoading(true);
+    try {
+      await addPasskey();
+      navigate(after, { replace: true });
+    } catch (err) {
+      setError(passkeyError(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const skipOffer = () => { dismissOffer(); navigate(after, { replace: true }); };
 
   const linkButton = (label, m) => (
     <button type="button" onClick={() => { window.history.replaceState(null, '', '/Login'); setLink(null); go(m); }} className="text-primary hover:underline font-medium">{label}</button>
@@ -134,8 +173,27 @@ export default function Login() {
             <p>{error || 'It expired or was already used. Links work once. Ask your coach or the front desk for a new one, or get one by email.'}</p>
             <p className="flex gap-6">{linkButton('Sign in', 'login')}{linkButton('Email me a link', 'forgot')}</p>
           </div>
+        ) : mode === 'offer' ? (
+          <div className="bg-card border border-border rounded-2xl p-6 space-y-4 shadow-sm text-sm text-foreground">
+            <p>Use {passkeyName()} instead of typing your password. Your face or fingerprint never leaves this device.</p>
+            {error && <p role="alert" className="text-red-500">{error}</p>}
+            <button type="button" onClick={setUpPasskey} disabled={loading}
+              className="w-full flex items-center justify-center gap-2 rounded-[6px] bg-primary text-primary-foreground hover:opacity-90 py-3 text-sm font-bold uppercase tracking-[0.08em] disabled:opacity-60 transition">
+              <ScanFace className="w-5 h-5" />{loading ? 'Please wait…' : `Set up ${passkeyName()}`}
+            </button>
+            <button type="button" onClick={skipOffer} disabled={loading} className="w-full py-2 font-medium text-muted-foreground hover:text-foreground">Not now</button>
+          </div>
         ) : (
           <form onSubmit={submit} className="bg-card border border-border rounded-2xl p-6 space-y-4 shadow-sm">
+            {mode === 'login' && canPasskey && (
+              <>
+                <button type="button" onClick={passkeySignIn} disabled={loading}
+                  className="w-full flex items-center justify-center gap-2 rounded-[6px] border border-border bg-background text-foreground hover:border-primary py-3 text-sm font-bold uppercase tracking-[0.08em] disabled:opacity-60 transition">
+                  <ScanFace className="w-5 h-5" />Use {passkeyName()}
+                </button>
+                <p className="text-center text-xs text-muted-foreground">or use your password</p>
+              </>
+            )}
             {mode === 'join' && (
               <p className="text-sm text-muted-foreground">
                 Brigade accounts are by invitation. Open the link your coach sent you, or enter the email the gym has for you and we'll send one.

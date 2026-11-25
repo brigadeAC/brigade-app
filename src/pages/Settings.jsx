@@ -43,6 +43,7 @@ import { useTheme } from "@/components/hooks/useTheme";
 import ClientPortalSettings from "@/components/settings/ClientPortalSettings";
 import ComplianceSettings from "@/components/settings/ComplianceSettings";
 import ChangePassword from "@/components/settings/ChangePassword";
+import Passkeys from "@/components/settings/Passkeys";
 
 export default function Settings() {
   const [user, setUser] = useState(null);
@@ -271,7 +272,7 @@ export default function Settings() {
         <p className="text-foreground mt-1">Manage your account and preferences</p>
       </div>
 
-      <Tabs defaultValue="profile" className="space-y-6">
+      <Tabs defaultValue={new URLSearchParams(window.location.search).get("tab") === "account" ? "account" : "profile"} className="space-y-6">
         <div className="flex justify-center w-full pb-2">
           <TabsList className="bg-secondary border border-border p-1 flex flex-wrap h-auto justify-center w-full sm:w-auto max-w-full gap-1">
             <TabsTrigger value="profile" className="flex-1 sm:flex-none text-xs sm:text-sm gap-1.5 sm:gap-2 whitespace-nowrap">
@@ -647,6 +648,8 @@ export default function Settings() {
         )}
 
         <TabsContent value="account" className="space-y-6">
+          <Passkeys />
+
           <ChangePassword />
 
           {/* Right of access — download everything we hold on this account */}
