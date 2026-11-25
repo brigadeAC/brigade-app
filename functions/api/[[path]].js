@@ -1237,7 +1237,8 @@ async function getGymSettings(env) {
 function sessionRules(session, s) {
   const o = session?.overrides || {};
   return {
-    open_h: numOr(o.booking_open_hours, s.booking_open_hours),
+    // single class > its weekly slot / class type (copied onto the session) > gym default
+    open_h: numOr(o.booking_open_hours, numOr(session?.booking_open_hours, s.booking_open_hours)),
     close_m: numOr(o.booking_close_minutes, s.booking_close_minutes),
     late_h: numOr(o.late_cancel_hours, s.late_cancel_hours),
   };
@@ -1553,10 +1554,11 @@ function slotSessionFields(slot, type, date) {
     coach_user_id: slot.coach_user_id || null,
     coach_name: slot.coach_name || '',
     reservable: type?.reservable !== false,
+    booking_open_hours: numOr(slot.booking_open_hours, numOr(type?.booking_open_hours, null)),
   };
 }
 const TIME_FIELDS = ['date', 'start_time', 'end_time', 'duration_min', 'start_at', 'end_at', 'capacity'];
-const LABEL_FIELDS = ['class_type_id', 'class_type_name', 'color', 'coach_user_id', 'coach_name', 'reservable'];
+const LABEL_FIELDS = ['class_type_id', 'class_type_name', 'color', 'coach_user_id', 'coach_name', 'reservable', 'booking_open_hours'];
 
 // Bring one slot's future sessions in line with it and generate to the horizon.
 // Empty future sessions follow the slot; booked ones keep time and capacity
@@ -1565,7 +1567,10 @@ const LABEL_FIELDS = ['class_type_id', 'class_type_name', 'color', 'coach_user_i
 async function syncSlotSessions(env, slot, type, s, now = Date.now()) {
   const out = { generated: 0, revived: 0, updated: 0, cancelled: 0, booked_kept: 0, booked_sessions: [] };
   const today = programToday(now);
-  const horizonEnd = pAddDays(today, Math.max(1, numOr(s.generate_days_ahead, 21)) - 1);
+  // Classes must exist at least as far ahead as members may book them.
+  const openHours = numOr(slot.booking_open_hours, numOr(type?.booking_open_hours, s.booking_open_hours));
+  const horizonDays = Math.min(62, Math.max(1, numOr(s.generate_days_ahead, 21), Math.ceil(openHours / 24) + 1));
+  const horizonEnd = pAddDays(today, horizonDays - 1);
   const active = slot.is_active !== false && !!type && type.is_active !== false && hmToMin(slot.start_time) !== null
     && Number.isInteger(Number(slot.day_of_week));
   const wants = (date) => active && pDow(date) === Number(slot.day_of_week)
@@ -1574,14 +1579,19 @@ async function syncSlotSessions(env, slot, type, s, now = Date.now()) {
 
   const existing = await selectEntities(env, 'ClassSession',
     `json_extract(data,'$.slot_id') = ? AND json_extract(data,'$.date') >= ?`, [slot.id, today]);
+  const bookedIds = new Set();
+  for (let i = 0; i < existing.length; i += 50) {
+    const chunk = existing.slice(i, i + 50).map((x) => x.id);
+    const { results } = await env.DB.prepare(
+      `SELECT DISTINCT json_extract(data,'$.session_id') AS sid FROM entities WHERE entity_type='Reservation' AND json_extract(data,'$.session_id') IN (${inList(chunk)}) AND json_extract(data,'$.status') IN (${sqlStr(ACTIVE_RES)})`
+    ).bind(...chunk).all();
+    results.forEach((r) => bookedIds.add(r.sid));
+  }
   for (const ex of existing) {
     if (Date.parse(ex.start_at) <= now) continue;
     if (ex.status === 'cancelled' && !ex.auto_cancelled) continue;
     if (ex.edited_manually) continue;
-    const c = await env.DB.prepare(
-      `SELECT COUNT(*) AS n FROM entities WHERE entity_type='Reservation' AND json_extract(data,'$.session_id') = ? AND json_extract(data,'$.status') IN (${sqlStr(ACTIVE_RES)})`
-    ).bind(ex.id).first();
-    const booked = (c?.n || 0) > 0;
+    const booked = bookedIds.has(ex.id);
     if (wants(ex.date)) {
       const want = slotSessionFields(slot, type, ex.date);
       if (ex.status === 'cancelled') {
@@ -1692,6 +1702,7 @@ async function normalizeClassSession(env, fields, existing) {
       if (fields.color === undefined) fields.color = type.color || null;
       if (fields.reservable === undefined) fields.reservable = type.reservable !== false;
       if (!existing && fields.capacity === undefined) fields.capacity = numOr(type.default_capacity, null);
+      if (!existing && fields.booking_open_hours === undefined) fields.booking_open_hours = numOr(type.booking_open_hours, null);
     }
   }
   const timeKeys = ['date', 'start_time', 'end_time', 'duration_min'];

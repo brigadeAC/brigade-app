@@ -1,5 +1,6 @@
 import React from "react";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 
 export const NativeSelect = ({ className = "", ...props }) => (
   <select
@@ -15,5 +16,14 @@ export const Field = ({ label, hint, children }) => (
     {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
   </div>
 );
+
+// "Members can book up to N days ahead". Stored in hours; blank = inherit.
+export const MAX_BOOK_DAYS = 60;
+export const hoursToDays = (h) => (h === null || h === undefined || h === "" ? "" : Math.round((Number(h) / 24) * 100) / 100);
+export const daysToHours = (d) => {
+  const n = numOrNull(d);
+  return n === null ? null : Math.round(Math.min(MAX_BOOK_DAYS, Math.max(1, n)) * 24);
+};
+export const BookDaysInput = (props) => <Input type="number" min="1" max={MAX_BOOK_DAYS} step="any" aria-label="Book up to (days ahead)" {...props} />;
 
 export const numOrNull = (v) => (v === "" || v === null || v === undefined || Number.isNaN(Number(v)) ? null : Number(v));

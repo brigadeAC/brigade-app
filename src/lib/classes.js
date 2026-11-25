@@ -127,7 +127,7 @@ export function dayLabel(key, now) {
 export function bookingWindow(session, settings = DEFAULT_GYM_SETTINGS) {
   const start = sessionStartMs(session);
   const o = session?.overrides || {};
-  const openH = o.booking_open_hours ?? settings.booking_open_hours;
+  const openH = o.booking_open_hours ?? session?.booking_open_hours ?? settings.booking_open_hours;
   const closeM = o.booking_close_minutes ?? settings.booking_close_minutes;
   return { opens: start - openH * 3600000, closes: start - closeM * 60000 };
 }
@@ -248,7 +248,7 @@ export function sessionAction(session, ctx) {
 
   if (now > start) return { action: "none", reason: "Class started", tone: "muted" };
   const bw = bookingWindow(session, settings);
-  if (now < bw.opens) return { action: "none", reason: `Booking opens ${formatEastern(bw.opens)}`, tone: "muted" };
+  if (now < bw.opens) return { action: "none", reason: `Booking opens ${formatEastern(bw.opens, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}`, tone: "muted" };
   if (now > bw.closes) {
     // Late self check-in with no reservation is allowed when a spot exists.
     if (isCheckInOpen(session, settings, now) && !isFull(session)) {

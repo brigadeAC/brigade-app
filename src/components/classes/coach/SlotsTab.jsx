@@ -8,9 +8,9 @@ import { Plus, Pencil, PowerOff, Power } from "lucide-react";
 import { toast } from "sonner";
 import { todayKey } from "@/lib/programs";
 import { errorMessage, runClassTick, fmtTime, addMinutes, DAY_NAMES, DAY_ORDER } from "./api";
-import { Field, NativeSelect, numOrNull } from "./ui";
+import { BookDaysInput, daysToHours, Field, hoursToDays, NativeSelect, numOrNull } from "./ui";
 
-const EMPTY = { class_type_id: "", day_of_week: 1, start_time: "06:00", duration_min: 60, capacity: "", coach_user_id: "", coach_name: "", start_date: "", end_date: "", is_active: true };
+const EMPTY = { class_type_id: "", day_of_week: 1, start_time: "06:00", duration_min: 60, capacity: "", coach_user_id: "", coach_name: "", book_days: "", start_date: "", end_date: "", is_active: true };
 
 export default function SlotsTab() {
   const qc = useQueryClient();
@@ -55,12 +55,13 @@ export default function SlotsTab() {
     e.preventDefault();
     if (!editing.class_type_id) return toast.error("Pick a class type.");
     if (!editing.start_time) return toast.error("Set a start time.");
-    const { id, created_date: _c, updated_date: _u, created_by: _b, ...rest } = editing;
+    const { id, created_date: _c, updated_date: _u, created_by: _b, book_days, ...rest } = editing;
     const data = {
       ...rest,
       day_of_week: Number(rest.day_of_week),
       duration_min: numOrNull(rest.duration_min) || 60,
       capacity: numOrNull(rest.capacity),
+      booking_open_hours: daysToHours(book_days),
       start_date: rest.start_date || today,
       end_date: rest.end_date || null,
       coach_user_id: rest.coach_user_id || null,
@@ -115,10 +116,10 @@ export default function SlotsTab() {
                         {fmtTime(s.start_time)} to {fmtTime(addMinutes(s.start_time, s.duration_min))} · {t?.name || "Unknown type"}{inactive ? " (inactive)" : ""}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {s.coach_name || "No coach"} · {(s.capacity ?? t?.default_capacity) ? `${s.capacity ?? t?.default_capacity} spots` : "No cap"}
+                        {s.coach_name || "No coach"} · {(s.capacity ?? t?.default_capacity) ? `${s.capacity ?? t?.default_capacity} spots` : "No cap"}{t?.reservable !== false && s.booking_open_hours ? ` · book ${hoursToDays(s.booking_open_hours)} days ahead` : ""}
                       </p>
                     </div>
-                    <Button variant="ghost" size="icon" aria-label="Edit" onClick={() => setEditing({ ...EMPTY, ...s, capacity: s.capacity ?? "", coach_user_id: s.coach_user_id || "", start_date: s.start_date || "", end_date: s.end_date || "" })}><Pencil className="w-4 h-4" /></Button>
+                    <Button variant="ghost" size="icon" aria-label="Edit" onClick={() => setEditing({ ...EMPTY, ...s, capacity: s.capacity ?? "", coach_user_id: s.coach_user_id || "", book_days: hoursToDays(s.booking_open_hours), start_date: s.start_date || "", end_date: s.end_date || "" })}><Pencil className="w-4 h-4" /></Button>
                     <Button variant="ghost" size="icon" aria-label={inactive ? "Reactivate" : "Deactivate"} onClick={() => (inactive ? setActive(s, true) : setDeactivating(s))}>
                       {inactive ? <Power className="w-4 h-4" /> : <PowerOff className="w-4 h-4" />}
                     </Button>
@@ -159,6 +160,11 @@ export default function SlotsTab() {
                 <Field label="Starts" hint="Blank = today"><Input type="date" value={editing.start_date || ""} onChange={(e) => set("start_date", e.target.value)} /></Field>
                 <Field label="Ends" hint="Blank = ongoing"><Input type="date" value={editing.end_date || ""} onChange={(e) => set("end_date", e.target.value)} /></Field>
               </div>
+              {typeById[editing.class_type_id]?.reservable !== false && (
+                <Field label="Book up to (days ahead)" hint="Blank = the class type's setting, or the gym default">
+                  <BookDaysInput value={editing.book_days} onChange={(e) => set("book_days", e.target.value)} />
+                </Field>
+              )}
               {editImpact && (
                 <div className="rounded-lg bg-secondary/60 p-3 text-xs text-muted-foreground space-y-1">
                   <p>Saving updates {editImpact.empty} upcoming {editImpact.empty === 1 ? "session" : "sessions"} with no reservations.</p>

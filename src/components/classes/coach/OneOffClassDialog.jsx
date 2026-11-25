@@ -9,9 +9,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { toast } from "sonner";
 import { fromKey, todayKey } from "@/lib/programs";
 import { errorMessage, fmtTime } from "./api";
-import { Field, NativeSelect, numOrNull } from "./ui";
+import { BookDaysInput, daysToHours, Field, NativeSelect, numOrNull } from "./ui";
 
-const blank = (date) => ({ class_type_id: "", class_type_name: "", date, start_time: "09:00", duration_min: 60, capacity: "", coach_user_id: "" });
+const blank = (date) => ({ class_type_id: "", class_type_name: "", date, start_time: "09:00", duration_min: 60, capacity: "", book_days: "", coach_user_id: "" });
 
 export default function OneOffClassDialog({ open, onOpenChange, defaultDate, onCreated }) {
   const qc = useQueryClient();
@@ -47,13 +47,15 @@ export default function OneOffClassDialog({ open, onOpenChange, defaultDate, onC
     const coach = staff.find((u) => u.id === form.coach_user_id);
     const name = form.class_type_name.trim();
     const capacity = numOrNull(form.capacity);
+    const openHours = type?.reservable === false ? null : daysToHours(form.book_days);
     setSaving(true);
     try {
-      // Left-out fields (name, capacity) fall back to the class type's defaults.
+      // Left-out fields (name, capacity, booking days) fall back to the class type's defaults.
       await base44.entities.ClassSession.create({
         class_type_id: form.class_type_id,
         ...(name ? { class_type_name: name } : {}),
         ...(capacity ? { capacity } : {}),
+        ...(openHours ? { booking_open_hours: openHours } : {}),
         slot_id: null,
         date: form.date,
         start_time: form.start_time,
@@ -100,6 +102,11 @@ export default function OneOffClassDialog({ open, onOpenChange, defaultDate, onC
               <Input aria-label="Capacity" type="number" min="1" value={form.capacity} onChange={(e) => set("capacity", e.target.value)} />
             </Field>
           </div>
+          {type?.reservable !== false && (
+            <Field label="Book up to (days ahead)" hint="Blank = the class type's setting, or the gym default">
+              <BookDaysInput value={form.book_days} onChange={(e) => set("book_days", e.target.value)} />
+            </Field>
+          )}
           <Field label="Coach">
             <NativeSelect aria-label="Coach" value={form.coach_user_id} onChange={(e) => set("coach_user_id", e.target.value)}>
               <option value="">No coach</option>

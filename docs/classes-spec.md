@@ -43,7 +43,9 @@ is_active`
 `class_type_id, class_type_name, color, slot_id (null for one-offs), date, start_time, end_time,
 start_at, end_at (ISO UTC), capacity, coach_user_id, coach_name, status: scheduled|cancelled,
 cancel_reason, reservable, notes, reserved_count, waitlist_count, checked_in_count,
-overrides?: { booking_open_hours, booking_close_minutes, late_cancel_hours }`
+booking_open_hours? (copied from slot, else class type), overrides?: { booking_open_hours, booking_close_minutes, late_cancel_hours }`
+  Booking window: overrides (this class) > booking_open_hours (slot, else type) > GymSettings. UI edits it in days.
+  Generation extends past `generate_days_ahead` when a window is longer (max 62 days).
 - Generated from active slots for the next `generate_days_ahead` days (default 21). Idempotent:
   never two sessions with the same (slot_id, date). Editing a slot updates FUTURE sessions of
   that slot that have no reservations; sessions with reservations keep their time unless

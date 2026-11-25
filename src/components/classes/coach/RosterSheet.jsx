@@ -11,6 +11,7 @@ import { Loader2, UserPlus, Check, Undo2, UserX, XCircle, CalendarPlus } from "l
 import { toast } from "sonner";
 import { fromKey } from "@/lib/programs";
 import ClientPicker from "./ClientPicker";
+import BookingWindowRow from "./BookingWindowRow";
 import {
   fetchRoster, checkInReservation, undoCheckIn, markNoShow, cancelReservation, walkIn, bookClient,
   cancelSession, errorMessage, fmtTime, RES_STATUS,
@@ -135,6 +136,8 @@ export default function RosterSheet({ session, open, onOpenChange, onChanged }) 
                   <ClientPicker exclude={existingIds} disabled={busyId === "pick"} onPick={(c) => handlePick(c, mode)} />
                 </div>
               )}
+
+              {reservable && <BookingWindowRow key={session.id} session={session} onSaved={refresh} />}
 
               {rosterQuery.isLoading ? (
                 <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>

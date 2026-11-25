@@ -9,14 +9,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Plus, Pencil, EyeOff, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { errorMessage } from "./api";
-import { Field, numOrNull } from "./ui";
+import { BookDaysInput, daysToHours, Field, hoursToDays, numOrNull } from "./ui";
 
 const SEEDS = [
   { name: "CrossFit", color: "#4B91DD", reservable: true, default_capacity: 20, default_duration_min: 60 },
   { name: "Open Gym", color: "#6B7280", reservable: false, default_capacity: null, default_duration_min: 60 },
   { name: "Women's Functional Strength", color: "#D9467A", reservable: true, default_capacity: 20, default_duration_min: 60 },
 ];
-const EMPTY = { name: "", description: "", color: "#4B91DD", reservable: true, default_capacity: "", default_duration_min: 60, is_active: true };
+const EMPTY = { name: "", description: "", color: "#4B91DD", reservable: true, default_capacity: "", default_duration_min: 60, book_days: "", is_active: true };
 
 export default function ClassTypesTab() {
   const qc = useQueryClient();
@@ -36,11 +36,12 @@ export default function ClassTypesTab() {
   const save = async (e) => {
     e.preventDefault();
     if (!editing.name.trim()) return toast.error("Give the class type a name.");
-    const { id, created_date: _c, updated_date: _u, created_by: _b, ...rest } = editing;
+    const { id, created_date: _c, updated_date: _u, created_by: _b, book_days, ...rest } = editing;
     const data = {
       ...rest, name: rest.name.trim(),
       default_capacity: numOrNull(rest.default_capacity),
       default_duration_min: numOrNull(rest.default_duration_min) || 60,
+      booking_open_hours: daysToHours(book_days),
     };
     setSaving(true);
     try {
@@ -81,10 +82,10 @@ export default function ClassTypesTab() {
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold text-foreground">{t.name}{t.is_active === false ? " (inactive)" : ""}</p>
               <p className="text-xs text-muted-foreground">
-                {t.reservable === false ? "Check-in only" : "Reservable"} · {t.default_capacity ? `${t.default_capacity} spots` : "No cap"} · {t.default_duration_min || 60} min
+                {t.reservable === false ? "Check-in only" : "Reservable"} · {t.default_capacity ? `${t.default_capacity} spots` : "No cap"} · {t.default_duration_min || 60} min{t.reservable !== false && t.booking_open_hours ? ` · book ${hoursToDays(t.booking_open_hours)} days ahead` : ""}
               </p>
             </div>
-            <Button variant="ghost" size="icon" aria-label="Edit" onClick={() => setEditing({ ...EMPTY, ...t, default_capacity: t.default_capacity ?? "" })}><Pencil className="w-4 h-4" /></Button>
+            <Button variant="ghost" size="icon" aria-label="Edit" onClick={() => setEditing({ ...EMPTY, ...t, default_capacity: t.default_capacity ?? "", book_days: hoursToDays(t.booking_open_hours) })}><Pencil className="w-4 h-4" /></Button>
             <Button variant="ghost" size="icon" aria-label={t.is_active === false ? "Activate" : "Deactivate"} onClick={() => toggleActive(t)}>
               {t.is_active === false ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
             </Button>
@@ -111,6 +112,11 @@ export default function ClassTypesTab() {
                 </div>
                 <Switch checked={editing.reservable !== false} onCheckedChange={(v) => set("reservable", v)} />
               </div>
+              {editing.reservable !== false && (
+                <Field label="Book up to (days ahead)" hint="Blank = the gym default in Booking settings">
+                  <BookDaysInput value={editing.book_days} onChange={(e) => set("book_days", e.target.value)} />
+                </Field>
+              )}
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setEditing(null)}>Cancel</Button>
                 <Button type="submit" disabled={saving}>{saving ? "Saving" : "Save"}</Button>

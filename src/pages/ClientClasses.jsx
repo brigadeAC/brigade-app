@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { ArrowLeft, Loader2, CalendarDays } from "lucide-react";
 import { createPageUrl } from "@/utils";
 import { addDays } from "@/lib/programs";
-import { easternTodayKey, dayLabel, sessionAction } from "@/lib/classes";
+import { bookingWindow, easternTodayKey, dayLabel, sessionAction } from "@/lib/classes";
 import DayStrip from "@/components/classes/member/DayStrip";
 import SessionRow from "@/components/classes/member/SessionRow";
 import CancelDialog from "@/components/classes/member/CancelDialog";
@@ -22,14 +22,27 @@ export default function ClientClasses() {
   }, []);
 
   const today = easternTodayKey(now);
-  const horizon = Math.min(14, Math.max(7, settings.generate_days_ahead || 14));
-  const days = useMemo(() => Array.from({ length: horizon }, (_, i) => addDays(today, i)), [today, horizon]);
+  const schedule = useSchedule(today, addDays(today, 61));
+  const sessions = useMemo(() => schedule.data || [], [schedule.data]);
+  // Two weeks, or further when a class beyond that is already open for booking
+  // (or they're already booked into one).
+  const lastDay = useMemo(() => {
+    let last = addDays(today, 13);
+    sessions.forEach((s) => {
+      if (s.status === "cancelled" || s.date <= last) return;
+      const open = s.reservable !== false && bookingWindow(s, settings).opens <= now;
+      if (open || my.reservationBySession[s.id]) last = s.date;
+    });
+    return last;
+  }, [sessions, settings, my.reservationBySession, now, today]);
+  const days = useMemo(() => {
+    const out = [];
+    for (let d = today; d <= lastDay; d = addDays(d, 1)) out.push(d);
+    return out;
+  }, [today, lastDay]);
   const [selected, setSelected] = useState(null);
   const day = selected && days.includes(selected) ? selected : today;
   const [cancelTarget, setCancelTarget] = useState(null);
-
-  const schedule = useSchedule(days[0], days[days.length - 1]);
-  const sessions = useMemo(() => schedule.data || [], [schedule.data]);
 
   const countsByDay = useMemo(() => {
     const m = {};

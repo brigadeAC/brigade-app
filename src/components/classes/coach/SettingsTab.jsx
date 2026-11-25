@@ -5,10 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { errorMessage, GYM_SETTINGS_DEFAULTS } from "./api";
+import { errorMessage, runClassTick, GYM_SETTINGS_DEFAULTS } from "./api";
+import { BookDaysInput, daysToHours, hoursToDays } from "./ui";
 
 const NUMBERS = [
-  ["booking_open_hours", "Booking opens (hours before class)", "168 = one week ahead"],
   ["booking_close_minutes", "Booking closes (minutes before class)", ""],
   ["late_cancel_hours", "Late cancel window (hours before class)", "Cancelling inside this is a late cancel"],
   ["self_checkin_before_minutes", "Self check-in opens (minutes before start)", ""],
@@ -25,15 +25,17 @@ const TOGGLES = [
   ["show_roster_to_members", "Members can see who is booked"],
 ];
 
+const withDays = (s) => ({ ...s, book_days: hoursToDays(s.booking_open_hours) });
+
 export default function SettingsTab() {
   const qc = useQueryClient();
   const { data: records = [], isLoading } = useQuery({ queryKey: ["gymSettings"], queryFn: () => base44.entities.GymSettings.list() });
   const record = records[0] || null;
-  const [form, setForm] = useState(GYM_SETTINGS_DEFAULTS);
+  const [form, setForm] = useState(withDays(GYM_SETTINGS_DEFAULTS));
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (!isLoading) setForm({ ...GYM_SETTINGS_DEFAULTS, ...(record || {}) });
+    if (!isLoading) setForm(withDays({ ...GYM_SETTINGS_DEFAULTS, ...(record || {}) }));
   }, [isLoading, record]);
 
   const save = async (e) => {
@@ -42,10 +44,12 @@ export default function SettingsTab() {
     for (const k of Object.keys(GYM_SETTINGS_DEFAULTS)) {
       data[k] = typeof GYM_SETTINGS_DEFAULTS[k] === "number" ? Math.max(0, Number(form[k]) || 0) : !!form[k];
     }
+    data.booking_open_hours = daysToHours(form.book_days) ?? GYM_SETTINGS_DEFAULTS.booking_open_hours;
     setSaving(true);
     try {
       if (record) await base44.entities.GymSettings.update(record.id, data);
       else await base44.entities.GymSettings.create(data);
+      await runClassTick().catch(() => {}); // a longer booking window needs classes further out
       toast.success("Booking settings saved");
       qc.invalidateQueries({ queryKey: ["gymSettings"] });
     } catch (err) { toast.error(errorMessage(err)); } finally { setSaving(false); }
@@ -55,6 +59,13 @@ export default function SettingsTab() {
     <form onSubmit={save} className="space-y-6 max-w-xl">
       <p className="text-sm text-muted-foreground">These apply to every class. {record ? "" : "Showing Brigade's defaults; nothing is stored until you save."}</p>
       <div className="space-y-4">
+        <div className="flex items-center justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-foreground">Members can book up to (days ahead)</p>
+            <p className="text-xs text-muted-foreground">The default. A class type, weekly slot or single class can override it.</p>
+          </div>
+          <BookDaysInput className="w-24 shrink-0" value={form.book_days} onChange={(e) => setForm((f) => ({ ...f, book_days: e.target.value }))} />
+        </div>
         {NUMBERS.map(([k, label, hint]) => (
           <div key={k} className="flex items-center justify-between gap-4">
             <div className="min-w-0">
