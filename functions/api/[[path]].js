@@ -144,7 +144,7 @@ async function currentUser(request, env) {
   // A password change or reset signs out every session issued before it.
   if (u.sessions_valid_from && (payload.iat || 0) < u.sessions_valid_from) return null;
   u.role = resolveRole(env, u.email, u.role);
-  return u;
+  return attachRights(env, u);
 }
 
 /* ---------------------------- account links ------------------------------ */
@@ -303,29 +303,121 @@ const STAFF_PRIVATE_TYPES = new Set(['Message', 'Notification', 'CoachBriefing',
 const isStaff = (user) => !!user && (user.role === 'admin' || user.user_type === 'trainer');
 
 /* ---- Roles and permissions ----
- * Admin comes only from ADMIN_EMAILS. Staff accounts (user_type 'trainer') are
- * a coach unless an admin made them a manager (users.data.staff_role). Clients
- * are members; a member with linked children is also a parent (client_guardians).
- * Every staff-only action names the permission it needs; change a role's powers
- * here and only here. */
-const STAFF_ROLES = ['coach', 'manager'];
-const PERMISSIONS = {
-  manager: new Set(['classes.run', 'classes.edit', 'schedule.manage', 'members.invite', 'members.manage', 'guardians.manage', 'reports.view', 'programs.manage', 'settings.manage']),
-  coach: new Set(['classes.run', 'classes.edit', 'members.invite', 'programs.manage']),
+ * Admin comes only from ADMIN_EMAILS and has every right. Staff accounts
+ * (user_type 'trainer') hold one role (users.data.staff_role, default 'coach').
+ * Admins create roles and tick their rights on the Team page; the definitions
+ * live in app_state 'staff_roles'. Clients are members; a member with linked
+ * children is also a parent (client_guardians). Every staff-only action names
+ * the right it needs. */
+const RIGHTS = [
+  { key: 'classes.run', label: 'Run classes', hint: 'Rosters, check-in, book people in' },
+  { key: 'classes.edit', label: 'Change a single class', hint: 'Time, coach, capacity, or cancel it' },
+  { key: 'schedule.manage', label: 'Set up the class schedule', hint: 'Class types, weekly times, holiday closures' },
+  { key: 'members.invite', label: 'Invite members', hint: 'Send join links to members' },
+  { key: 'members.manage', label: 'Manage memberships', hint: 'Plans, holds and end dates' },
+  { key: 'guardians.manage', label: 'Link parents and children', hint: 'Who can book for a child' },
+  { key: 'members.coaching_all', label: 'See all personal training details', hint: "Notes, health and logs for every coach's personal training clients" },
+  { key: 'programs.manage', label: 'Programs and workouts', hint: 'Build and assign programs' },
+  { key: 'reports.view', label: 'Class reports', hint: 'Attendance, class fill, no-shows, members by plan' },
+  { key: 'settings.manage', label: 'Booking rules', hint: 'Booking windows, late cancels, waiver' },
+  { key: 'billing.view', label: 'Rates and payments', hint: 'Prices, rates, payments and billing' },
+];
+const RIGHT_KEYS = new Set(RIGHTS.map((r) => r.key));
+const ADMIN_ONLY_RIGHTS = ['staff.manage']; // invite staff, change roles: never grantable
+const DEFAULT_ROLES = {
+  coach: { name: 'Coach', builtin: true, rights: ['classes.run', 'classes.edit', 'members.invite', 'programs.manage'] },
+  manager: { name: 'Manager', builtin: true, rights: ['classes.run', 'classes.edit', 'schedule.manage', 'members.invite', 'members.manage', 'guardians.manage', 'members.coaching_all', 'programs.manage', 'reports.view', 'settings.manage', 'billing.view'] },
 };
-const ALL_PERMISSIONS = [...new Set([...PERMISSIONS.manager, ...PERMISSIONS.coach, 'staff.manage', 'settings.manage'])].sort();
+const ALL_PERMISSIONS = [...RIGHT_KEYS, ...ADMIN_ONLY_RIGHTS].sort();
+async function loadRoles(env) {
+  let saved = {};
+  try { saved = JSON.parse((await getState(env, 'staff_roles'))?.value || '{}'); } catch { saved = {}; }
+  const roles = {};
+  for (const [k, v] of Object.entries(DEFAULT_ROLES)) roles[k] = { ...v, rights: [...v.rights] };
+  for (const [k, v] of Object.entries(saved)) {
+    if (!v || typeof v !== 'object') continue;
+    roles[k] = { name: String(v.name || k), builtin: !!DEFAULT_ROLES[k], rights: (v.rights || []).filter((r) => RIGHT_KEYS.has(r)) };
+  }
+  return roles;
+}
+// Attach the signed-in staff member's role and rights (once per request).
+async function attachRights(env, user) {
+  if (!user || user.role === 'admin' || user.user_type !== 'trainer') return user;
+  const roles = await loadRoles(env);
+  const key = roles[user.staff_role] ? user.staff_role : 'coach';
+  user._staffRole = key;
+  user._roleName = roles[key].name;
+  user._rights = new Set(roles[key].rights);
+  return user;
+}
+
+/* What each staff level can open about a member:
+ * - Every coach: all group members' basics, coaching details included.
+ * - Personal training clients (Client.personal_training + trainer_id): coaching
+ *   details only for their assigned coach, managers and admins.
+ * - Money (rates, prices, payments): managers and admins only. */
+const MONEY_FIELDS = ['price', 'price_label', 'price_cents', 'rate', 'rate_cents', 'amount', 'amount_cents', 'balance', 'balance_cents',
+  'billing', 'payment', 'payments', 'payment_method', 'payment_status', 'last_payment', 'last_payment_date', 'next_payment', 'next_payment_date',
+  'stripe_customer_id', 'stripe_subscription_id', 'card_last4', 'card_brand', 'autopay', 'discount', 'invoice', 'invoices', 'failed_payments'];
+const MONEY_TYPES = new Set(['Client', 'Membership', 'MembershipPlan']);
+const HEALTH_FIELDS = ['medical_notes', 'injuries', 'medical_conditions', 'medications', 'allergies', 'health_notes', 'health_history',
+  'parq', 'emergency_notes', 'body_fat', 'weight', 'measurements', 'notes'];
+// Coaching-detail records about a member, keyed by client_id.
+const COACHING_DETAIL_TYPES = new Set(['ClientNote', 'ClientNotebookPage', 'JournalEntry', 'MealLog', 'CalorieLog', 'ProgressLog',
+  'SleepLog', 'StressLog', 'CheckinResponse', 'FormCheck', 'Goal', 'MealPlan']);
+const seesAllCoaching = (user) => can(user, 'members.coaching_all');
+// SQL: this row is NOT about a personal training client assigned to another coach.
+const notOthersPtClient = (col) => `NOT EXISTS (SELECT 1 FROM entities pt WHERE pt.entity_type = 'Client'
+  AND (pt.id = ${col} OR json_extract(pt.data,'$.user_id') = ${col})
+  AND json_extract(pt.data,'$.personal_training') = 1 AND COALESCE(json_extract(pt.data,'$.trainer_id'),'') <> ?)`;
+const isOthersPtClient = (user, client) => !!client && client.personal_training === true && isStaff(user) && !seesAllCoaching(user) && client.trainer_id !== user.id;
+function redactFor(user, type, rec) {
+  if (!rec || !isStaff(user)) return rec;
+  let out = rec;
+  if (MONEY_TYPES.has(type) && !can(user, 'billing.view')) {
+    out = { ...out };
+    for (const f of MONEY_FIELDS) delete out[f];
+  }
+  if (type === 'Client' && isOthersPtClient(user, out)) {
+    out = { ...out };
+    for (const f of HEALTH_FIELDS) delete out[f];
+    out.details_limited = true;
+  }
+  return out;
+}
+// Staff writes a coach may not make. Money fields are dropped from the write
+// (a coach never sees them, so they can't knowingly change them).
+function staffFieldViolation(user, type, fields, existing = null) {
+  if (!isStaff(user)) return null;
+  if (MONEY_TYPES.has(type) && !can(user, 'billing.view')) for (const f of MONEY_FIELDS) delete fields[f];
+  if (type !== 'Client' || seesAllCoaching(user)) return null;
+  if (existing && isOthersPtClient(user, existing)) return 'This is another coach\'s personal training client. Ask a manager.';
+  const nextPt = 'personal_training' in fields ? fields.personal_training === true : existing?.personal_training === true;
+  const nextTrainer = 'trainer_id' in fields ? fields.trainer_id : existing?.trainer_id;
+  if (nextPt && nextTrainer !== user.id && ('personal_training' in fields || 'trainer_id' in fields)) {
+    return 'Coaches can only make someone their own personal training client.';
+  }
+  return null;
+}
 function staffRole(user) {
   if (!user) return null;
   if (user.role === 'admin') return 'admin';
   if (user.user_type !== 'trainer') return null;
-  return user.staff_role === 'manager' ? 'manager' : 'coach';
+  return user._staffRole || (DEFAULT_ROLES[user.staff_role] ? user.staff_role : 'coach');
 }
 function can(user, perm) {
   const r = staffRole(user);
   if (r === 'admin') return true;
-  return !!r && PERMISSIONS[r].has(perm);
+  if (!r) return false;
+  const rights = user._rights || new Set(DEFAULT_ROLES[r]?.rights || DEFAULT_ROLES.coach.rights);
+  return rights.has(perm);
 }
-const permissionsOf = (user) => (staffRole(user) === 'admin' ? ALL_PERMISSIONS : [...(PERMISSIONS[staffRole(user)] || [])].sort());
+const permissionsOf = (user) => {
+  const r = staffRole(user);
+  if (r === 'admin') return ALL_PERMISSIONS;
+  if (!r) return [];
+  return ALL_PERMISSIONS.filter((p) => can(user, p));
+};
 const NO_PERMISSION = { success: false, error: 'Your role doesn\'t allow this. Ask an admin.', code: 'forbidden' };
 // Entity types whose writes need more than plain staff access.
 const TYPE_PERMISSION = {
@@ -573,7 +665,12 @@ const COACH_PRIVATE_TYPES = new Set(['ClientNote', 'ClientNotebookPage']);
 
 async function entityScope(env, type, user) {
   if (SHARED_TYPES.has(type) || STAFF_LIBRARY_TYPES.has(type)) return null;
-  if (isStaff(user) && !STAFF_PRIVATE_TYPES.has(type)) return null;
+  if (isStaff(user) && !STAFF_PRIVATE_TYPES.has(type)) {
+    if (COACHING_DETAIL_TYPES.has(type) && !seesAllCoaching(user)) {
+      return { sql: notOthersPtClient("json_extract(entities.data,'$.client_id')"), binds: [user.id] };
+    }
+    return null;
+  }
   const scope = await ownershipClause(env, user);
   if (!scope) return null; // admin
   let sql = scope.sql;
@@ -2774,6 +2871,7 @@ async function runFunction(name, payload, ctx) {
     case 'listTeam': {
       if (!user || user.role !== 'admin') return { success: false, error: 'Only an admin can see the team.' };
       const { results } = await env.DB.prepare(`SELECT * FROM users WHERE user_type = 'trainer' ORDER BY full_name`).all();
+      const roles = await loadRoles(env);
       const pending = await env.DB.prepare(
         `SELECT email, full_name, expires_date FROM account_tokens WHERE kind = 'invite' AND user_type = 'trainer' AND used_date IS NULL AND expires_date > ? ORDER BY created_date DESC`
       ).bind(nowISO()).all();
@@ -2781,9 +2879,9 @@ async function runFunction(name, payload, ctx) {
         success: true, email_enabled: emailReady(env),
         team: results.map(userRow).map((u) => {
           const isAdmin = resolveRole(env, u.email, u.role) === 'admin';
-          return { id: u.id, email: u.email, full_name: u.full_name, disabled: !!u.disabled, is_admin: isAdmin, staff_role: isAdmin ? 'admin' : staffRole(u), is_me: u.id === user.id };
+          return { id: u.id, email: u.email, full_name: u.full_name, disabled: !!u.disabled, is_admin: isAdmin, staff_role: isAdmin ? 'admin' : (roles[u.staff_role] ? u.staff_role : 'coach'), is_me: u.id === user.id };
         }),
-        roles: STAFF_ROLES,
+        roles: Object.entries(roles).map(([key, r]) => ({ key, name: r.name })),
         pending: pending.results,
       };
     }
@@ -2800,21 +2898,79 @@ async function runFunction(name, payload, ctx) {
       return { success: true, disabled: data.disabled };
     }
 
-    // Admin only: make a staff account a coach or a manager.
+    // Admin only: give a staff account one of the roles.
     case 'setStaffRole': {
       if (!can(user, 'staff.manage')) return { success: false, error: 'Only an admin can change roles.' };
+      const roles = await loadRoles(env);
       const role = String(payload?.role || '');
-      if (!STAFF_ROLES.includes(role)) return { success: false, error: 'Pick coach or manager.' };
+      if (!roles[role]) return { success: false, error: 'Pick one of the roles.' };
       const row = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(payload?.user_id || '').first();
       if (!row || row.user_type !== 'trainer') return { success: false, error: 'Staff account not found.' };
-      if (resolveRole(env, row.email, row.role) === 'admin') return { success: false, error: 'Admins already have every permission.' };
+      if (resolveRole(env, row.email, row.role) === 'admin') return { success: false, error: 'Admins already have every right.' };
       const data = JSON.parse(row.data || '{}');
-      const before = data.staff_role === 'manager' ? 'manager' : 'coach';
+      const before = roles[data.staff_role] ? data.staff_role : 'coach';
       if (before === role) return { success: true, role };
       data.staff_role = role;
       await env.DB.prepare('UPDATE users SET data = ?, updated_date = ? WHERE id = ?').bind(JSON.stringify(data), nowISO(), row.id).run();
       await audit(env, { actor: user.email, action: 'role_changed', target: 'Account', targetId: row.id, detail: `${before} -> ${role}`, request: null });
       return { success: true, role };
+    }
+
+    // Admin only: the roles, the rights each one has, and how many staff hold it.
+    case 'listRoles': {
+      if (!can(user, 'staff.manage')) return { success: false, error: 'Only an admin can see roles.' };
+      const roles = await loadRoles(env);
+      const { results } = await env.DB.prepare(`SELECT email, role, data FROM users WHERE user_type = 'trainer'`).all();
+      const counts = {};
+      for (const r of results) {
+        if (resolveRole(env, r.email, r.role) === 'admin') continue;
+        let d = {}; try { d = JSON.parse(r.data || '{}'); } catch { /* skip */ }
+        const k = roles[d.staff_role] ? d.staff_role : 'coach';
+        counts[k] = (counts[k] || 0) + 1;
+      }
+      return { success: true, rights: RIGHTS, roles: Object.entries(roles).map(([key, r]) => ({ key, ...r, people: counts[key] || 0 })) };
+    }
+
+    // Admin only: create a role or change its name and rights.
+    case 'saveRole': {
+      if (!can(user, 'staff.manage')) return { success: false, error: 'Only an admin can change roles.' };
+      const roles = await loadRoles(env);
+      const name = String(payload?.name || '').trim().slice(0, 40);
+      if (!name) return { success: false, error: 'Give the role a name.' };
+      const rights = [...new Set((Array.isArray(payload?.rights) ? payload.rights : []).map(String))];
+      const bad = rights.filter((r) => !RIGHT_KEYS.has(r));
+      if (bad.length) return { success: false, error: 'Some of those rights can\'t be given to a role.' };
+      let key = String(payload?.key || '');
+      const isNew = !key;
+      if (isNew) {
+        key = name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 30) || 'role';
+        if (roles[key]) key = `${key}_${Math.random().toString(36).slice(2, 6)}`;
+      } else if (!roles[key]) return { success: false, error: 'Role not found.' };
+      if (Object.values(roles).some((r, i) => Object.keys(roles)[i] !== key && r.name.toLowerCase() === name.toLowerCase())) {
+        return { success: false, error: 'Another role already has that name.' };
+      }
+      const before = roles[key] ? roles[key].rights.join(',') : '';
+      roles[key] = { name, builtin: !!DEFAULT_ROLES[key], rights };
+      const store = Object.fromEntries(Object.entries(roles).map(([k, r]) => [k, { name: r.name, rights: r.rights }]));
+      await setState(env, 'staff_roles', JSON.stringify(store));
+      await audit(env, { actor: user.email, action: isNew ? 'role_created' : 'role_updated', target: 'Role', targetId: key, detail: `${name}: ${before} -> ${rights.join(',')}`, request: null });
+      return { success: true, key };
+    }
+
+    // Admin only: remove a role nobody holds. Coach and Manager stay.
+    case 'deleteRole': {
+      if (!can(user, 'staff.manage')) return { success: false, error: 'Only an admin can change roles.' };
+      const roles = await loadRoles(env);
+      const key = String(payload?.key || '');
+      if (!roles[key]) return { success: false, error: 'Role not found.' };
+      if (DEFAULT_ROLES[key]) return { success: false, error: 'Coach and Manager can be changed but not removed.' };
+      const inUse = await env.DB.prepare(`SELECT COUNT(*) AS n FROM users WHERE user_type = 'trainer' AND json_extract(data,'$.staff_role') = ?`).bind(key).first();
+      if (inUse?.n) return { success: false, error: `${inUse.n} staff member${inUse.n === 1 ? ' has' : 's have'} this role. Give them another role first.` };
+      delete roles[key];
+      const store = Object.fromEntries(Object.entries(roles).map(([k, r]) => [k, { name: r.name, rights: r.rights }]));
+      await setState(env, 'staff_roles', JSON.stringify(store));
+      await audit(env, { actor: user.email, action: 'role_deleted', target: 'Role', targetId: key, request: null });
+      return { success: true };
     }
 
     /* ---- Email ---- */
@@ -4902,7 +5058,8 @@ export async function onRequest(context) {
               ).bind(uid(), 'Client', JSON.stringify(profile), user.email, now, now).run();
             }
           }
-          return json({ ...user, staff_role: staffRole(user), permissions: permissionsOf(user) });
+          const { _rights: _r, _staffRole: _k, _roleName: roleName, ...pub } = user;
+          return json({ ...pub, staff_role: staffRole(user), role_name: staffRole(user) === 'admin' ? 'Admin' : roleName || null, permissions: permissionsOf(user) });
         }
         if (method === 'PUT') {
           const body = await request.json();
@@ -5054,7 +5211,7 @@ export async function onRequest(context) {
           const filter = url.searchParams.get('filter') ? JSON.parse(url.searchParams.get('filter')) : {};
           const sort = url.searchParams.get('sort') || undefined;
           const limit = url.searchParams.get('limit') || undefined;
-          return json(await listEntities(env, type, { filter, sort, limit, user }));
+          return json((await listEntities(env, type, { filter, sort, limit, user })).map((r) => redactFor(user, type, r)));
         }
         if (method === 'POST') {
           const body = await request.json();
@@ -5067,6 +5224,8 @@ export async function onRequest(context) {
             if (staffWriteDenied(type, user)) return err(isStaff(user) ? 'Your role doesn\'t allow this. Ask an admin.' : 'Only coaches can change this.', 403);
             const violation = await memberWriteViolation(env, user, type, fields);
             if (violation) return err(violation, 403);
+            const staffLimit = staffFieldViolation(user, type, fields);
+            if (staffLimit) return err(staffLimit, 403);
             // One Client record per email per coach. A duplicate splits the
             // member's plans and logs across two records.
             if (type === 'Client' && fields.email && fields.trainer_id) {
@@ -5107,7 +5266,7 @@ export async function onRequest(context) {
           if (PHI_TYPES.has(type)) {
             await audit(env, { actor: user.email, action: 'read', target: type, targetId: id, request });
           }
-          return json(rowToEntity(row));
+          return json(redactFor(user, type, rowToEntity(row)));
         }
         if (method === 'PUT') {
           const row = await getScopedEntity(env, type, id, user);
@@ -5118,6 +5277,8 @@ export async function onRequest(context) {
           if (staffWriteDenied(type, user)) return err(isStaff(user) ? 'Your role doesn\'t allow this. Ask an admin.' : 'Only coaches can change this.', 403);
           const violation = await memberWriteViolation(env, user, type, fields, data);
           if (violation) return err(violation, 403);
+          const staffLimit = staffFieldViolation(user, type, fields, data);
+          if (staffLimit) return err(staffLimit, 403);
           if (sharedWriteDenied(type, row, user, fields)) return err('Only the author can edit this.', 403);
           if (type === 'ClassSession' && isStaff(user)) await normalizeClassSession(env, fields, data);
           const merged = { ...data, ...fields };
@@ -5130,7 +5291,7 @@ export async function onRequest(context) {
             const fresh = type === 'ClassSession' ? await getEntityById(env, 'ClassSession', id) : null;
             return json({ ...(fresh || { ...merged, id, created_by: row.created_by, created_date: row.created_date, updated_date: now }), ...(sync ? { class_sync: sync } : {}) });
           }
-          return json({ ...merged, id, created_by: row.created_by, created_date: row.created_date, updated_date: now });
+          return json(redactFor(user, type, { ...merged, id, created_by: row.created_by, created_date: row.created_date, updated_date: now }));
         }
         if (method === 'DELETE') {
           const row = await getScopedEntity(env, type, id, user);

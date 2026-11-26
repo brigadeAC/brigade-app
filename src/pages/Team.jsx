@@ -9,6 +9,7 @@ import { Loader2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { accountCall } from "@/components/accounts/api";
 import LinkBox from "@/components/accounts/LinkBox";
+import RolesEditor from "@/components/accounts/RolesEditor";
 
 export default function Team() {
   const qc = useQueryClient();
@@ -48,7 +49,7 @@ export default function Team() {
   const setRole = async (m, role) => {
     try {
       await accountCall("setStaffRole", { user_id: m.id, role });
-      toast.success(`${m.full_name || m.email} is now a ${role}`);
+      toast.success(`${m.full_name || m.email} now has the ${(data.roles || []).find((r) => r.key === role)?.name || role} role`);
       refresh();
     } catch (e) { toast.error(e.message); }
   };
@@ -58,7 +59,7 @@ export default function Team() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Team</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Staff who can sign in. Managers also handle memberships, holds, family links, the class schedule, booking rules and reports.</p>
+          <p className="text-sm text-muted-foreground mt-0.5">Staff who can sign in. Each person has one role; set what each role can do below.</p>
         </div>
         <Button onClick={() => { setFormError(""); setInviting(true); }} className="gap-2"><UserPlus className="w-4 h-4" /> Invite coach</Button>
       </div>
@@ -70,7 +71,7 @@ export default function Team() {
               {data.team.map((m) => (
                 <li key={m.id} className={`rounded-xl border border-border bg-card p-4 flex flex-wrap items-center gap-3 ${m.disabled ? "opacity-60" : ""}`}>
                   <div className="min-w-0 flex-1 basis-48">
-                    <p className="text-sm font-semibold text-foreground">{m.full_name || m.email}{m.is_admin ? " · Admin" : m.staff_role === "manager" ? " · Manager" : " · Coach"}{m.is_me ? " (you)" : ""}{m.disabled ? " · Access off" : ""}</p>
+                    <p className="text-sm font-semibold text-foreground">{m.full_name || m.email}{m.is_admin ? " · Admin" : ` · ${(data.roles || []).find((r) => r.key === m.staff_role)?.name || "Coach"}`}{m.is_me ? " (you)" : ""}{m.disabled ? " · Access off" : ""}</p>
                     <p className="text-xs text-muted-foreground break-all">{m.email}</p>
                   </div>
                   {!m.is_me && (
@@ -78,8 +79,7 @@ export default function Team() {
                       {!m.is_admin && (
                         <select aria-label={`Role for ${m.full_name || m.email}`} value={m.staff_role || "coach"} onChange={(e) => setRole(m, e.target.value)}
                           className="h-9 rounded-md border border-input bg-background px-2 text-sm text-foreground">
-                          <option value="coach">Coach</option>
-                          <option value="manager">Manager</option>
+                          {(data.roles || []).map((r) => <option key={r.key} value={r.key}>{r.name}</option>)}
                         </select>
                       )}
                       {!m.disabled && <Button size="sm" variant="outline" onClick={() => reset(m)}>Reset password</Button>}
@@ -108,6 +108,8 @@ export default function Team() {
             {!data.email_enabled && <p className="text-xs text-muted-foreground">Email isn't connected yet, so send invite and reset links yourself.</p>}
           </>
         )}
+
+      <RolesEditor />
 
       <Dialog open={inviting} onOpenChange={setInviting}>
         <DialogContent className="w-[calc(100vw-1rem)] sm:w-full max-w-md">

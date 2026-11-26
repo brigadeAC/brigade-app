@@ -115,3 +115,72 @@ test('members get no staff powers', async () => {
   assert.equal((await api.fn('holdMembership', { membership_id: membership.id }, member.token)).success, false);
   assert.equal((await api.call('POST', 'entities/ClassSlot', { class_type_id: crossfit.id, day_of_week: 3, start_time: '07:00' }, member.token)).status, 403);
 });
+
+test('admins create a role, tick its rights, assign it, and remove it when unused', async () => {
+  assert.equal((await api.fn('listRoles', {}, manager.token)).success, false, 'only admins see roles');
+  assert.equal((await api.fn('saveRole', { name: 'Sneaky', rights: ['reports.view'] }, manager.token)).success, false);
+  const list = await api.fn('listRoles', {}, admin.token);
+  assert.ok(list.rights.length >= 10 && list.roles.some((r) => r.key === 'coach') && list.roles.some((r) => r.key === 'manager'));
+  assert.equal((await api.fn('saveRole', { name: 'Bad', rights: ['staff.manage'] }, admin.token)).success, false, 'staff.manage is admin only');
+  const made = await api.fn('saveRole', { name: 'Front desk', rights: ['reports.view', 'members.invite'] }, admin.token);
+  assert.equal(made.success, true, JSON.stringify(made));
+  const desk = await staff('desk@example.test', 'Dee Desk');
+  assert.equal((await api.fn('setStaffRole', { user_id: desk.id, role: made.key }, admin.token)).success, true);
+  const m = await me(desk);
+  assert.equal(m.role_name, 'Front desk');
+  assert.deepEqual(m.permissions, ['members.invite', 'reports.view']);
+  assert.equal((await api.fn('classReports', {}, desk.token)).success, true);
+  assert.equal((await api.fn('holdMembership', { membership_id: membership.id }, desk.token)).code, 'forbidden');
+  // Change the role's rights: takes effect on the next request.
+  assert.equal((await api.fn('saveRole', { key: made.key, name: 'Front desk', rights: ['members.invite'] }, admin.token)).success, true);
+  assert.equal((await api.fn('classReports', {}, desk.token)).code, 'forbidden');
+  assert.equal((await api.fn('deleteRole', { key: made.key }, admin.token)).success, false, 'still in use');
+  assert.equal((await api.fn('deleteRole', { key: 'coach' }, admin.token)).success, false, 'built-in roles stay');
+  await api.fn('setStaffRole', { user_id: desk.id, role: 'coach' }, admin.token);
+  assert.equal((await api.fn('deleteRole', { key: made.key }, admin.token)).success, true);
+  const log = JSON.stringify((await api.call('GET', 'audit?limit=500', undefined, admin.token)).data);
+  assert.ok(log.includes('role_created') && log.includes('role_updated') && log.includes('role_deleted'));
+});
+
+test('coaches never see rates or payments; managers and admins do', async () => {
+  const p = await api.create('MembershipPlan', { name: 'Premium', kind: 'unlimited', price_label: '$199', is_active: true }, admin.token);
+  const c = await api.create('Client', { full_name: 'Pat Payer', status: 'active', rate: 199, payment_method: 'Visa 4242' }, admin.token);
+  const asCoach = (await api.call('GET', `entities/MembershipPlan/${p.id}`, undefined, coach.token)).data;
+  assert.equal(asCoach.price_label, undefined);
+  assert.equal(asCoach.name, 'Premium');
+  const coachList = (await api.call('GET', 'entities/Client', undefined, coach.token)).data;
+  const pat = coachList.find((x) => x.id === c.id);
+  assert.ok(pat && pat.rate === undefined && pat.payment_method === undefined);
+  assert.equal((await api.call('GET', `entities/MembershipPlan/${p.id}`, undefined, manager.token)).data.price_label, '$199');
+  assert.equal((await api.call('GET', `entities/Client/${c.id}`, undefined, admin.token)).data.rate, 199);
+  // A coach editing the record can't change or wipe the hidden price.
+  await api.update('Client', c.id, { full_name: 'Pat P.', rate: 1 }, coach.token);
+  assert.equal((await api.call('GET', `entities/Client/${c.id}`, undefined, admin.token)).data.rate, 199);
+});
+
+test('personal training clients: coaching details only for their coach, managers and admins', async () => {
+  const other = await staff('other.coach@example.test', 'Olly Other');
+  const pt = await api.create('Client', { full_name: 'Tara Training', status: 'active', personal_training: true, trainer_id: coach.id, injuries: 'Left knee', medical_notes: 'Asthma' }, admin.token);
+  const group = await api.create('Client', { full_name: 'Gus Group', status: 'active', injuries: 'Shoulder' }, admin.token);
+  await api.create('ClientNote', { client_id: pt.id, note: 'PT note', category: 'medical' }, coach.token);
+  await api.create('ClientNote', { client_id: group.id, note: 'Group note' }, coach.token);
+  // Her own coach sees everything.
+  const mine = (await api.call('GET', `entities/Client/${pt.id}`, undefined, coach.token)).data;
+  assert.equal(mine.injuries, 'Left knee');
+  assert.ok((await api.call('GET', 'entities/ClientNote', undefined, coach.token)).data.some((n) => n.note === 'PT note'));
+  // Another coach sees her basics but not her coaching details.
+  const theirs = (await api.call('GET', `entities/Client/${pt.id}`, undefined, other.token)).data;
+  assert.equal(theirs.full_name, 'Tara Training');
+  assert.equal(theirs.injuries, undefined);
+  assert.equal(theirs.details_limited, true);
+  const otherNotes = (await api.call('GET', 'entities/ClientNote', undefined, other.token)).data;
+  assert.ok(!otherNotes.some((n) => n.note === 'PT note'), 'PT note hidden');
+  assert.ok(otherNotes.some((n) => n.note === 'Group note'), 'group members stay open to every coach');
+  assert.equal((await api.call('GET', `entities/Client/${group.id}`, undefined, other.token)).data.injuries, 'Shoulder');
+  // They can't edit her or take her over.
+  assert.equal((await api.update('Client', pt.id, { notes: 'x' }, other.token)).status, 403);
+  assert.equal((await api.update('Client', group.id, { personal_training: true, trainer_id: coach.id }, other.token)).status, 403);
+  // Managers see everything.
+  assert.equal((await api.call('GET', `entities/Client/${pt.id}`, undefined, manager.token)).data.injuries, 'Left knee');
+  assert.ok((await api.call('GET', 'entities/ClientNote', undefined, manager.token)).data.some((n) => n.note === 'PT note'));
+});
