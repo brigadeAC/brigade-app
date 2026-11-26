@@ -593,7 +593,7 @@ test('holiday: closing a day cancels and tells everyone, and stays closed', asyn
 
 test('holiday: a day can run another day\'s schedule, or shift every class', async () => {
   const today = eastern().date;
-  const target = addDays(today, 5);
+  const target = addDays(today, 7); // a date no other test puts a class on
   const otherDow = (dowOf(target) + 2) % 7;
   const normal = await api.create('ClassSlot', { class_type_id: crossfit.id, day_of_week: dowOf(target), start_time: '05:30', duration_min: 60, start_date: target, end_date: target, is_active: true }, coach.token);
   const other = await api.create('ClassSlot', { class_type_id: openGym.id, day_of_week: otherDow, start_time: '09:00', duration_min: 120, start_date: today, end_date: target, is_active: true }, coach.token);
