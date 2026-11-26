@@ -40,7 +40,7 @@ import {
 } from "lucide-react";
 import { Dumbbell } from "lucide-react"; // Phase 3 editor
 import { Wallet, Tag } from "lucide-react"; // Phase 4: SALES
-import { CalendarClock, Plane, CalendarRange } from "lucide-react"; // Scheduling: CORE
+import { CalendarClock, Plane, CalendarRange, CalendarOff } from "lucide-react"; // Scheduling
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
@@ -71,11 +71,13 @@ const navGroups = [
     ]
   },
   {
-    title: "Schedule",
+    title: "Coach Schedule",
     items: [
       { name: "My schedule", icon: CalendarRange, page: "MySchedule" }, // Scheduling: CORE
       { name: "Availability", icon: CalendarClock, page: "MyAvailability" }, // Scheduling: CORE
       { name: "Time off", icon: Plane, page: "TimeOff" }, // Scheduling: CORE
+      { name: "Schedule board", icon: CalendarRange, page: "ScheduleBoard", perm: "coach_schedule.manage" }, // Scheduling: BOARD
+      { name: "Time off requests", icon: CalendarOff, page: "TimeOffInbox", perm: "coach_schedule.manage" }, // Scheduling: BOARD
     ]
   },
   {
@@ -152,11 +154,13 @@ const adminNavGroups = [
     ]
   },
   {
-    title: 'Schedule',
+    title: 'Coach Schedule',
     items: [
       { name: 'My schedule', icon: CalendarRange, page: 'MySchedule' }, // Scheduling: CORE
       { name: 'Availability', icon: CalendarClock, page: 'MyAvailability' }, // Scheduling: CORE
       { name: 'Time off', icon: Plane, page: 'TimeOff' }, // Scheduling: CORE
+      { name: 'Schedule board', icon: CalendarRange, page: 'ScheduleBoard', perm: 'coach_schedule.manage' }, // Scheduling: BOARD
+      { name: 'Time off requests', icon: CalendarOff, page: 'TimeOffInbox', perm: 'coach_schedule.manage' }, // Scheduling: BOARD
     ]
   },
   {
