@@ -33,7 +33,8 @@ import {
   EyeOff,
   Upload,
   CalendarCheck,
-  SlidersHorizontal
+  SlidersHorizontal,
+  BarChart3
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -68,7 +69,8 @@ const navGroups = [
     title: "Group Classes",
     items: [
       { name: "Classes", icon: CalendarCheck, page: "Classes" },
-      { name: "Class Setup", icon: SlidersHorizontal, page: "ClassSetup" }
+      { name: "Class Setup", icon: SlidersHorizontal, page: "ClassSetup" },
+      { name: "Class Reports", icon: BarChart3, page: "ClassReports" }
     ]
   },
   {
@@ -130,6 +132,7 @@ const adminNavGroups = [
     items: [
       { name: 'Classes', icon: CalendarCheck, page: 'Classes' },
       { name: 'Class Setup', icon: SlidersHorizontal, page: 'ClassSetup' },
+      { name: 'Class Reports', icon: BarChart3, page: 'ClassReports' },
     ]
   },
   {

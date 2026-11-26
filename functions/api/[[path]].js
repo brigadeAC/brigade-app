@@ -2230,6 +2230,116 @@ async function normalizeClassSession(env, fields, existing) {
   }
 }
 
+/* ---- staff reports (read-only) ---- */
+// Attendance, class fill, no-shows and members by plan for a date range of
+// Eastern day keys. `to` stops at today; the range is at most a year.
+// "Booked" = held a spot by booking (checked in, no-show or still reserved);
+// walk-ins count as check-ins and as used spots for fill, not as bookings.
+const REPORT_MAX_DAYS = 366;
+const REPORT_INACTIVE_DAYS = 14;
+const REPORT_RES = `SELECT json_extract(data,'$.client_id') AS cid, json_extract(data,'$.client_name') AS cname,
+    json_extract(data,'$.class_type_id') AS tid, json_extract(data,'$.class_name') AS tname,
+    json_extract(data,'$.session_id') AS sid, json_extract(data,'$.date') AS date, json_extract(data,'$.status') AS st,
+    COALESCE(json_extract(data,'$.created_at_checkin'),0) AS walkin
+  FROM entities WHERE entity_type='Reservation' AND json_extract(data,'$.date') BETWEEN ?1 AND ?2`;
+const REPORT_SESSIONS = `SELECT id, json_extract(data,'$.class_type_id') AS tid, json_extract(data,'$.class_type_name') AS tname,
+    json_extract(data,'$.date') AS date, json_extract(data,'$.start_time') AS time,
+    CAST(json_extract(data,'$.capacity') AS INTEGER) AS cap, COALESCE(json_extract(data,'$.reservable'),1) AS reservable
+  FROM entities WHERE entity_type='ClassSession' AND json_extract(data,'$.date') BETWEEN ?1 AND ?2
+    AND COALESCE(json_extract(data,'$.status'),'scheduled') != 'cancelled' AND COALESCE(json_extract(data,'$.auto_cancelled'),0) = 0`;
+const REPORT_TALLY = `SUM(st='checked_in') AS check_ins, SUM(st IN ('checked_in','no_show','reserved') AND walkin = 0) AS booked,
+    SUM(st='no_show') AS no_shows, SUM(st='late_cancelled') AS late_cancels`;
+// Memberships current on ?1 (not ended, started, not past their end date).
+const REPORT_CURRENT_MEMBERSHIPS = `SELECT json_extract(data,'$.client_id') AS cid, json_extract(data,'$.plan_id') AS pid,
+    json_extract(data,'$.plan_name') AS pname, json_extract(data,'$.start_date') AS sd
+  FROM entities WHERE entity_type='Membership' AND COALESCE(json_extract(data,'$.status'),'active') NOT IN ('ended','cancelled')
+    AND (COALESCE(json_extract(data,'$.end_date'),'') = '' OR json_extract(data,'$.end_date') >= ?1)
+    AND COALESCE(json_extract(data,'$.start_date'),'') <= ?1`;
+
+async function classReports(env, payload) {
+  const today = programToday();
+  let to = isDateKey(payload.to) ? payload.to : today;
+  if (to > today) to = today;
+  let from = isDateKey(payload.from) ? payload.from : pAddDays(to, -29);
+  if (from > to) return { success: false, error: 'The start date is after the end date.' };
+  if (pDaysBetween(from, to) >= REPORT_MAX_DAYS) from = pAddDays(to, -(REPORT_MAX_DAYS - 1));
+  const cutoff = pAddDays(today, -REPORT_INACTIVE_DAYS);
+  const all = async (sql, ...binds) => (await env.DB.prepare(sql).bind(...binds).all()).results || [];
+  const n = (v) => Number(v) || 0;
+
+  const [memberRows, classRows, sessionRows, fillRows, dailyRows, planCounts, plans, inactiveRows] = await Promise.all([
+    all(`SELECT cid, MAX(cname) AS name, ${REPORT_TALLY}, MAX(CASE WHEN st='checked_in' THEN date END) AS last_visit
+         FROM (${REPORT_RES}) GROUP BY cid`, from, to),
+    all(`SELECT tid, MAX(tname) AS name, ${REPORT_TALLY} FROM (${REPORT_RES}) GROUP BY tid`, from, to),
+    all(`SELECT tid, MAX(tname) AS name, COUNT(*) AS sessions FROM (${REPORT_SESSIONS}) GROUP BY tid`, from, to),
+    all(`WITH s AS (${REPORT_SESSIONS}),
+              r AS (SELECT sid, SUM(st IN ('checked_in','no_show','reserved')) AS held, SUM(st='checked_in') AS check_ins FROM (${REPORT_RES}) GROUP BY sid)
+         SELECT CAST(strftime('%w', s.date) AS INTEGER) AS dow, s.time AS time, MAX(s.tname) AS name, COUNT(*) AS sessions,
+                SUM(COALESCE(r.held,0)) AS booked, SUM(COALESCE(r.check_ins,0)) AS check_ins,
+                SUM(CASE WHEN s.cap > 0 THEN s.cap ELSE 0 END) AS capacity,
+                SUM(CASE WHEN s.cap > 0 THEN COALESCE(r.held,0) ELSE 0 END) AS booked_capped,
+                SUM(CASE WHEN s.cap > 0 AND COALESCE(r.held,0) >= s.cap THEN 1 ELSE 0 END) AS full_sessions
+         FROM s LEFT JOIN r ON r.sid = s.id WHERE s.reservable != 0
+         GROUP BY dow, s.time, s.tid ORDER BY dow, s.time`, from, to),
+    all(`SELECT date, SUM(st='checked_in') AS check_ins, SUM(st='no_show') AS no_shows FROM (${REPORT_RES}) GROUP BY date`, from, to),
+    all(`SELECT pid, MAX(pname) AS name, COUNT(DISTINCT cid) AS members FROM (${REPORT_CURRENT_MEMBERSHIPS}) GROUP BY pid`, today),
+    all(`SELECT id, json_extract(data,'$.name') AS name, json_extract(data,'$.kind') AS kind, COALESCE(json_extract(data,'$.is_active'),1) AS active
+         FROM entities WHERE entity_type='MembershipPlan'`),
+    all(`WITH m AS (${REPORT_CURRENT_MEMBERSHIPS}),
+              lv AS (SELECT json_extract(data,'$.client_id') AS cid, MAX(json_extract(data,'$.date')) AS last_visit
+                     FROM entities WHERE entity_type='Reservation' AND json_extract(data,'$.status') = 'checked_in' AND json_extract(data,'$.date') <= ?1
+                     GROUP BY cid)
+         SELECT c.id AS client_id, json_extract(c.data,'$.full_name') AS name, json_extract(c.data,'$.email') AS email, lv.last_visit AS last_visit,
+                (SELECT GROUP_CONCAT(DISTINCT m.pname) FROM m WHERE m.cid = c.id) AS plans,
+                (SELECT MIN(m.sd) FROM m WHERE m.cid = c.id) AS member_since
+         FROM entities c LEFT JOIN lv ON lv.cid = c.id
+         WHERE c.entity_type = 'Client' AND c.id IN (SELECT cid FROM m) AND (lv.last_visit IS NULL OR lv.last_visit <= ?2)
+         ORDER BY lv.last_visit IS NOT NULL, lv.last_visit, name`, today, cutoff),
+  ]);
+
+  const tallied = (r) => ({ check_ins: n(r.check_ins), booked: n(r.booked), no_shows: n(r.no_shows), late_cancels: n(r.late_cancels) });
+  const members = memberRows.map((r) => ({ client_id: r.cid, name: r.name || 'Member', ...tallied(r), last_visit: r.last_visit || null }))
+    .sort((a, b) => b.check_ins - a.check_ins || b.no_shows - a.no_shows || a.name.localeCompare(b.name));
+  const sessionsByType = new Map(sessionRows.map((r) => [r.tid, r]));
+  const classes = classRows.map((r) => ({ class_type_id: r.tid, name: r.name || sessionsByType.get(r.tid)?.name || 'Class', sessions: n(sessionsByType.get(r.tid)?.sessions), ...tallied(r) }));
+  for (const r of sessionRows) if (!classes.some((c) => c.class_type_id === r.tid)) classes.push({ class_type_id: r.tid, name: r.name || 'Class', sessions: n(r.sessions), check_ins: 0, booked: 0, no_shows: 0, late_cancels: 0 });
+  classes.sort((a, b) => b.check_ins - a.check_ins || a.name.localeCompare(b.name));
+
+  const fill = fillRows.map((r) => ({
+    dow: n(r.dow), time: r.time || '', name: r.name || 'Class', sessions: n(r.sessions),
+    avg_booked: Math.round((n(r.booked) / Math.max(1, n(r.sessions))) * 10) / 10,
+    avg_capacity: n(r.capacity) ? Math.round((n(r.capacity) / n(r.sessions)) * 10) / 10 : null,
+    fill_pct: n(r.capacity) ? Math.round((n(r.booked_capped) / n(r.capacity)) * 100) : null,
+    full_sessions: n(r.full_sessions),
+  }));
+
+  const byDay = new Map(dailyRows.map((r) => [r.date, r]));
+  const daily = [];
+  for (let d = from; d <= to; d = pAddDays(d, 1)) daily.push({ date: d, check_ins: n(byDay.get(d)?.check_ins), no_shows: n(byDay.get(d)?.no_shows) });
+
+  const countByPlan = new Map(planCounts.map((r) => [r.pid, r]));
+  const planList = plans.map((p) => ({ plan_id: p.id, name: p.name || 'Plan', kind: p.kind || null, members: n(countByPlan.get(p.id)?.members), active: p.active !== 0 && p.active !== 'false' }))
+    .filter((p) => p.active || p.members > 0);
+  for (const r of planCounts) if (!plans.some((p) => p.id === r.pid)) planList.push({ plan_id: r.pid || null, name: r.name || 'No plan', kind: null, members: n(r.members), active: false });
+  planList.sort((a, b) => b.members - a.members || a.name.localeCompare(b.name));
+
+  const inactive = inactiveRows.map((r) => ({
+    client_id: r.client_id, name: r.name || 'Member', email: r.email || '', plans: r.plans || '',
+    last_visit: r.last_visit || null, days_since: r.last_visit ? pDaysBetween(r.last_visit, today) : null, member_since: r.member_since || null,
+  }));
+
+  const sum = (rows, k) => rows.reduce((t, r) => t + (r[k] || 0), 0);
+  const capped = fillRows.reduce((t, r) => ({ cap: t.cap + n(r.capacity), held: t.held + n(r.booked_capped) }), { cap: 0, held: 0 });
+  const totals = {
+    check_ins: sum(members, 'check_ins'), booked: sum(members, 'booked'), no_shows: sum(members, 'no_shows'), late_cancels: sum(members, 'late_cancels'),
+    members_attended: members.filter((m) => m.check_ins > 0).length, sessions: sum(sessionRows.map((r) => ({ s: n(r.sessions) })), 's'),
+    avg_fill_pct: capped.cap ? Math.round((capped.held / capped.cap) * 100) : null,
+    active_members: new Set((await all(`SELECT DISTINCT cid FROM (${REPORT_CURRENT_MEMBERSHIPS})`, today)).map((r) => r.cid)).size,
+    inactive: inactive.length,
+  };
+  return { success: true, from, to, today, inactive_days: REPORT_INACTIVE_DAYS, totals, daily, members, classes, fill, inactive, plans: planList };
+}
+
 // Copy plan fields onto a new Membership (only fields the caller left out).
 async function normalizeMembership(env, fields) {
   const plan = await getEntityById(env, 'MembershipPlan', fields.plan_id);
@@ -3421,6 +3531,11 @@ async function runFunction(name, payload, ctx) {
       ).bind(child.id, guardian.id, user.email, ts).run();
       await audit(env, { actor: user.email, action: 'guardian_linked', target: 'Client', targetId: child.id, detail: `guardian ${guardian.id}`, request: null });
       return { success: true };
+    }
+
+    case 'classReports': {
+      if (!isStaff(user)) return { success: false, error: 'Only coaches can see reports.' };
+      return classReports(env, payload || {});
     }
 
     case 'classCoaches': {
