@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, CalendarClock, Plane, Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, CalendarClock, Plane, Loader2, Bell } from "lucide-react";
 import { todayKey, addDays } from "@/lib/programs";
 import { cn } from "@/lib/utils";
 import {
@@ -89,7 +89,9 @@ export default function MySchedule() {
         <Button asChild variant="outline" size="sm" className="gap-1.5">
           <Link to={createPageUrl("TimeOff")}><Plane className="w-4 h-4" /> Time off</Link>
         </Button>
-        {/* Scheduling: REMIND adds one link here */}
+        <Button asChild variant="outline" size="sm" className="gap-1.5">
+          <Link to={createPageUrl("ScheduleSettings")}><Bell className="w-4 h-4" /> Reminders & calendar</Link>
+        </Button>
       </div>
 
       <div className="flex items-center justify-between gap-2">

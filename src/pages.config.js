@@ -47,6 +47,7 @@ const ClassReports = lazy(() => import('./pages/ClassReports'));
 const MySchedule = lazy(() => import('./pages/MySchedule')); // Scheduling: CORE
 const MyAvailability = lazy(() => import('./pages/MyAvailability')); // Scheduling: CORE
 const TimeOff = lazy(() => import('./pages/TimeOff')); // Scheduling: CORE
+const ScheduleSettings = lazy(() => import('./pages/ScheduleSettings')); // Scheduling: REMIND
 const ClientClasses = lazy(() => import('./pages/ClientClasses'));
 const MyLifts = lazy(() => import('./pages/MyLifts'));
 const ProgramBuilder = lazy(() => import('./pages/ProgramBuilder'));
@@ -85,6 +86,7 @@ export const PAGES = {
     "Classes": Classes,
     "ClassSetup": ClassSetup,
     "ClassReports": ClassReports,
+    "ScheduleSettings": ScheduleSettings, // Scheduling: REMIND
     "ClientClasses": ClientClasses,
     "MyLifts": MyLifts,
     "ProgramBuilder": ProgramBuilder,
