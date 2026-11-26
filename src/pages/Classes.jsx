@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ChevronLeft, ChevronRight, Loader2, Plus, RefreshCw, Settings2, Users } from "lucide-react";
+import { BarChart3, ChevronLeft, ChevronRight, Loader2, Plus, RefreshCw, Settings2, Users } from "lucide-react";
 import { toast } from "sonner";
 import { todayKey, addDays, fromKey } from "@/lib/programs";
 import RosterSheet from "@/components/classes/coach/RosterSheet";
@@ -65,6 +65,9 @@ export default function Classes() {
           </Button>
           <Button variant="outline" size="sm" className="gap-1.5" asChild>
             <Link to={createPageUrl("ClassSetup")}><Settings2 className="w-4 h-4" /> Class setup</Link>
+          </Button>
+          <Button variant="outline" size="sm" className="gap-1.5" asChild>
+            <Link to={createPageUrl("ClassReports")}><BarChart3 className="w-4 h-4" /> Reports</Link>
           </Button>
           <Button variant="outline" size="sm" className="gap-1.5" onClick={generate} disabled={generating}>
             {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />} Generate schedule now
