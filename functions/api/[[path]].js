@@ -376,6 +376,7 @@ const notOthersPtClient = (col) => `NOT EXISTS (SELECT 1 FROM entities pt WHERE 
 const isOthersPtClient = (user, client) => !!client && client.personal_training === true && isStaff(user) && !seesAllCoaching(user) && client.trainer_id !== user.id;
 function redactFor(user, type, rec) {
   if (type === 'Workout') return workoutFor(user, rec); // Phase 3 editor
+  if (type === 'TimeOffRequest') return schedRedact(user, type, rec); // Scheduling: CORE
   if (!rec || !isStaff(user)) return rec;
   let out = rec;
   if (MONEY_TYPES.has(type) && !can(user, 'billing.view')) {
@@ -433,7 +434,8 @@ const TYPE_PERMISSION = {
 const isMemberUser = (user) => !!user && user.role !== 'admin' && (user.user_type === 'client' || user.user_type === 'independent');
 const staffWriteDenied = (type, user) => ((STAFF_LIBRARY_TYPES.has(type) || STAFF_WRITE_TYPES.has(type)) && !isStaff(user))
   || (TYPE_PERMISSION[type] && isStaff(user) && !can(user, TYPE_PERMISSION[type]))
-  || GYM_BILLING_WRITE_LOCKED.has(type); // Phase 4 CORE: Payment rows come only from Stripe
+  || GYM_BILLING_WRITE_LOCKED.has(type) // Phase 4 CORE: Payment rows come only from Stripe
+  || (SCHED_TYPES.has(type) && !managesCoachSchedule(user)); // Scheduling: CORE — coaches write only through the functions
 
 // Ownership scoping: admins see everything; everyone else only rows they own —
 // rows they created, rows assigned to them as trainer, or rows about them as
@@ -674,6 +676,7 @@ const COACH_PRIVATE_TYPES = new Set(['ClientNote', 'ClientNotebookPage']);
 async function entityScope(env, type, user) {
   if (type === 'Workout') return workoutReadScope(user); // Phase 3 editor
   if (type === 'Payment') return paymentReadScope(user); // Phase 4 CORE
+  if (SCHED_TYPES.has(type)) return schedEntityScope(type, user); // Scheduling: CORE
   if (SHARED_TYPES.has(type) || STAFF_LIBRARY_TYPES.has(type)) return null;
   if (isStaff(user) && !STAFF_PRIVATE_TYPES.has(type)) {
     if (COACHING_DETAIL_TYPES.has(type) && !seesAllCoaching(user)) {
@@ -3728,6 +3731,323 @@ async function runSalesFunction(name, payload, ctx) {
 }
 // ===== end Phase 4: SALES =====
 
+// ===== Scheduling: CORE =====
+// Coach scheduling, coach side: the staff-only entities (StaffShift,
+// Availability, TimeOffRequest, ScheduleWeek), each coach's own schedule,
+// availability and time off. Managing other people's schedules needs the
+// right coach_schedule.manage (BOARD adds it to RIGHTS; admins always have it).
+// Coaches write the four entities only through these functions; generic
+// entity-API writes need coach_schedule.manage. Reads are scoped below.
+const SCHED_TYPES = new Set(['StaffShift', 'Availability', 'TimeOffRequest', 'ScheduleWeek']);
+for (const t of SCHED_TYPES) STAFF_WRITE_TYPES.add(t);
+const AVAILABILITY_BLOCKS = {
+  early: { label: 'Early', start: '05:00', end: '11:00' },
+  midday: { label: 'Midday', start: '11:00', end: '16:00' },
+  evening: { label: 'Evening', start: '16:00', end: '21:00' },
+};
+const SCHED_COLORS = { shift: '#14b8a6', class: '#8b5cf6', pt: '#f97366', time_off: '#9ca3af' };
+const SCHED_AVAIL_DAYS = 28; // today .. today+27
+const SCHED_MAX_RANGE = 62;
+const managesCoachSchedule = (user) => can(user, 'coach_schedule.manage');
+
+// Generic entity reads: members get nothing; coaches see published shifts,
+// their own availability and their own time off; managers see everything.
+function schedEntityScope(type, user) {
+  if (!isStaff(user)) return { sql: '0', binds: [] };
+  if (managesCoachSchedule(user) || type === 'ScheduleWeek') return null;
+  if (type === 'StaffShift') return { sql: `json_extract(data,'$.status') = 'published'`, binds: [] };
+  return { sql: `json_extract(data,'$.user_id') = ?`, binds: [user.id] };
+}
+// A time-off reason is for the coach and schedule managers only.
+function schedRedact(user, type, rec) {
+  if (type !== 'TimeOffRequest' || !rec || managesCoachSchedule(user) || rec.user_id === user?.id) return rec;
+  const { reason: _r, ...rest } = rec;
+  return rest;
+}
+
+const schedHm = (v) => (typeof v === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(v) ? v : null);
+const GYM_HM = new Intl.DateTimeFormat('en-US', { timeZone: PROGRAM_TZ, hourCycle: 'h23', hour: '2-digit', minute: '2-digit' });
+const isoToGymHm = (iso) => {
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return null;
+  const p = Object.fromEntries(GYM_HM.formatToParts(new Date(t)).map((x) => [x.type, x.value]));
+  return `${String(Number(p.hour) % 24).padStart(2, '0')}:${p.minute}`;
+};
+const schedFmtRange = (a, b) => (a === b ? fmtDay(a) : `${fmtDay(a)} – ${fmtDay(b)}`);
+const schedDates = (from, to) => { const out = []; for (let d = from; d <= to; d = pAddDays(d, 1)) out.push(d); return out; };
+const schedOverlap = (s1, e1, s2, e2) => hmToMin(s1) < hmToMin(e2) && hmToMin(s2) < hmToMin(e1);
+
+function classTimes(cs) {
+  const start = schedHm(cs.start_time) || isoToGymHm(cs.start_at) || '00:00';
+  let end = cs.end_at ? isoToGymHm(cs.end_at) : null;
+  if (!end) end = minToHm(hmToMin(start) + (numOr(cs.duration_min, 60) || 60));
+  return { start, end };
+}
+function ptTimes(s) {
+  const start = schedHm(s.start_time) || '00:00';
+  const end = schedHm(s.end_time) && hmToMin(s.end_time) > hmToMin(start) ? s.end_time : minToHm(hmToMin(start) + (numOr(s.duration, 60) || 60));
+  return { start, end };
+}
+
+// Range from the payload, with defaults and a cap. -> { from, to } | { error }
+function schedRange(p, defFrom, defTo) {
+  const from = p?.from ?? defFrom;
+  const to = p?.to ?? defTo;
+  if (!isDateKey(from) || !isDateKey(to)) return { error: 'Pick valid dates.' };
+  if (to < from) return { error: 'The end date is before the start date.' };
+  if (pDaysBetween(from, to) + 1 > SCHED_MAX_RANGE) return { error: `Pick ${SCHED_MAX_RANGE} days or fewer.` };
+  return { from, to };
+}
+
+// Everything one coach works in a date range (published shifts, coached
+// classes, PT sessions), as schedule items.
+async function schedWorkItems(env, userId, from, to) {
+  const shifts = await selectEntities(env, 'StaffShift',
+    `json_extract(data,'$.user_id') = ? AND json_extract(data,'$.date') BETWEEN ? AND ? AND json_extract(data,'$.status') = 'published'`, [userId, from, to]);
+  const classes = await selectEntities(env, 'ClassSession',
+    `json_extract(data,'$.coach_user_id') = ? AND json_extract(data,'$.date') BETWEEN ? AND ? AND COALESCE(json_extract(data,'$.status'),'scheduled') = 'scheduled'`, [userId, from, to]);
+  const pts = await selectEntities(env, 'Session',
+    `json_extract(data,'$.trainer_id') = ? AND json_extract(data,'$.date') BETWEEN ? AND ? AND COALESCE(json_extract(data,'$.status'),'') <> 'cancelled'`, [userId, from, to]);
+  return [
+    ...shifts.map((s) => ({ kind: 'shift', id: s.id, date: s.date, start: s.start, end: s.end, title: s.role_label || 'Shift', subtitle: s.note || '', color: SCHED_COLORS.shift, status: s.status })),
+    ...classes.map((c) => ({ kind: 'class', id: c.id, date: c.date, ...classTimes(c), title: c.class_type_name || 'Class', subtitle: 'Coaching', color: SCHED_COLORS.class, status: c.status || 'scheduled' })),
+    ...pts.map((s) => ({ kind: 'pt', id: s.id, date: s.date, ...ptTimes(s), title: s.client_name || 'Client session', subtitle: String(s.type || 'personal_training').replace(/_/g, ' '), color: SCHED_COLORS.pt, status: s.status || 'scheduled' })),
+  ];
+}
+
+// Hours worked, counting overlapping items (a class inside a shift) once.
+function schedHours(items) {
+  const byDay = {};
+  for (const it of items) {
+    if (it.kind === 'time_off') continue;
+    const a = hmToMin(it.start); const b = hmToMin(it.end);
+    if (a === null || b === null || b <= a) continue;
+    (byDay[it.date] = byDay[it.date] || []).push([a, b]);
+  }
+  let mins = 0;
+  for (const list of Object.values(byDay)) {
+    list.sort((x, y) => x[0] - y[0]);
+    let [cs, ce] = list[0];
+    for (const [a, b] of list.slice(1)) {
+      if (a <= ce) ce = Math.max(ce, b);
+      else { mins += ce - cs; cs = a; ce = b; }
+    }
+    mins += ce - cs;
+  }
+  return Math.round((mins / 60) * 100) / 100;
+}
+
+async function schedOwnTimeOff(env, userId, from, to, statuses = ['pending', 'approved']) {
+  return selectEntities(env, 'TimeOffRequest',
+    `json_extract(data,'$.user_id') = ? AND json_extract(data,'$.status') IN (${inList(statuses)}) AND json_extract(data,'$.start_date') <= ? AND json_extract(data,'$.end_date') >= ?`,
+    [userId, ...statuses, to, from]);
+}
+
+const timeOffPublic = (r) => ({
+  id: r.id, user_id: r.user_id, user_name: r.user_name || '', start_date: r.start_date, end_date: r.end_date,
+  part_day: r.part_day || null, reason: r.reason || '', status: r.status, decided_by: r.decided_by || null,
+  decided_at: r.decided_at || null, decision_note: r.decision_note || '', affected: r.affected || [],
+  created_date: r.created_date,
+});
+
+// Validates a time-off window. -> { start_date, end_date, part_day } | { error }
+function schedTimeOffWindow(p) {
+  const today = programToday();
+  const { start_date: s, end_date: e0 } = p || {};
+  const e = e0 || s;
+  if (!isDateKey(s) || !isDateKey(e)) return { error: 'Pick the dates you need off.' };
+  if (e < s) return { error: 'The last day is before the first day.' };
+  if (s < today) return { error: 'Time off can\'t start in the past.' };
+  if (pDaysBetween(s, e) + 1 > 60) return { error: 'Ask for 60 days or fewer at a time.' };
+  let part = null;
+  if (p.part_day) {
+    if (s !== e) return { error: 'Part of a day only works for a single day.' };
+    const ps = schedHm(p.part_day.start); const pe = schedHm(p.part_day.end);
+    if (!ps || !pe || hmToMin(pe) <= hmToMin(ps)) return { error: 'Pick a start and end time for the part of the day.' };
+    part = { start: ps, end: pe };
+  }
+  return { start_date: s, end_date: e, part_day: part };
+}
+
+async function schedImpact(env, userId, w) {
+  const items = await schedWorkItems(env, userId, w.start_date, w.end_date);
+  return items
+    .filter((it) => !w.part_day || schedOverlap(it.start, it.end, w.part_day.start, w.part_day.end))
+    .sort((a, b) => (a.date + a.start).localeCompare(b.date + b.start))
+    .map((it) => ({ kind: it.kind, id: it.id, date: it.date, label: it.title, time: `${it.start}–${it.end}` }));
+}
+
+// Staff with coach_schedule.manage (admins included).
+async function schedManagers(env) {
+  const { results } = await env.DB.prepare('SELECT * FROM users').all();
+  const out = [];
+  for (const row of results) {
+    const u = userRow(row);
+    if (!u || u.disabled) continue;
+    u.role = resolveRole(env, u.email, u.role);
+    if (!isStaff(u)) continue;
+    if (managesCoachSchedule(await attachRights(env, u))) out.push(u);
+  }
+  return out;
+}
+
+async function schedNotify(env, userIds, { title, message, link }, actor) {
+  if (!userIds.length) return;
+  // eslint-disable-next-line no-undef
+  if (typeof notifyScheduleChange === 'function') return notifyScheduleChange(env, userIds, { title, message, link }); // owned by REMIND
+  for (const id of userIds) {
+    await insertEntity(env, 'Notification', { user_id: id, type: 'schedule', title, message, link, read: false }, actor);
+    await sendPushToUser(env, id, { title, body: message, url: link, tag: 'schedule' });
+  }
+}
+
+async function schedAvailabilityRows(env, userId, from, to) {
+  return selectEntities(env, 'Availability',
+    `json_extract(data,'$.user_id') = ? AND json_extract(data,'$.date') BETWEEN ? AND ?`, [userId, from, to]);
+}
+const schedBlocks = (b) => Object.fromEntries(Object.keys(AVAILABILITY_BLOCKS).map((k) => [k, b?.[k] === true]));
+
+async function schedUpsertAvailability(env, user, date, blocks, note) {
+  const [existing] = await schedAvailabilityRows(env, user.id, date, date);
+  const fields = { user_id: user.id, date, blocks: schedBlocks(blocks), note: String(note || '').slice(0, 300), submitted_at: nowISO() };
+  return existing ? patchEntity(env, existing, fields) : insertEntity(env, 'Availability', fields, user.email);
+}
+
+async function runSchedCoreFunction(name, p, { env, user }) {
+  if (!isStaff(user)) return { success: false, error: 'Only staff can use the schedule.', code: 'forbidden' };
+  p = p || {};
+  const today = programToday();
+  switch (name) {
+    case 'mySchedule': {
+      let target = user;
+      if (p.user_id && p.user_id !== user.id) {
+        if (!managesCoachSchedule(user)) return NO_PERMISSION;
+        const row = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(p.user_id).first();
+        const u = row ? userRow(row) : null;
+        if (u) u.role = resolveRole(env, u.email, u.role);
+        if (!u || !isStaff(u)) return { success: false, error: 'Staff member not found.' };
+        target = u;
+      }
+      const monday = classWeekStart(today);
+      const r = schedRange(p, monday, pAddDays(monday, 6));
+      if (r.error) return { success: false, error: r.error };
+      const items = await schedWorkItems(env, target.id, r.from, r.to);
+      const offs = await schedOwnTimeOff(env, target.id, r.from, r.to);
+      for (const t of offs) {
+        for (const d of schedDates(t.start_date < r.from ? r.from : t.start_date, t.end_date > r.to ? r.to : t.end_date)) {
+          items.push({
+            kind: 'time_off', id: t.id, date: d, start: t.part_day?.start || null, end: t.part_day?.end || null,
+            title: t.status === 'approved' ? 'Time off' : 'Time off (pending)', subtitle: t.part_day ? 'Part of the day' : 'All day',
+            color: SCHED_COLORS.time_off, status: t.status,
+          });
+        }
+      }
+      items.sort((a, b) => (a.date + (a.start || '')).localeCompare(b.date + (b.start || '')));
+      return { success: true, user_id: target.id, from: r.from, to: r.to, items, hours_total: schedHours(items), time_off: offs.map(timeOffPublic) };
+    }
+
+    case 'myAvailability': {
+      const r = schedRange(p, today, pAddDays(today, 13));
+      if (r.error) return { success: false, error: r.error };
+      const rows = await schedAvailabilityRows(env, user.id, r.from, r.to);
+      const byDate = Object.fromEntries(rows.map((x) => [x.date, x]));
+      const days = schedDates(r.from, r.to).map((date) => ({
+        date, blocks: schedBlocks(byDate[date]?.blocks), note: byDate[date]?.note || '', saved: !!byDate[date],
+      }));
+      return { success: true, from: r.from, to: r.to, blocks: AVAILABILITY_BLOCKS, days, last_date: pAddDays(today, SCHED_AVAIL_DAYS - 1) };
+    }
+
+    case 'saveAvailability': {
+      const days = Array.isArray(p.days) ? p.days : [];
+      if (!days.length) return { success: false, error: 'Nothing to save.' };
+      if (days.length > SCHED_AVAIL_DAYS) return { success: false, error: `Save ${SCHED_AVAIL_DAYS} days or fewer.` };
+      const last = pAddDays(today, SCHED_AVAIL_DAYS - 1);
+      for (const d of days) {
+        if (!isDateKey(d?.date) || d.date < today || d.date > last) {
+          return { success: false, error: `You can set availability from today through ${fmtDay(last)}.` };
+        }
+      }
+      const saved = [];
+      for (const d of days) {
+        const row = await schedUpsertAvailability(env, user, d.date, d.blocks, d.note);
+        saved.push({ date: row.date, blocks: row.blocks, note: row.note });
+      }
+      return { success: true, days: saved.sort((a, b) => a.date.localeCompare(b.date)) };
+    }
+
+    case 'copyAvailabilityLastWeek': {
+      // Source: the past 7 days if any were saved (fills both coming weeks);
+      // otherwise this coming week (fills the week after it).
+      let source = await schedAvailabilityRows(env, user.id, pAddDays(today, -7), pAddDays(today, -1));
+      let first = today;
+      if (!source.length) { source = await schedAvailabilityRows(env, user.id, today, pAddDays(today, 6)); first = pAddDays(today, 7); }
+      if (!source.length) return { success: false, error: 'Save a week first, then copy it.' };
+      const byDow = {};
+      for (const s of source) byDow[pDow(s.date)] = s;
+      const days = [];
+      for (const date of schedDates(first, pAddDays(today, 13))) {
+        const src = byDow[pDow(date)];
+        if (!src) continue;
+        const row = await schedUpsertAvailability(env, user, date, src.blocks, src.note);
+        days.push({ date, blocks: row.blocks, note: row.note });
+      }
+      return { success: true, days, copied: days.length };
+    }
+
+    case 'timeOffImpact': {
+      const w = schedTimeOffWindow(p);
+      if (w.error) return { success: false, error: w.error };
+      return { success: true, affected: await schedImpact(env, user.id, w) };
+    }
+
+    case 'requestTimeOff': {
+      const w = schedTimeOffWindow(p);
+      if (w.error) return { success: false, error: w.error };
+      const clash = (await schedOwnTimeOff(env, user.id, w.start_date, w.end_date)).find((t) => !(
+        w.part_day && t.part_day && t.start_date === w.start_date && !schedOverlap(t.part_day.start, t.part_day.end, w.part_day.start, w.part_day.end)));
+      if (clash) return { success: false, error: `You already asked for time off ${schedFmtRange(clash.start_date, clash.end_date)}.`, code: 'overlap' };
+      const request = await insertEntity(env, 'TimeOffRequest', {
+        user_id: user.id, user_name: user.full_name || user.email, start_date: w.start_date, end_date: w.end_date,
+        part_day: w.part_day, reason: String(p.reason || '').trim().slice(0, 500), status: 'pending',
+        decided_by: null, decided_at: null, decision_note: '', affected: await schedImpact(env, user.id, w),
+      }, user.email);
+      await audit(env, { actor: user.email, action: 'time_off_requested', target: 'TimeOffRequest', targetId: request.id, detail: schedFmtRange(w.start_date, w.end_date) });
+      const managers = (await schedManagers(env)).map((m) => m.id).filter((id) => id !== user.id);
+      await schedNotify(env, managers, {
+        title: 'Time off request',
+        message: `${user.full_name || 'A coach'} asked for time off ${schedFmtRange(w.start_date, w.end_date)}${request.affected.length ? ` (${request.affected.length} thing${request.affected.length === 1 ? '' : 's'} need cover)` : ''}.`,
+        link: '/TimeOffInbox',
+      }, user.email);
+      return { success: true, request: timeOffPublic(request) };
+    }
+
+    case 'cancelTimeOff': {
+      const r = await getEntityById(env, 'TimeOffRequest', p.id);
+      if (!r || r.user_id !== user.id) return { success: false, error: 'Request not found.' };
+      if (r.status === 'approved' && r.start_date <= today) return { success: false, error: 'This time off has already started. Ask a manager to change it.' };
+      if (r.status !== 'pending' && r.status !== 'approved') return { success: false, error: 'This request can\'t be cancelled.' };
+      const wasApproved = r.status === 'approved';
+      const fresh = await patchEntity(env, r, { status: 'cancelled', cancelled_at: nowISO() });
+      await audit(env, { actor: user.email, action: 'time_off_cancelled', target: 'TimeOffRequest', targetId: r.id, detail: r.status });
+      if (wasApproved) {
+        const managers = (await schedManagers(env)).map((m) => m.id).filter((id) => id !== user.id);
+        await schedNotify(env, managers, { title: 'Time off cancelled', message: `${user.full_name || 'A coach'} cancelled their time off ${schedFmtRange(r.start_date, r.end_date)}.`, link: '/TimeOffInbox' }, user.email);
+      }
+      return { success: true, request: timeOffPublic(fresh) };
+    }
+
+    case 'myTimeOff': {
+      const rows = await selectEntities(env, 'TimeOffRequest', `json_extract(data,'$.user_id') = ?`, [user.id]);
+      rows.sort((a, b) => b.start_date.localeCompare(a.start_date));
+      return { success: true, requests: rows.map(timeOffPublic) };
+    }
+
+    default:
+      return { __unimplemented: true };
+  }
+}
+// ===== end Scheduling: CORE =====
+
 const PUBLIC_FUNCTIONS = new Set(['getAppLogo', 'submitContact',
   'publicPlans', 'publicCheckout', // Phase 4: SALES
 ]);
@@ -5231,6 +5551,12 @@ async function runFunction(name, payload, ctx) {
     case 'getCuratedRecipes':
     case 'searchResourceSources':
       return { results: [], items: [], recipes: [] };
+
+    // ===== Scheduling: CORE (cases) =====
+    case 'mySchedule': case 'myAvailability': case 'saveAvailability': case 'copyAvailabilityLastWeek':
+    case 'timeOffImpact': case 'requestTimeOff': case 'cancelTimeOff': case 'myTimeOff':
+      return runSchedCoreFunction(name, payload, ctx);
+    // ===== end Scheduling: CORE (cases) =====
 
     // Phase 4 CORE: gym billing
     case 'billingStatus': case 'syncPlanToStripe': case 'startCheckout': case 'billingPortal': case 'myBilling':

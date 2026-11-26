@@ -40,6 +40,7 @@ import {
 } from "lucide-react";
 import { Dumbbell } from "lucide-react"; // Phase 3 editor
 import { Wallet, Tag } from "lucide-react"; // Phase 4: SALES
+import { CalendarClock, Plane, CalendarRange } from "lucide-react"; // Scheduling: CORE
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
@@ -67,6 +68,14 @@ const navGroups = [
       { name: "Notebooks", icon: BookOpen, page: "ClientNotebooks" },
       { name: "Contracts", icon: FileText, page: "Contracts" },
       { name: "Schedule", icon: CalendarDays, page: "Schedule" }
+    ]
+  },
+  {
+    title: "Schedule",
+    items: [
+      { name: "My schedule", icon: CalendarRange, page: "MySchedule" }, // Scheduling: CORE
+      { name: "Availability", icon: CalendarClock, page: "MyAvailability" }, // Scheduling: CORE
+      { name: "Time off", icon: Plane, page: "TimeOff" }, // Scheduling: CORE
     ]
   },
   {
@@ -140,6 +149,14 @@ const adminNavGroups = [
       { name: 'Messages', icon: MessageCircle, page: 'Messages' },
       { name: 'Contact Messages', icon: Mail, page: 'AdminContactMessages' },
       { name: 'Bug Reports', icon: Bug, page: 'AdminBugs' },
+    ]
+  },
+  {
+    title: 'Schedule',
+    items: [
+      { name: 'My schedule', icon: CalendarRange, page: 'MySchedule' }, // Scheduling: CORE
+      { name: 'Availability', icon: CalendarClock, page: 'MyAvailability' }, // Scheduling: CORE
+      { name: 'Time off', icon: Plane, page: 'TimeOff' }, // Scheduling: CORE
     ]
   },
   {

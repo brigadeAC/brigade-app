@@ -44,6 +44,9 @@ const Programs = lazy(() => import('./pages/Programs'));
 const Classes = lazy(() => import('./pages/Classes'));
 const ClassSetup = lazy(() => import('./pages/ClassSetup'));
 const ClassReports = lazy(() => import('./pages/ClassReports'));
+const MySchedule = lazy(() => import('./pages/MySchedule')); // Scheduling: CORE
+const MyAvailability = lazy(() => import('./pages/MyAvailability')); // Scheduling: CORE
+const TimeOff = lazy(() => import('./pages/TimeOff')); // Scheduling: CORE
 const ClientClasses = lazy(() => import('./pages/ClientClasses'));
 const MyLifts = lazy(() => import('./pages/MyLifts'));
 const ProgramBuilder = lazy(() => import('./pages/ProgramBuilder'));
@@ -133,6 +136,9 @@ export const PAGES = {
     "JoinBrigade": JoinBrigade, // Phase 4: SALES
     "PromoCodes": PromoCodes, // Phase 4: SALES
     "BillingDashboard": BillingDashboard, // Phase 4: SALES
+    "MySchedule": MySchedule, // Scheduling: CORE
+    "MyAvailability": MyAvailability, // Scheduling: CORE
+    "TimeOff": TimeOff, // Scheduling: CORE
 }
 
 export const pagesConfig = {
