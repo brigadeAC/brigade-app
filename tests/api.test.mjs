@@ -422,6 +422,116 @@ test('a one-time class never repeats', async () => {
   assert.equal(all.filter((x) => x.class_type_name === s.class_type_name).length, 1);
 });
 
+/* ---------------- one-class edits and holiday changes ---------------- */
+const dowOf = (key) => new Date(`${key}T12:00:00Z`).getUTCDay();
+const daySessions = async (date, token = coach.token) => (await api.fn('classSchedule', { from: date, to: date }, token));
+const activeOn = async (date) => (await daySessions(date)).sessions.filter((x) => x.status === 'scheduled');
+
+test('edit one class: time, coach and capacity change for that date only', async () => {
+  const today = eastern().date;
+  const target = addDays(today, 3);
+  const slot = await api.create('ClassSlot', { class_type_id: crossfit.id, day_of_week: dowOf(target), start_time: '07:00', duration_min: 60, start_date: today, end_date: addDays(target, 7), is_active: true }, coach.token);
+  const ofSlot = async () => (await api.fn('classSchedule', { from: today, to: addDays(target, 7) }, coach.token)).sessions.filter((x) => x.slot_id === slot.id);
+  const [one, next] = await ofSlot();
+  assert.equal(next.date, addDays(target, 7));
+  await book(members.alice, one); await book(members.bob, one);
+  assert.equal((await api.fn('editClassSession', { session_id: one.id, start_time: '08:00' }, members.alice.token)).success, false, 'members cannot edit');
+  const r = await api.fn('editClassSession', { session_id: one.id, start_time: '08:00', capacity: 1, coach_user_id: coach.id }, coach.token);
+  assert.equal(r.success, true, JSON.stringify(r));
+  assert.equal(r.session.start_time, '08:00');
+  assert.equal(r.session.coach_name, 'Cody Coach');
+  assert.equal(r.session.capacity, 1);
+  assert.equal(r.notified, 2);
+  assert.match(r.warnings[0], /Nobody was removed/);
+  const people = (await roster(one)).reservations.filter((x) => x.status === 'reserved');
+  assert.equal(people.length, 2, 'both keep their spot');
+  assert.ok(people.every((x) => x.start_at === r.session.start_at), 'bookings follow the new time');
+  const notes = await api.list('Notification', members.alice.token);
+  assert.ok(notes.some((n) => n.title === 'Class time changed' && /8:00 AM/.test(n.message)));
+  assert.equal((await book(members.cara, one)).status, 'waitlisted', 'class is full at the new capacity');
+  // The weekly template and next week's class are untouched, even after a tick.
+  await api.fn('classTick', {}, coach.token);
+  const after = await ofSlot();
+  assert.equal(after[0].start_time, '08:00', 'the edit sticks');
+  assert.equal(after[1].start_time, '07:00');
+  assert.equal(after[1].capacity, 20);
+  // Raising capacity again lets the waitlist in.
+  const up = await api.fn('editClassSession', { session_id: one.id, capacity: 5 }, coach.token);
+  assert.equal(up.warnings.length, 0);
+  assert.equal(up.session.reserved_count, 3);
+  assert.equal((await api.fn('editClassSession', { session_id: one.id, start_time: '25:00' }, coach.token)).success, false);
+  await api.update('ClassSlot', slot.id, { is_active: false }, coach.token);
+});
+
+test('holiday: closing a day cancels and tells everyone, and stays closed', async () => {
+  const today = eastern().date;
+  const target = addDays(today, 4);
+  const slot = await api.create('ClassSlot', { class_type_id: crossfit.id, day_of_week: dowOf(target), start_time: '06:00', duration_min: 60, start_date: target, end_date: target, is_active: true }, coach.token);
+  const [s] = (await activeOn(target)).filter((x) => x.slot_id === slot.id);
+  const oneOff = await api.create('ClassSession', { class_type_id: crossfit.id, class_type_name: 'Holiday WOD', date: target, start_time: '10:00', duration_min: 60, slot_id: null }, coach.token);
+  await book(members.alice, s);
+  assert.equal((await api.fn('classDayChange', { date: target, mode: 'closed' }, members.alice.token)).success, false, 'members cannot close the gym');
+  const r = await api.fn('classDayChange', { date: target, mode: 'closed', reason: 'Thanksgiving' }, coach.token);
+  assert.equal(r.success, true, JSON.stringify(r));
+  assert.ok(r.cancelled >= 2);
+  assert.ok(r.notified >= 1, 'booked member told');
+  assert.equal((await activeOn(target)).length, 0, 'no classes that day');
+  const sched = await daySessions(target, members.alice.token);
+  assert.equal(sched.day_changes[0].mode, 'closed');
+  assert.equal(sched.day_changes[0].reason, 'Thanksgiving');
+  const notes = await api.list('Notification', members.alice.token);
+  assert.ok(notes.some((n) => n.title === 'Class cancelled' && /Thanksgiving/.test(n.message)));
+  assert.equal((await roster(s)).reservations[0].status, 'cancelled_by_gym', 'booking released');
+  await api.fn('classTick', {}, coach.token);
+  assert.equal((await activeOn(target)).length, 0, 'the scheduled job does not bring classes back');
+  assert.equal((await api.fn('classDayChange', { date: target, mode: 'shift', shift_minutes: 30 }, coach.token)).success, false, 'one change per day');
+  const undo = await api.fn('classDayChange', { date: target, mode: 'normal' }, coach.token);
+  assert.equal(undo.success, true);
+  const back = await activeOn(target);
+  assert.ok(back.some((x) => x.id === s.id) && back.some((x) => x.id === oneOff.id), 'classes come back after undo');
+  assert.equal((await daySessions(target)).day_changes.length, 0);
+  await api.update('ClassSlot', slot.id, { is_active: false }, coach.token);
+});
+
+test('holiday: a day can run another day\'s schedule, or shift every class', async () => {
+  const today = eastern().date;
+  const target = addDays(today, 5);
+  const otherDow = (dowOf(target) + 2) % 7;
+  const normal = await api.create('ClassSlot', { class_type_id: crossfit.id, day_of_week: dowOf(target), start_time: '05:30', duration_min: 60, start_date: target, end_date: target, is_active: true }, coach.token);
+  const other = await api.create('ClassSlot', { class_type_id: openGym.id, day_of_week: otherDow, start_time: '09:00', duration_min: 120, start_date: today, end_date: target, is_active: true }, coach.token);
+  const [n] = (await activeOn(target)).filter((x) => x.slot_id === normal.id);
+  await book(members.bob, n);
+  assert.equal((await api.fn('classDayChange', { date: target, mode: 'use_day', use_day_of_week: dowOf(target) }, coach.token)).success, false, 'same weekday is refused');
+  const r = await api.fn('classDayChange', { date: target, mode: 'use_day', use_day_of_week: otherDow }, coach.token);
+  assert.equal(r.success, true, JSON.stringify(r));
+  let day = await activeOn(target);
+  assert.ok(!day.some((x) => x.slot_id === normal.id), 'the normal class is off');
+  assert.ok(day.some((x) => x.slot_id === other.id && x.start_time === '09:00'), 'the other day\'s class runs');
+  assert.ok((await api.list('Notification', members.bob.token)).some((n2) => /schedule/.test(n2.message)));
+  await api.fn('classTick', {}, coach.token);
+  day = await activeOn(target);
+  assert.equal(day.filter((x) => x.slot_id === other.id).length, 1, 'still swapped after a tick');
+  assert.equal((await api.fn('classDayChange', { date: target, mode: 'normal' }, coach.token)).success, true);
+  day = await activeOn(target);
+  assert.ok(day.some((x) => x.slot_id === normal.id) && !day.some((x) => x.slot_id === other.id), 'undo puts the normal day back');
+
+  // Shift every class an hour later; bookings stay and people are told.
+  await book(members.cara, day.find((x) => x.slot_id === normal.id));
+  const sh = await api.fn('classDayChange', { date: target, mode: 'shift', shift_minutes: 60 }, coach.token);
+  assert.equal(sh.success, true, JSON.stringify(sh));
+  assert.ok(sh.notified >= 1);
+  day = await activeOn(target);
+  const moved = day.find((x) => x.slot_id === normal.id);
+  assert.equal(moved.start_time, '06:30');
+  assert.equal(moved.reserved_count, 1);
+  await api.fn('classTick', {}, coach.token);
+  assert.equal((await activeOn(target)).find((x) => x.slot_id === normal.id).start_time, '06:30', 'tick keeps the shift');
+  assert.equal((await api.fn('classDayChange', { date: target, mode: 'normal' }, coach.token)).success, true);
+  assert.equal((await activeOn(target)).find((x) => x.slot_id === normal.id).start_time, '05:30');
+  assert.equal((await api.fn('classDayChange', { date: target, mode: 'shift', shift_minutes: -400 }, coach.token)).success, false, 'cannot shift past midnight');
+  for (const sl of [normal, other]) await api.update('ClassSlot', sl.id, { is_active: false }, coach.token);
+});
+
 /* ---------------- programs and the scheduled job ---------------- */
 test('scheduled job needs its secret and reports a heartbeat', async () => {
   assert.equal((await api.call('POST', 'cron/program-tick', {})).status, 401);

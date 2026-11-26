@@ -44,10 +44,14 @@ export function useMyClasses(options = {}, clientId = null) {
   return { ...q, upcoming, recent: d.recent || d.recent_attendance || [], memberships, waiverSigned, reservationBySession };
 }
 
+// -> data: { sessions, dayChanges } (dayChanges: holiday closures and swapped days)
 export function useSchedule(from, to, enabled = true, clientId = null) {
   return useQuery({
     queryKey: [...SCHEDULE_KEY, from, to, clientId || "me"],
-    queryFn: async () => asSessions(await classSchedule({ from, to, client_id: clientId })),
+    queryFn: async () => {
+      const d = await classSchedule({ from, to, client_id: clientId });
+      return { sessions: asSessions(d), dayChanges: Array.isArray(d?.day_changes) ? d.day_changes : [] };
+    },
     enabled,
     staleTime: 30000,
   });

@@ -7,11 +7,12 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Loader2, UserPlus, Check, Undo2, UserX, XCircle, CalendarPlus } from "lucide-react";
+import { Loader2, UserPlus, Check, Undo2, UserX, XCircle, CalendarPlus, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { fromKey, todayKey } from "@/lib/programs";
 import ClientPicker from "./ClientPicker";
 import BookingWindowRow from "./BookingWindowRow";
+import EditSessionDialog from "./EditSessionDialog";
 import {
   fetchRoster, checkInReservation, undoCheckIn, markNoShow, cancelReservation, walkIn, bookClient,
   cancelSession, errorMessage, fmtTime, RES_STATUS,
@@ -26,6 +27,7 @@ export default function RosterSheet({ session, open, onOpenChange, onChanged }) 
   const [cancelOpen, setCancelOpen] = useState(false);
   const [reason, setReason] = useState("");
   const [cancelling, setCancelling] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
 
   const rosterQuery = useQuery({
     queryKey: ["classRoster", session?.id],
@@ -244,13 +246,18 @@ export default function RosterSheet({ session, open, onOpenChange, onChanged }) 
                 </ul>
               )}
 
-              <div className="pt-2 border-t border-border">
+              <div className="pt-2 border-t border-border flex flex-wrap gap-2">
+                {Date.parse(session.end_at) > Date.now() && (
+                  <Button variant="outline" className="gap-1.5" onClick={() => setEditOpen(true)}><Pencil className="w-4 h-4" /> Edit this class</Button>
+                )}
                 <Button variant="outline" className="text-red-600 hover:text-red-600" onClick={() => setCancelOpen(true)}>Cancel this class</Button>
               </div>
             </div>
           )}
         </SheetContent>
       </Sheet>
+
+      <EditSessionDialog session={session} open={editOpen} onOpenChange={setEditOpen} onSaved={refresh} />
 
       <AlertDialog open={cancelOpen} onOpenChange={setCancelOpen}>
         <AlertDialogContent>

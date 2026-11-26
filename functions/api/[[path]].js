@@ -290,7 +290,7 @@ async function memberResourceTerm(env, user) {
 // plans, templates and business records. Only these stay private per person.
 // Gym libraries everyone can read but only staff can change.
 const STAFF_LIBRARY_TYPES = new Set(['HabitTemplate', 'Lesson', 'Program', 'ProgramItem',
-  'ClassType', 'ClassSlot', 'ClassSession', 'MembershipPlan', 'GymSettings']);
+  'ClassType', 'ClassSlot', 'ClassSession', 'MembershipPlan', 'GymSettings', 'ClassDayChange']);
 // Client records only staff (or the system) may write. Members still read
 // their own rows through the normal ownership scope (client_id/client_user_id).
 // Reservation/Membership: members book only through the class functions.
@@ -1805,9 +1805,231 @@ async function cancelSessionReservations(env, session, actor, reason) {
   return { affected, notified };
 }
 
+/* ---- one-class edits and holiday day changes ---- */
+const DOW_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const fmtHm = (hm) => {
+  const mins = hmToMin(hm) ?? 0; const h = Math.floor(mins / 60);
+  return `${h % 12 === 0 ? 12 : h % 12}:${String(mins % 60).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
+};
+const fmtDay = (k) => { const [y, m, d] = String(k).split('-').map(Number); return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-US', { timeZone: 'UTC', weekday: 'short', month: 'short', day: 'numeric' }); };
+
+// Holiday changes, one ClassDayChange row per date (id cdc_<date>):
+// mode 'closed' (no classes), 'use_day' (runs another weekday's schedule) or
+// 'shift' (every class moved by shift_minutes). -> Map date -> row
+async function loadDayChanges(env, from, to) {
+  const rows = await selectEntities(env, 'ClassDayChange', `json_extract(data,'$.date') BETWEEN ? AND ?`, [from, to]);
+  return new Map(rows.filter((r) => ['closed', 'use_day', 'shift'].includes(r.mode)).map((r) => [r.date, r]));
+}
+const dayOfWeekFor = (date, changes) => {
+  const ch = changes?.get(date);
+  return ch?.mode === 'use_day' && Number.isInteger(Number(ch.use_day_of_week)) ? Number(ch.use_day_of_week) : pDow(date);
+};
+const dayChangeLabel = (ch) => (ch.mode === 'closed' ? 'Closed'
+  : ch.mode === 'use_day' ? `Runs the ${DOW_NAMES[Number(ch.use_day_of_week)]} schedule`
+    : `All classes ${Math.abs(ch.shift_minutes)} min ${ch.shift_minutes > 0 ? 'later' : 'earlier'}`);
+
+// Move one class to a new start time / length on the same date. Bookings stay;
+// everyone booked or waitlisted is told when the start time changes.
+async function moveSessionTime(env, session, startMin, dur, actor, extra = {}) {
+  const startMs = easternToUTC(session.date, minToHm(startMin));
+  const patch = {
+    ...extra,
+    start_time: minToHm(startMin), end_time: minToHm(startMin + dur), duration_min: dur,
+    start_at: new Date(startMs).toISOString(), end_at: new Date(startMs + dur * 60000).toISOString(),
+  };
+  const moved = patch.start_at !== session.start_at;
+  const fresh = await patchEntity(env, session, patch);
+  let notified = 0;
+  if (moved) {
+    await env.DB.prepare(
+      `UPDATE entities SET data = json_set(data, '$.start_at', ?), updated_date = ? WHERE entity_type='Reservation' AND json_extract(data,'$.session_id') = ?`
+    ).bind(patch.start_at, nowISO(), session.id).run();
+    const active = await selectEntities(env, 'Reservation',
+      `json_extract(data,'$.session_id') = ? AND json_extract(data,'$.status') IN ('reserved','waitlisted','checked_in')`, [session.id]);
+    const createdBy = await classActorEmail(env, actor, session);
+    const told = new Set();
+    for (const r of active) {
+      if (!r.client_user_id || told.has(r.client_user_id)) continue;
+      told.add(r.client_user_id);
+      if (await notifyClassMember(env, {
+        loginId: r.client_user_id, createdBy,
+        title: 'Class time changed',
+        message: `${session.class_type_name || 'Your class'} on ${fmtDay(session.date)} now starts at ${fmtHm(patch.start_time)} (was ${fmtHm(session.start_time)}). You are still booked.`,
+      })) notified++;
+    }
+  }
+  await recountSession(env, session.id);
+  return { session: { ...fresh, ...(await getEntityById(env, 'ClassSession', session.id)) }, moved, notified };
+}
+
+// Staff edit of one class on one date: time, length, coach, capacity. The
+// weekly slot is untouched (edited_manually keeps the generator off it).
+async function editClassSession(env, user, payload) {
+  const session = await getEntityById(env, 'ClassSession', payload?.session_id);
+  if (!session) return { success: false, error: 'Class not found.' };
+  if (session.status !== 'scheduled') return { success: false, error: 'This class was cancelled.' };
+  if (Date.now() > Date.parse(session.end_at)) return { success: false, error: 'This class is over.' };
+  const has = (k) => payload && Object.prototype.hasOwnProperty.call(payload, k);
+  const patch = { edited_manually: true };
+  const warnings = [];
+  if (has('coach_user_id')) {
+    if (payload.coach_user_id) {
+      const coach = await staffLogin(env, payload.coach_user_id);
+      if (!coach) return { success: false, error: 'Pick a coach from the list.' };
+      patch.coach_user_id = coach.id; patch.coach_name = coach.full_name || coach.email;
+    } else { patch.coach_user_id = null; patch.coach_name = ''; }
+  }
+  let capChanged = false;
+  if (has('capacity')) {
+    const c = payload.capacity === null || payload.capacity === '' ? null : Number(payload.capacity);
+    if (c !== null && (!Number.isInteger(c) || c < 1 || c > 1000)) return { success: false, error: 'Capacity must be a whole number, 1 or more. Leave it blank for no cap.' };
+    capChanged = (capOf(session) ?? null) !== c;
+    patch.capacity = c;
+  }
+  let startMin = hmToMin(session.start_time);
+  let dur = numOr(session.duration_min, 60);
+  if (has('start_time')) {
+    startMin = hmToMin(payload.start_time);
+    if (startMin === null || startMin >= 1440) return { success: false, error: 'Pick a start time.' };
+  }
+  if (has('duration_min')) {
+    dur = Number(payload.duration_min);
+    if (!Number.isInteger(dur) || dur < 5 || dur > 600) return { success: false, error: 'Length must be 5 to 600 minutes.' };
+  }
+  if (startMin + dur > 1440) return { success: false, error: 'The class has to end by midnight.' };
+  const timeChanged = minToHm(startMin) !== session.start_time || dur !== numOr(session.duration_min, 60);
+  if (timeChanged && easternToUTC(session.date, minToHm(startMin)) <= Date.now()) {
+    return { success: false, error: 'That time has already passed. Pick a later time.' };
+  }
+  const base = await patchEntity(env, session, patch);
+  const r = await moveSessionTime(env, { ...session, ...base }, startMin, dur, user, timeChanged ? { day_shifted: null } : {});
+  let fresh = r.session;
+  if (capChanged) {
+    const booked = numOr(fresh.reserved_count, 0);
+    const cap = capOf(fresh);
+    if (cap !== null && booked > cap) {
+      warnings.push(`${booked} people are booked but the class now holds ${cap}. Nobody was removed.`);
+    } else {
+      const promoted = await promoteWaitlist(env, fresh, await getGymSettings(env), user);
+      if (promoted.length) fresh = await getEntityById(env, 'ClassSession', session.id);
+    }
+  }
+  const what = [timeChanged && 'time', has('coach_user_id') && 'coach', capChanged && 'capacity'].filter(Boolean).join(', ') || 'nothing';
+  await audit(env, { actor: user.email, action: 'update', target: 'ClassSession', targetId: session.id, detail: `edited one class: ${what}; ${r.notified} notified`, request: null });
+  return { success: true, session: fresh, notified: r.notified, time_changed: r.moved, warnings };
+}
+
+// Cancel a class as part of a day change: hidden from the schedule (the day
+// banner explains it), bookings released, members told.
+async function dayCancelSession(env, session, user, reason, marker) {
+  const res = await env.DB.prepare(
+    `UPDATE entities SET data = json_set(data, '$.status', 'cancelled', '$.cancel_reason', ?, '$.cancelled_at', ?, '$.cancelled_by', ?, '$.auto_cancelled', json('true'), '$.${marker}', json('true')), updated_date = ?
+     WHERE id = ? AND entity_type = 'ClassSession' AND json_extract(data,'$.status') = 'scheduled'`
+  ).bind(reason, nowISO(), user.id, nowISO(), session.id).run();
+  if (!res?.meta?.changes) return { affected: 0, notified: 0 };
+  return cancelSessionReservations(env, { ...session, status: 'cancelled' }, user, reason);
+}
+
+// Apply or undo a holiday change for one date. payload: { date, mode:
+// 'closed'|'use_day'|'shift'|'normal', reason, use_day_of_week, shift_minutes }.
+async function classDayChange(env, user, payload) {
+  const date = payload?.date;
+  const today = programToday();
+  if (!isDateKey(date)) return { success: false, error: 'Pick a date.' };
+  if (date < today) return { success: false, error: 'Pick today or a later date.' };
+  const mode = payload?.mode;
+  if (!['closed', 'use_day', 'shift', 'normal'].includes(mode)) return { success: false, error: 'Pick what happens that day.' };
+  const id = `cdc_${date}`;
+  const existing = await getEntityById(env, 'ClassDayChange', id);
+  const s = await getGymSettings(env);
+  const now = Date.now();
+  const onDay = async () => (await selectEntities(env, 'ClassSession', `json_extract(data,'$.date') = ?`, [date]))
+    .filter((x) => Date.parse(x.start_at) > now);
+  const out = { success: true, date, cancelled: 0, moved: 0, added: 0, restored: 0, notified: 0 };
+  const tally = (r) => { out.notified += r.notified || 0; };
+
+  if (mode === 'normal') {
+    if (!existing) return { success: false, error: 'This day has no change to undo.' };
+    await env.DB.prepare('DELETE FROM entities WHERE id = ?').bind(id).run();
+    const sessions = await onDay();
+    if (existing.mode === 'shift') {
+      const back = -numOr(existing.shift_minutes, 0);
+      for (const x of sessions.filter((v) => v.status === 'scheduled' && v.day_shifted)) {
+        const st = hmToMin(x.start_time) + back;
+        if (st < 0 || st >= 1440) continue;
+        const r = await moveSessionTime(env, x, st, numOr(x.duration_min, 60), user, { day_shifted: null });
+        out.moved++; tally(r);
+      }
+    } else {
+      if (existing.mode === 'use_day') {
+        for (const x of sessions.filter((v) => v.status === 'scheduled' && v.day_change_added)) {
+          tally(await dayCancelSession(env, x, user, 'Back to the normal schedule', 'day_change_removed'));
+          out.cancelled++;
+        }
+      }
+      // Classes this change took off come back (empty; members were told they were cancelled).
+      for (const x of sessions.filter((v) => v.status === 'cancelled' && v.day_change)) {
+        await patchEntity(env, x, { status: 'scheduled', auto_cancelled: false, cancel_reason: null, cancelled_at: null, day_change: null });
+        await recountSession(env, x.id);
+        out.restored++;
+      }
+    }
+    addSync(out, await syncSlotsWhere(env, s, '1=1', []));
+    await audit(env, { actor: user.email, action: 'update', target: 'ClassDayChange', targetId: id, detail: `undid ${existing.mode} on ${date}`, request: null });
+    return out;
+  }
+
+  if (existing) return { success: false, error: 'This day already has a change. Undo it first.' };
+  const reason = String(payload?.reason || '').trim().slice(0, 120);
+  const row = { date, mode, reason, created_by_name: user.full_name || user.email };
+  if (mode === 'use_day') {
+    const dow = Number(payload?.use_day_of_week);
+    if (!Number.isInteger(dow) || dow < 0 || dow > 6) return { success: false, error: 'Pick which day\'s schedule to run.' };
+    if (dow === pDow(date)) return { success: false, error: `That date is already a ${DOW_NAMES[dow]}.` };
+    row.use_day_of_week = dow;
+  }
+  if (mode === 'shift') {
+    const shift = Number(payload?.shift_minutes);
+    if (!Number.isInteger(shift) || shift === 0 || Math.abs(shift) > 720) return { success: false, error: 'Pick how many minutes to move the classes.' };
+    row.shift_minutes = shift;
+  }
+  const sessions = (await onDay()).filter((x) => x.status === 'scheduled');
+  if (mode === 'shift') {
+    const bad = sessions.find((x) => { const st = hmToMin(x.start_time) + row.shift_minutes; return st < 0 || st + numOr(x.duration_min, 60) > 1440; });
+    if (bad) return { success: false, error: `${bad.class_type_name || 'A class'} at ${fmtHm(bad.start_time)} would move past midnight. Pick a smaller shift.` };
+    const early = sessions.find((x) => easternToUTC(date, minToHm(hmToMin(x.start_time) + row.shift_minutes)) <= now);
+    if (early) return { success: false, error: `${early.class_type_name || 'A class'} at ${fmtHm(early.start_time)} would move to a time that has passed.` };
+  }
+  await env.DB.prepare(
+    'INSERT OR IGNORE INTO entities (id, entity_type, data, created_by, created_date, updated_date) VALUES (?,?,?,?,?,?)'
+  ).bind(id, 'ClassDayChange', JSON.stringify(row), user.email, nowISO(), nowISO()).run();
+  const label = fmtDay(date);
+  if (mode === 'closed') {
+    const why = reason ? `Gym closed ${label}: ${reason}` : `Gym closed ${label}`;
+    for (const x of sessions) { tally(await dayCancelSession(env, x, user, why, 'day_change')); out.cancelled++; }
+  } else if (mode === 'use_day') {
+    const why = `${label} runs the ${DOW_NAMES[row.use_day_of_week]} schedule${reason ? ` (${reason})` : ''}`;
+    for (const x of sessions.filter((v) => v.slot_id)) { tally(await dayCancelSession(env, x, user, why, 'day_change')); out.cancelled++; }
+  } else {
+    for (const x of sessions) {
+      const r = await moveSessionTime(env, x, hmToMin(x.start_time) + row.shift_minutes, numOr(x.duration_min, 60), user, { day_shifted: true });
+      out.moved++; tally(r);
+    }
+  }
+  addSync(out, await syncSlotsWhere(env, s, '1=1', []));
+  if (mode === 'use_day') {
+    // Weekly classes that now run that day (new, or revived from an earlier change).
+    const added = (await onDay()).filter((x) => x.status === 'scheduled' && x.slot_id && !x.day_change_added);
+    for (const x of added) await patchEntity(env, x, { day_change_added: true });
+    out.added = (await onDay()).filter((x) => x.status === 'scheduled' && x.day_change_added).length;
+  }
+  await audit(env, { actor: user.email, action: 'create', target: 'ClassDayChange', targetId: id, detail: `${mode} on ${date}; ${out.cancelled} cancelled, ${out.moved} moved, ${out.notified} notified`, request: null });
+  return { ...out, change: { ...row, id, label: dayChangeLabel(row) } };
+}
+
 /* ---- session generation from weekly slots ---- */
-function slotSessionFields(slot, type, date) {
-  const startMin = hmToMin(slot.start_time);
+function slotSessionFields(slot, type, date, shiftMin = 0) {
+  const startMin = hmToMin(slot.start_time) + (Number(shiftMin) || 0);
   const duration = numOr(slot.duration_min, numOr(type?.default_duration_min, 60)) || 60;
   const startMs = easternToUTC(date, minToHm(startMin));
   const capRaw = numOr(slot.capacity, numOr(type?.default_capacity, null));
@@ -1836,18 +2058,22 @@ const LABEL_FIELDS = ['class_type_id', 'class_type_name', 'color', 'coach_user_i
 // Empty future sessions follow the slot; booked ones keep time and capacity
 // (only coach / name / color follow) and are reported in booked_sessions.
 // Sessions staff edited one by one (edited_manually) or cancelled are left alone.
-async function syncSlotSessions(env, slot, type, s, now = Date.now()) {
+async function syncSlotSessions(env, slot, type, s, now = Date.now(), dayChanges = null) {
   const out = { generated: 0, revived: 0, updated: 0, cancelled: 0, booked_kept: 0, booked_sessions: [] };
   const today = programToday(now);
   // Classes must exist at least as far ahead as members may book them.
   const openHours = numOr(slot.booking_open_hours, numOr(type?.booking_open_hours, s.booking_open_hours));
   const horizonDays = Math.min(62, Math.max(1, numOr(s.generate_days_ahead, 21), Math.ceil(openHours / 24) + 1));
   const horizonEnd = pAddDays(today, horizonDays - 1);
+  const changes = dayChanges || await loadDayChanges(env, today, pAddDays(today, 62));
   const active = slot.is_active !== false && !!type && type.is_active !== false && hmToMin(slot.start_time) !== null
     && Number.isInteger(Number(slot.day_of_week));
-  const wants = (date) => active && pDow(date) === Number(slot.day_of_week)
+  // Holiday changes: closed days get nothing, "runs Saturday's schedule" swaps the weekday.
+  const wants = (date) => active && changes.get(date)?.mode !== 'closed' && dayOfWeekFor(date, changes) === Number(slot.day_of_week)
     && (!isDateKey(slot.start_date) || date >= slot.start_date) && (!isDateKey(slot.end_date) || date <= slot.end_date)
-    && date >= today && date <= horizonEnd;
+    && date >= today && date <= horizonEnd && fitsDay(date);
+  const shiftOf = (date) => (changes.get(date)?.mode === 'shift' ? numOr(changes.get(date).shift_minutes, 0) : 0);
+  function fitsDay(date) { const st = hmToMin(slot.start_time) + shiftOf(date); return st >= 0 && st < 1440; }
 
   const existing = await selectEntities(env, 'ClassSession',
     `json_extract(data,'$.slot_id') = ? AND json_extract(data,'$.date') >= ?`, [slot.id, today]);
@@ -1865,7 +2091,7 @@ async function syncSlotSessions(env, slot, type, s, now = Date.now()) {
     if (ex.edited_manually) continue;
     const booked = bookedIds.has(ex.id);
     if (wants(ex.date)) {
-      const want = slotSessionFields(slot, type, ex.date);
+      const want = slotSessionFields(slot, type, ex.date, shiftOf(ex.date));
       if (ex.status === 'cancelled') {
         await patchEntity(env, ex, { ...want, status: 'scheduled', auto_cancelled: false, cancel_reason: null });
         out.revived++;
@@ -1897,9 +2123,11 @@ async function syncSlotSessions(env, slot, type, s, now = Date.now()) {
     const stmts = [];
     for (let d = today; d <= horizonEnd; d = pAddDays(d, 1)) {
       if (!wants(d)) continue;
-      const f = slotSessionFields(slot, type, d);
+      const f = slotSessionFields(slot, type, d, shiftOf(d));
       if (Date.parse(f.start_at) <= now) continue;
       const data = { ...f, status: 'scheduled', cancel_reason: null, notes: '', reserved_count: 0, waitlist_count: 0, checked_in_count: 0 };
+      if (shiftOf(d)) data.day_shifted = true;
+      if (changes.get(d)?.mode === 'use_day') data.day_change_added = true;
       stmts.push(env.DB.prepare(
         'INSERT OR IGNORE INTO entities (id, entity_type, data, created_by, created_date, updated_date) VALUES (?,?,?,?,?,?)'
       ).bind(`cs_${slot.id}_${d}`, 'ClassSession', JSON.stringify(data), slot.created_by || null, nowISO(), nowISO()));
@@ -1922,9 +2150,11 @@ async function syncSlotsWhere(env, s, whereSql, binds, overrideSlot = null) {
   const slots = overrideSlot ? [overrideSlot] : await selectEntities(env, 'ClassSlot', whereSql, binds);
   const typeCache = new Map();
   const total = { generated: 0, revived: 0, updated: 0, cancelled: 0, booked_kept: 0, booked_sessions: [] };
+  const today = programToday();
+  const changes = await loadDayChanges(env, today, pAddDays(today, 62));
   for (const slot of slots) {
     if (!typeCache.has(slot.class_type_id)) typeCache.set(slot.class_type_id, await getEntityById(env, 'ClassType', slot.class_type_id));
-    addSync(total, await syncSlotSessions(env, slot, typeCache.get(slot.class_type_id), s));
+    addSync(total, await syncSlotSessions(env, slot, typeCache.get(slot.class_type_id), s, Date.now(), changes));
   }
   return total;
 }
@@ -3082,7 +3312,10 @@ async function runFunction(name, payload, ctx) {
         }
         return row;
       });
-      return { success: true, from, to, today, now: nowISO(), settings: s, sessions: out };
+      const dayChanges = [...(await loadDayChanges(env, from, to)).values()]
+        .map((c) => ({ id: c.id, date: c.date, mode: c.mode, reason: c.reason || '', use_day_of_week: c.use_day_of_week ?? null, shift_minutes: c.shift_minutes ?? null, label: dayChangeLabel(c) }))
+        .sort((a, b) => a.date.localeCompare(b.date));
+      return { success: true, from, to, today, now: nowISO(), settings: s, sessions: out, day_changes: dayChanges };
     }
 
     case 'classRoster': {
@@ -3435,6 +3668,16 @@ async function runFunction(name, payload, ctx) {
       await recountSession(env, resv.session_id);
       await audit(env, { actor: user.email, action: 'update', target: 'Reservation', targetId: resv.id, detail: newStatus, request: null });
       return { success: true, reservation: await getEntityById(env, 'Reservation', resv.id), session: await getEntityById(env, 'ClassSession', resv.session_id) };
+    }
+
+    case 'editClassSession': {
+      if (!isStaff(user)) return { success: false, error: 'Only coaches can change a class.' };
+      return editClassSession(env, user, payload);
+    }
+
+    case 'classDayChange': {
+      if (!isStaff(user)) return { success: false, error: 'Only coaches can change the schedule.' };
+      return classDayChange(env, user, payload);
     }
 
     case 'cancelClassSession': {

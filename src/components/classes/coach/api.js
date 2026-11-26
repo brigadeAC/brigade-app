@@ -26,6 +26,12 @@ const asList = (data, ...keys) => {
 export const fetchSchedule = async (from, to) =>
   asList(await invoke("classSchedule", { from, to }), "sessions", "items");
 
+// Sessions plus holiday changes (closed days, swapped or shifted days).
+export async function fetchScheduleWithChanges(from, to) {
+  const data = await invoke("classSchedule", { from, to });
+  return { sessions: asList(data, "sessions", "items"), dayChanges: asList(data, "day_changes") };
+}
+
 export async function fetchRoster(sessionId) {
   const data = await invoke("classRoster", { session_id: sessionId });
   return {
@@ -46,6 +52,10 @@ export const cancelReservation = (r) => invoke("cancelReservation", { reservatio
 export const walkIn = (sessionId, clientId, override = false) => invoke("checkIn", { session_id: sessionId, client_id: clientId, ...(override ? { override: true } : {}) });
 export const bookClient = (sessionId, clientId, override = false) => invoke("bookClass", { session_id: sessionId, client_id: clientId, ...(override ? { override: true } : {}) });
 export const cancelSession = (sessionId, reason) => invoke("cancelClassSession", { session_id: sessionId, reason });
+// One class on one date: { start_time, duration_min, coach_user_id, capacity } (only what changed).
+export const editSession = (sessionId, changes) => invoke("editClassSession", { session_id: sessionId, ...changes });
+// Holiday change for a date: { date, mode: closed|use_day|shift|normal, reason, use_day_of_week, shift_minutes }.
+export const changeDay = (payload) => invoke("classDayChange", payload);
 export const runClassTick = () => invoke("classTick", {});
 
 export const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];

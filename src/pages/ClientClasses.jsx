@@ -31,7 +31,8 @@ export default function ClientClasses() {
 
   const today = easternTodayKey(now);
   const schedule = useSchedule(today, addDays(today, 61), true, forId);
-  const sessions = useMemo(() => schedule.data || [], [schedule.data]);
+  const sessions = useMemo(() => schedule.data?.sessions || [], [schedule.data]);
+  const dayChanges = useMemo(() => schedule.data?.dayChanges || [], [schedule.data]);
   // Two weeks, or further when a class beyond that is already open for booking
   // (or they're already booked into one).
   const lastDay = useMemo(() => {
@@ -63,6 +64,8 @@ export default function ClientClasses() {
     [sessions, day]
   );
 
+  const dayChange = dayChanges.find((c) => c.date === day) || null;
+
   const ctx = { settings, now, memberships: my.memberships, waiverSigned: my.waiverSigned, reservationBySession: my.reservationBySession };
 
   const confirmCancel = async () => {
@@ -86,6 +89,11 @@ export default function ClientClasses() {
       <div className="glass-card p-4 space-y-3">
         <DayStrip days={days} selected={day} onSelect={setSelected} countsByDay={countsByDay} todayKey={today} />
         <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground px-1">{dayLabel(day, now)}</h2>
+        {dayChange && (
+          <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm font-medium text-foreground">
+            {dayChange.mode === "closed" ? "The gym is closed" : dayChange.label}{dayChange.reason ? `: ${dayChange.reason}` : ""}
+          </p>
+        )}
         {schedule.isLoading ? (
           <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
         ) : schedule.isError ? (
@@ -93,7 +101,7 @@ export default function ClientClasses() {
         ) : daySessions.length === 0 ? (
           <div className="py-8 text-center text-sm text-muted-foreground">
             <CalendarDays className="w-8 h-8 mx-auto mb-2 opacity-50" />
-            No classes this day.
+            {dayChange?.mode === "closed" ? "No classes. See you the next day." : "No classes this day."}
           </div>
         ) : (
           <div className="space-y-2">
