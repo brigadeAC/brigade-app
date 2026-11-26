@@ -290,7 +290,8 @@ async function memberResourceTerm(env, user) {
 // plans, templates and business records. Only these stay private per person.
 // Gym libraries everyone can read but only staff can change.
 const STAFF_LIBRARY_TYPES = new Set(['HabitTemplate', 'Lesson', 'Program', 'ProgramItem',
-  'ClassType', 'ClassSlot', 'ClassSession', 'MembershipPlan', 'GymSettings', 'ClassDayChange']);
+  'ClassType', 'ClassSlot', 'ClassSession', 'MembershipPlan', 'GymSettings', 'ClassDayChange',
+  'Movement', 'Benchmark', 'Workout']); // Phase 3 editor: workout libraries + daily workouts
 // Client records only staff (or the system) may write. Members still read
 // their own rows through the normal ownership scope (client_id/client_user_id).
 // Reservation/Membership: members book only through the class functions.
@@ -372,6 +373,7 @@ const notOthersPtClient = (col) => `NOT EXISTS (SELECT 1 FROM entities pt WHERE 
   AND json_extract(pt.data,'$.personal_training') = 1 AND COALESCE(json_extract(pt.data,'$.trainer_id'),'') <> ?)`;
 const isOthersPtClient = (user, client) => !!client && client.personal_training === true && isStaff(user) && !seesAllCoaching(user) && client.trainer_id !== user.id;
 function redactFor(user, type, rec) {
+  if (type === 'Workout') return workoutFor(user, rec); // Phase 3 editor
   if (!rec || !isStaff(user)) return rec;
   let out = rec;
   if (MONEY_TYPES.has(type) && !can(user, 'billing.view')) {
@@ -423,6 +425,7 @@ const NO_PERMISSION = { success: false, error: 'Your role doesn\'t allow this. A
 const TYPE_PERMISSION = {
   Membership: 'members.manage', MembershipPlan: 'members.manage',
   GymSettings: 'settings.manage', ClassType: 'schedule.manage', ClassSlot: 'schedule.manage', ClassDayChange: 'schedule.manage',
+  Movement: 'programs.manage', Benchmark: 'programs.manage', Workout: 'programs.manage', // Phase 3 editor
 };
 const isMemberUser = (user) => !!user && user.role !== 'admin' && (user.user_type === 'client' || user.user_type === 'independent');
 const staffWriteDenied = (type, user) => ((STAFF_LIBRARY_TYPES.has(type) || STAFF_WRITE_TYPES.has(type)) && !isStaff(user))
@@ -664,6 +667,7 @@ async function audit(env, { actor, action, target, targetId, detail, request }) 
 const COACH_PRIVATE_TYPES = new Set(['ClientNote', 'ClientNotebookPage']);
 
 async function entityScope(env, type, user) {
+  if (type === 'Workout') return workoutReadScope(user); // Phase 3 editor
   if (SHARED_TYPES.has(type) || STAFF_LIBRARY_TYPES.has(type)) return null;
   if (isStaff(user) && !STAFF_PRIVATE_TYPES.has(type)) {
     if (COACHING_DETAIL_TYPES.has(type) && !seesAllCoaching(user)) {
@@ -893,6 +897,314 @@ async function listEntities(env, type, { filter = {}, sort, limit, user }) {
   const { results } = await env.DB.prepare(sql).bind(...binds).all();
   return results.map(rowToEntity);
 }
+
+// ===== Phase 3: editor =====
+// Daily class workouts (gym-owned): the Movement and Benchmark libraries and
+// one Workout per date per class type (class_type_id null = every class).
+// Coaches with programs.manage write them; members see a workout only once it
+// is published and its publish time has passed, and never see coach_notes.
+const WORKOUT_SECTION_KINDS = new Set(['warmup', 'strength', 'metcon', 'accessory', 'other']);
+const SCORING_TYPES = new Set(['time', 'rounds_reps', 'load', 'reps', 'distance', 'calories', 'check', 'none']);
+const SCORING_UNITS = new Set(['lb', 'kg', 'm', 'km', 'mi', 'cal']);
+const MOVEMENT_CATEGORIES = new Set(['weightlifting', 'gymnastics', 'monostructural', 'other']);
+const BENCHMARK_KINDS = new Set(['girl', 'hero', 'open', 'lift', 'other']);
+const WORKOUT_PUBLISH_DEFAULTS = { workout_publish_days_before: 1, workout_publish_time: '20:00' };
+
+const managesWorkouts = (user) => can(user, 'programs.manage');
+
+// Who may read which Workout rows (used by entityScope for the generic routes too).
+function workoutReadScope(user) {
+  if (managesWorkouts(user)) return null;
+  return {
+    sql: `(json_extract(data,'$.status') = 'published' AND (json_extract(data,'$.publish_at') IS NULL OR json_extract(data,'$.publish_at') <= ?))`,
+    binds: [nowISO()],
+  };
+}
+function workoutFor(user, w) {
+  if (!w || managesWorkouts(user)) return w;
+  const { coach_notes: _n, ...rest } = w;
+  return rest;
+}
+const workoutVisibleNow = (w, nowIso = nowISO()) => w.status === 'published' && (!w.publish_at || w.publish_at <= nowIso);
+
+function normalizeScoring(s) {
+  const src = s && typeof s === 'object' ? s : {};
+  const type = SCORING_TYPES.has(src.type) ? src.type : 'none';
+  const out = { type, lower_is_better: type === 'time' };
+  const cap = Number(src.time_cap_sec);
+  if (Number.isFinite(cap) && cap > 0) out.time_cap_sec = Math.round(cap);
+  if (SCORING_UNITS.has(src.unit)) out.unit = src.unit;
+  const rpr = Number(src.reps_per_round);
+  if (type === 'rounds_reps' && Number.isFinite(rpr) && rpr > 0) out.reps_per_round = Math.round(rpr);
+  return out;
+}
+function normalizeSections(list) {
+  const used = new Set();
+  return (Array.isArray(list) ? list : []).slice(0, 20).map((s, i) => {
+    let id = typeof s?.id === 'string' && s.id.trim() ? s.id.trim().slice(0, 40) : `s${i + 1}`;
+    for (let n = i + 1; used.has(id); n += 1) id = `s${n + 1}`;
+    used.add(id);
+    return {
+      id,
+      kind: WORKOUT_SECTION_KINDS.has(s?.kind) ? s.kind : 'other',
+      title: String(s?.title || '').slice(0, 200),
+      description: String(s?.description || '').slice(0, 5000),
+      scoring: normalizeScoring(s?.scoring),
+      movement_ids: (Array.isArray(s?.movement_ids) ? s.movement_ids : []).filter((x) => typeof x === 'string' && x).slice(0, 30),
+      benchmark_id: typeof s?.benchmark_id === 'string' && s.benchmark_id ? s.benchmark_id : null,
+    };
+  });
+}
+const toIsoOrNull = (v) => {
+  if (v === null || v === undefined || v === '') return null;
+  const t = Date.parse(v);
+  return Number.isFinite(t) ? new Date(t).toISOString() : undefined;
+};
+
+// Gym default publish time, stored on the GymSettings record.
+async function workoutPublishDefaults(env) {
+  const row = parseRow(await env.DB.prepare(
+    `SELECT * FROM entities WHERE entity_type='GymSettings' ORDER BY created_date ASC LIMIT 1`
+  ).first());
+  const days = numOr(row?.workout_publish_days_before, WORKOUT_PUBLISH_DEFAULTS.workout_publish_days_before);
+  const time = hmToMin(row?.workout_publish_time) !== null ? row.workout_publish_time : WORKOUT_PUBLISH_DEFAULTS.workout_publish_time;
+  return { workout_publish_days_before: Math.max(0, Math.min(14, Math.round(days))), workout_publish_time: time };
+}
+async function defaultPublishAt(env, date) {
+  const d = await workoutPublishDefaults(env);
+  return new Date(easternToUTC(pAddDays(date, -d.workout_publish_days_before), d.workout_publish_time)).toISOString();
+}
+
+const SEED_MOVEMENTS = [
+  // Barbell lifts (worth a 1-rep max)
+  ['Back Squat', 'weightlifting', true], ['Front Squat', 'weightlifting', true], ['Overhead Squat', 'weightlifting', true],
+  ['Deadlift', 'weightlifting', true], ['Sumo Deadlift', 'weightlifting', true], ['Romanian Deadlift', 'weightlifting', true],
+  ['Clean', 'weightlifting', true, ['Squat Clean']], ['Power Clean', 'weightlifting', true], ['Hang Power Clean', 'weightlifting', true],
+  ['Clean and Jerk', 'weightlifting', true, ['C&J']], ['Snatch', 'weightlifting', true, ['Squat Snatch']], ['Power Snatch', 'weightlifting', true],
+  ['Hang Power Snatch', 'weightlifting', true], ['Strict Press', 'weightlifting', true, ['Shoulder Press', 'Overhead Press']],
+  ['Push Press', 'weightlifting', true], ['Push Jerk', 'weightlifting', true], ['Split Jerk', 'weightlifting', true],
+  ['Bench Press', 'weightlifting', true], ['Thruster', 'weightlifting', true],
+  // Other loaded movements
+  ['Kettlebell Swing', 'weightlifting', false, ['KB Swing']], ['Dumbbell Snatch', 'weightlifting', false, ['DB Snatch']],
+  ['Wall Ball', 'other', false, ['Wall Ball Shot']], ['Sandbag Carry', 'other', false],
+  // Gymnastics
+  ['Pull-Up', 'gymnastics', false, ['Pullup']], ['Chest-to-Bar Pull-Up', 'gymnastics', false, ['C2B']],
+  ['Bar Muscle-Up', 'gymnastics', false, ['BMU']], ['Ring Muscle-Up', 'gymnastics', false, ['RMU']],
+  ['Toes-to-Bar', 'gymnastics', false, ['T2B']], ['Handstand Push-Up', 'gymnastics', false, ['HSPU']],
+  ['Handstand Walk', 'gymnastics', false], ['Push-Up', 'gymnastics', false], ['Ring Dip', 'gymnastics', false],
+  ['Sit-Up', 'gymnastics', false, ['AbMat Sit-Up']], ['Air Squat', 'gymnastics', false], ['Pistol', 'gymnastics', false, ['Single-Leg Squat']],
+  ['Rope Climb', 'gymnastics', false], ['Burpee', 'gymnastics', false], ['Box Jump', 'gymnastics', false], ['Walking Lunge', 'gymnastics', false],
+  // Monostructural
+  ['Row', 'monostructural', false, ['Rower', 'Erg']], ['Run', 'monostructural', false], ['Bike', 'monostructural', false, ['Assault Bike', 'Echo Bike']],
+  ['Ski Erg', 'monostructural', false], ['Double-Under', 'monostructural', false, ['DU']], ['Single-Under', 'monostructural', false],
+];
+const forTime = (cap) => ({ type: 'time', lower_is_better: true, ...(cap ? { time_cap_sec: cap } : {}) });
+const SEED_BENCHMARKS = [
+  ['Fran', 'girl', '21-15-9 reps for time:\nThrusters (95/65 lb)\nPull-ups', forTime(600)],
+  ['Grace', 'girl', '30 clean and jerks for time (135/95 lb)', forTime(600)],
+  ['Isabel', 'girl', '30 snatches for time (135/95 lb)', forTime(600)],
+  ['Diane', 'girl', '21-15-9 reps for time:\nDeadlifts (225/155 lb)\nHandstand push-ups', forTime(900)],
+  ['Helen', 'girl', '3 rounds for time:\n400 m run\n21 kettlebell swings (53/35 lb)\n12 pull-ups', forTime(1200)],
+  ['Karen', 'girl', '150 wall balls for time (20/14 lb)', forTime(1200)],
+  ['Annie', 'girl', '50-40-30-20-10 reps for time:\nDouble-unders\nSit-ups', forTime(1200)],
+  ['Jackie', 'girl', 'For time:\n1,000 m row\n50 thrusters (45 lb)\n30 pull-ups', forTime(1200)],
+  ['Cindy', 'girl', 'As many rounds as possible in 20 minutes:\n5 pull-ups\n10 push-ups\n15 air squats', { type: 'rounds_reps', reps_per_round: 30, time_cap_sec: 1200, lower_is_better: false }],
+  ['Murph', 'hero', 'For time, with a 20/14 lb vest:\n1 mile run\n100 pull-ups\n200 push-ups\n300 air squats\n1 mile run\nPartition the pull-ups, push-ups and squats as needed.', forTime(3600)],
+  ['DT', 'hero', '5 rounds for time (155/105 lb):\n12 deadlifts\n9 hang power cleans\n6 push jerks', forTime(1200)],
+  ['Back Squat 1RM', 'lift', 'Build to a heavy single back squat.', { type: 'load', unit: 'lb', lower_is_better: false }],
+  ['Deadlift 1RM', 'lift', 'Build to a heavy single deadlift.', { type: 'load', unit: 'lb', lower_is_better: false }],
+  ['Clean 1RM', 'lift', 'Build to a heavy single clean.', { type: 'load', unit: 'lb', lower_is_better: false }],
+  ['Snatch 1RM', 'lift', 'Build to a heavy single snatch.', { type: 'load', unit: 'lb', lower_is_better: false }],
+  ['Strict Press 1RM', 'lift', 'Build to a heavy single strict press.', { type: 'load', unit: 'lb', lower_is_better: false }],
+  ['Clean and Jerk 1RM', 'lift', 'Build to a heavy single clean and jerk.', { type: 'load', unit: 'lb', lower_is_better: false }],
+];
+
+// Seed the sample libraries the first time they are used (once; deleting
+// entries later never brings them back).
+let workoutLibraryChecked = false;
+async function ensureWorkoutLibrary(env) {
+  if (workoutLibraryChecked) return;
+  if (await getState(env, 'workout_library_seeded')) { workoutLibraryChecked = true; return; }
+  const now = nowISO();
+  const ins = (id, type, data) => env.DB.prepare(
+    `INSERT OR IGNORE INTO entities (id, entity_type, data, created_by, created_date, updated_date) VALUES (?,?,?,?,?,?)`
+  ).bind(id, type, JSON.stringify(data), 'system', now, now);
+  const hasMov = await env.DB.prepare(`SELECT 1 FROM entities WHERE entity_type='Movement' LIMIT 1`).first();
+  const hasBench = await env.DB.prepare(`SELECT 1 FROM entities WHERE entity_type='Benchmark' LIMIT 1`).first();
+  const stmts = [];
+  if (!hasMov) for (const [name, category, is_lift, aliases = []] of SEED_MOVEMENTS) stmts.push(ins(`mv_${slugify(name)}`, 'Movement', { name, category, is_lift, aliases }));
+  if (!hasBench) for (const [name, kind, description, scoring] of SEED_BENCHMARKS) stmts.push(ins(`bm_${slugify(name)}`, 'Benchmark', { name, kind, description, scoring }));
+  if (stmts.length) await env.DB.batch(stmts);
+  await setState(env, 'workout_library_seeded', now);
+  workoutLibraryChecked = true;
+}
+
+// Cleans Movement/Benchmark writes on the generic entity routes.
+function normalizeLibraryFields(type, fields) {
+  if (type === 'Movement') {
+    if ('name' in fields) fields.name = String(fields.name || '').trim().slice(0, 120);
+    if ('category' in fields && !MOVEMENT_CATEGORIES.has(fields.category)) fields.category = 'other';
+    if ('is_lift' in fields) fields.is_lift = fields.is_lift === true;
+    if ('aliases' in fields) fields.aliases = (Array.isArray(fields.aliases) ? fields.aliases : []).map((a) => String(a).trim()).filter(Boolean).slice(0, 20);
+  }
+  if (type === 'Benchmark') {
+    if ('name' in fields) fields.name = String(fields.name || '').trim().slice(0, 120);
+    if ('kind' in fields && !BENCHMARK_KINDS.has(fields.kind)) fields.kind = 'other';
+    if ('scoring' in fields) fields.scoring = normalizeScoring(fields.scoring);
+  }
+}
+
+async function loadWorkoutRange(env, user, from, to, classTypeId) {
+  const scope = workoutReadScope(user);
+  const where = [`json_extract(data,'$.date') >= ?`, `json_extract(data,'$.date') <= ?`];
+  const binds = [from, to];
+  if (classTypeId !== undefined) {
+    if (classTypeId === null) where.push(`json_extract(data,'$.class_type_id') IS NULL`);
+    else { where.push(`json_extract(data,'$.class_type_id') = ?`); binds.push(classTypeId); }
+  }
+  if (scope) { where.push(scope.sql); binds.push(...scope.binds); }
+  const rows = await selectEntities(env, 'Workout', where.join(' AND '), binds);
+  rows.sort((a, b) => (a.date === b.date ? (a.class_type_id ? 1 : 0) - (b.class_type_id ? 1 : 0) : a.date < b.date ? -1 : 1));
+  return rows.map((w) => workoutFor(user, w));
+}
+
+// Movement and benchmark names the workouts refer to, so screens can show them.
+async function workoutRefs(env, workouts) {
+  const mids = new Set(); const bids = new Set();
+  for (const w of workouts) for (const s of w.sections || []) {
+    (s.movement_ids || []).forEach((m) => mids.add(m));
+    if (s.benchmark_id) bids.add(s.benchmark_id);
+  }
+  const pick = async (type, ids) => {
+    if (!ids.size) return {};
+    const rows = await selectEntities(env, type, `id IN (${inList([...ids])})`, [...ids]);
+    return Object.fromEntries(rows.map((r) => [r.id, r]));
+  };
+  return { movements: await pick('Movement', mids), benchmarks: await pick('Benchmark', bids) };
+}
+
+async function workoutFunction(name, payload, user, env) {
+  if (!user) return { success: false, error: 'Please sign in.' };
+  await ensureWorkoutLibrary(env);
+  const p = payload || {};
+  switch (name) {
+    case 'workoutLibrary': {
+      const movements = await selectEntities(env, 'Movement');
+      const benchmarks = await selectEntities(env, 'Benchmark');
+      const byName = (a, b) => String(a.name).localeCompare(String(b.name));
+      return { success: true, movements: movements.sort(byName), benchmarks: benchmarks.sort(byName), publish_defaults: await workoutPublishDefaults(env) };
+    }
+    case 'listWorkouts': {
+      const from = isDateKey(p.from) ? p.from : programToday();
+      const to = isDateKey(p.to) ? p.to : pAddDays(from, 6);
+      if (pDaysBetween(from, to) > 92 || to < from) return { success: false, error: 'Pick a range of up to three months.' };
+      const workouts = await loadWorkoutRange(env, user, from, to, p.class_type_id === undefined ? undefined : (p.class_type_id || null));
+      return { success: true, from, to, workouts, publish_defaults: await workoutPublishDefaults(env) };
+    }
+    case 'saveWorkout': {
+      if (!managesWorkouts(user)) return NO_PERMISSION;
+      const existing = p.id ? await getEntityById(env, 'Workout', p.id) : null;
+      if (p.id && !existing) return { success: false, error: 'That workout is gone. Refresh and try again.' };
+      const date = p.date ?? existing?.date;
+      if (!isDateKey(date)) return { success: false, error: 'Pick a date for the workout.' };
+      const classTypeId = 'class_type_id' in p ? (p.class_type_id || null) : (existing?.class_type_id ?? null);
+      if (classTypeId && !(await getEntityById(env, 'ClassType', classTypeId))) return { success: false, error: 'That class type no longer exists.' };
+      const status = p.status === 'published' ? 'published' : p.status === 'draft' ? 'draft' : (existing?.status || 'draft');
+      let publishAt = 'publish_at' in p ? (p.publish_at === 'default' ? await defaultPublishAt(env, date) : toIsoOrNull(p.publish_at)) : (existing?.publish_at ?? null);
+      if (publishAt === undefined) return { success: false, error: 'That publish time is not valid.' };
+      if (status === 'draft' && !('publish_at' in p)) publishAt = existing?.publish_at ?? null;
+      const clash = await env.DB.prepare(
+        `SELECT id FROM entities WHERE entity_type='Workout' AND json_extract(data,'$.date') = ?
+         AND COALESCE(json_extract(data,'$.class_type_id'),'') = ? AND id <> ? LIMIT 1`
+      ).bind(date, classTypeId || '', existing?.id || '').first();
+      if (clash) return { success: false, error: 'There is already a workout for that day and class. Edit that one instead.', code: 'duplicate', id: clash.id };
+      const data = {
+        date,
+        class_type_id: classTypeId,
+        title: String(p.title ?? existing?.title ?? '').slice(0, 200),
+        sections: normalizeSections(p.sections ?? existing?.sections),
+        coach_notes: String(p.coach_notes ?? existing?.coach_notes ?? '').slice(0, 5000),
+        status,
+        publish_at: publishAt,
+      };
+      let saved;
+      if (existing) saved = await patchEntity(env, existing, data);
+      else saved = await insertEntity(env, 'Workout', data, user.email);
+      await audit(env, { actor: user.email, action: existing ? 'workout_updated' : 'workout_created', target: 'Workout', targetId: saved.id, detail: `${date} ${status}` });
+      return { success: true, workout: saved };
+    }
+    case 'deleteWorkout': {
+      if (!managesWorkouts(user)) return NO_PERMISSION;
+      const w = await getEntityById(env, 'Workout', p.id);
+      if (!w) return { success: false, error: 'That workout is already gone.' };
+      await env.DB.prepare(`DELETE FROM entities WHERE id = ? AND entity_type='Workout'`).bind(w.id).run();
+      await audit(env, { actor: user.email, action: 'workout_deleted', target: 'Workout', targetId: w.id, detail: w.date });
+      return { success: true };
+    }
+    case 'copyWorkouts': {
+      if (!managesWorkouts(user)) return NO_PERMISSION;
+      const days = Math.round(Number(p.days) || 7);
+      if (!isDateKey(p.from_date) || !isDateKey(p.to_date)) return { success: false, error: 'Pick the dates to copy from and to.' };
+      if (days < 1 || days > 31) return { success: false, error: 'Copy between 1 and 31 days.' };
+      const shift = pDaysBetween(p.from_date, p.to_date);
+      if (shift === 0) return { success: false, error: 'Pick a different start date.' };
+      const source = await selectEntities(env, 'Workout', `json_extract(data,'$.date') >= ? AND json_extract(data,'$.date') <= ?`, [p.from_date, pAddDays(p.from_date, days - 1)]);
+      const created = []; const skipped = [];
+      for (const w of source) {
+        const date = pAddDays(w.date, shift);
+        const clash = await env.DB.prepare(
+          `SELECT id FROM entities WHERE entity_type='Workout' AND json_extract(data,'$.date') = ? AND COALESCE(json_extract(data,'$.class_type_id'),'') = ? LIMIT 1`
+        ).bind(date, w.class_type_id || '').first();
+        if (clash) { skipped.push({ date, class_type_id: w.class_type_id || null }); continue; }
+        created.push(await insertEntity(env, 'Workout', {
+          date, class_type_id: w.class_type_id || null, title: w.title || '', sections: normalizeSections(w.sections),
+          coach_notes: w.coach_notes || '', status: 'draft', publish_at: null,
+        }, user.email));
+      }
+      await audit(env, { actor: user.email, action: 'workouts_copied', target: 'Workout', detail: `${p.from_date} +${days}d -> ${p.to_date}: ${created.length} made, ${skipped.length} skipped` });
+      return { success: true, created, skipped };
+    }
+    case 'todayWorkout': {
+      const date = isDateKey(p.date) ? p.date : programToday();
+      const nowIso = nowISO();
+      const preview = p.include_drafts === true && managesWorkouts(user);
+      const all = (await selectEntities(env, 'Workout', `json_extract(data,'$.date') = ?`, [date]))
+        .filter((w) => preview || workoutVisibleNow(w, nowIso));
+      let typeIds = p.class_type_id ? [p.class_type_id] : [];
+      if (!typeIds.length && !isStaff(user)) {
+        // The member's own booked classes that day decide which version they see.
+        const ids = await myClientIds(env, user);
+        const kids = ids.length ? (await guardedChildren(env, ids)).map((c) => c.id) : [];
+        const cids = [...ids, ...kids];
+        if (cids.length) {
+          const { results } = await env.DB.prepare(
+            `SELECT DISTINCT json_extract(s.data,'$.class_type_id') AS t FROM entities r JOIN entities s ON s.id = json_extract(r.data,'$.session_id') AND s.entity_type='ClassSession'
+             WHERE r.entity_type='Reservation' AND json_extract(r.data,'$.client_id') IN (${inList(cids)})
+             AND json_extract(r.data,'$.status') IN (${sqlStr(ACTIVE_RES)}) AND json_extract(s.data,'$.date') = ?`
+          ).bind(...cids, date).all();
+          typeIds = results.map((r) => r.t).filter(Boolean);
+        }
+      }
+      let picked;
+      if (typeIds.length) {
+        const general = all.find((w) => !w.class_type_id);
+        const seen = new Set();
+        picked = [];
+        for (const t of typeIds) {
+          const w = all.find((x) => x.class_type_id === t) || general;
+          if (w && !seen.has(w.id)) { seen.add(w.id); picked.push(w); }
+        }
+      } else {
+        picked = all.sort((a, b) => (a.class_type_id ? 1 : 0) - (b.class_type_id ? 1 : 0));
+      }
+      picked = picked.map((w) => workoutFor(user, w));
+      return { success: true, date, workouts: picked, ...(await workoutRefs(env, picked)) };
+    }
+    default:
+      return { success: false, error: 'Unknown function.' };
+  }
+}
+// ===== end Phase 3: editor =====
 
 /* ------------------------------ functions ------------------------------- */
 
@@ -4234,6 +4546,16 @@ async function runFunction(name, payload, ctx) {
       return runClassTick(env);
     }
 
+    // ===== Phase 3: editor (cases) =====
+    case 'workoutLibrary':
+    case 'listWorkouts':
+    case 'saveWorkout':
+    case 'deleteWorkout':
+    case 'copyWorkouts':
+    case 'todayWorkout':
+      return workoutFunction(name, payload, user, env);
+    // ===== end Phase 3: editor (cases) =====
+
     // Content browse helpers — empty until curated content sources are added.
     case 'getCuratedRecipes':
     case 'searchResourceSources':
@@ -4629,6 +4951,7 @@ async function ensureSchema(env) {
   ];
   for (const s of stmts) await env.DB.prepare(s).run();
   await seedCoachingContent(env);
+  await ensureWorkoutLibrary(env); // Phase 3 editor: sample movements + benchmarks
   schemaReady = true;
 }
 
@@ -5380,6 +5703,7 @@ export async function onRequest(context) {
             }
             if (type === 'ClassSession' && isStaff(user)) await normalizeClassSession(env, fields, null);
             if (type === 'Membership' && isStaff(user)) await normalizeMembership(env, fields);
+            if (type === 'Movement' || type === 'Benchmark') normalizeLibraryFields(type, fields); // Phase 3 editor
             prepared.push(fields);
           }
           for (const fields of prepared) {
@@ -5425,6 +5749,7 @@ export async function onRequest(context) {
           if (staffLimit) return err(staffLimit, 403);
           if (sharedWriteDenied(type, row, user, fields)) return err('Only the author can edit this.', 403);
           if (type === 'ClassSession' && isStaff(user)) await normalizeClassSession(env, fields, data);
+          if (type === 'Movement' || type === 'Benchmark') normalizeLibraryFields(type, fields); // Phase 3 editor
           const merged = { ...data, ...fields };
           const now = nowISO();
           await env.DB.prepare('UPDATE entities SET data=?, updated_date=? WHERE id=?')

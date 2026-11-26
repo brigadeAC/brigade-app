@@ -57,6 +57,8 @@ const TrainerExpenses = lazy(() => import('./pages/TrainerExpenses'));
 const TrainerJournalInsights = lazy(() => import('./pages/TrainerJournalInsights'));
 const WaitingList = lazy(() => import('./pages/WaitingList'));
 const Workouts = lazy(() => import('./pages/Workouts'));
+const DailyWorkouts = lazy(() => import('./pages/DailyWorkouts'));
+const MovementLibrary = lazy(() => import('./pages/MovementLibrary'));
 
 
 export const PAGES = {
@@ -115,6 +117,8 @@ export const PAGES = {
     "TrainerJournalInsights": TrainerJournalInsights,
     "WaitingList": WaitingList,
     "Workouts": Workouts,
+    "DailyWorkouts": DailyWorkouts,
+    "MovementLibrary": MovementLibrary,
 }
 
 export const pagesConfig = {
