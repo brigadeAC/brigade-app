@@ -19,8 +19,9 @@ export default function PageNotFound({}) {
         }
     });
 
+    // Old links may say /login; send them to the real sign-in page instead of reloading forever.
     if (pageName.startsWith('login')) {
-        window.location.reload();
+        window.location.replace('/Login' + window.location.search);
         return null;
     }
     

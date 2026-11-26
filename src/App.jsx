@@ -36,7 +36,7 @@ const AuthenticatedApp = () => {
   const location = useLocation();
 
   // Public, standalone routes — rendered without the app Layout or auth gate.
-  if (location.pathname === '/Login') {
+  if (location.pathname.toLowerCase().replace(/\/+$/, '') === '/login') {
     return <Login />;
   }
 
