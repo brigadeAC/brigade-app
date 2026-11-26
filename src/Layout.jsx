@@ -38,6 +38,7 @@ import {
   Sparkles,
   Trophy
 } from "lucide-react";
+import { Dumbbell } from "lucide-react"; // Phase 3 editor
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
@@ -73,6 +74,8 @@ const navGroups = [
       { name: "Classes", icon: CalendarCheck, page: "Classes" },
       { name: "Class Setup", icon: SlidersHorizontal, page: "ClassSetup" },
       { name: "Class Reports", icon: BarChart3, page: "ClassReports" },
+      { name: "Daily Workouts", icon: Dumbbell, page: "DailyWorkouts" },
+      { name: "Movement Library", icon: Library, page: "MovementLibrary" },
       { name: "Leaderboard", icon: Trophy, page: "Leaderboard" },
       { name: "Ask Brigade", icon: Sparkles, page: "AskBrigade" }
     ]
@@ -137,6 +140,8 @@ const adminNavGroups = [
       { name: 'Classes', icon: CalendarCheck, page: 'Classes' },
       { name: 'Class Setup', icon: SlidersHorizontal, page: 'ClassSetup' },
       { name: 'Class Reports', icon: BarChart3, page: 'ClassReports' },
+      { name: 'Daily Workouts', icon: Dumbbell, page: 'DailyWorkouts' },
+      { name: 'Movement Library', icon: Library, page: 'MovementLibrary' },
       { name: 'Leaderboard', icon: Trophy, page: 'Leaderboard' },
       { name: 'Ask Brigade', icon: Sparkles, page: 'AskBrigade' },
     ]

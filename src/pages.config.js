@@ -60,6 +60,8 @@ const WaitingList = lazy(() => import('./pages/WaitingList'));
 const Workouts = lazy(() => import('./pages/Workouts'));
 const TodaysWorkout = lazy(() => import('./pages/TodaysWorkout'));
 const Leaderboard = lazy(() => import('./pages/Leaderboard'));
+const DailyWorkouts = lazy(() => import('./pages/DailyWorkouts'));
+const MovementLibrary = lazy(() => import('./pages/MovementLibrary'));
 
 
 export const PAGES = {
@@ -121,6 +123,8 @@ export const PAGES = {
     "Workouts": Workouts,
     "TodaysWorkout": TodaysWorkout,
     "Leaderboard": Leaderboard,
+    "DailyWorkouts": DailyWorkouts,
+    "MovementLibrary": MovementLibrary,
 }
 
 export const pagesConfig = {
