@@ -17,7 +17,9 @@ const freePort = () => new Promise((resolve, reject) => {
   srv.listen(0, '127.0.0.1', () => { const { port } = srv.address(); srv.close(() => resolve(port)); });
 });
 
-export async function startServer(port) {
+// startServer(port?, { vars }?) — vars are extra env values for the API, e.g.
+// { STRIPE_SECRET_KEY: 'sk_test_fake', STRIPE_WEBHOOK_SECRET: 'whsec_fake', STRIPE_API_BASE: fake.url }.
+export async function startServer(port, { vars = {} } = {}) {
   port = port || Number(process.env.TEST_PORT) || await freePort();
   const dir = mkdtempSync(path.join(tmpdir(), 'brigade-test-'));
   mkdirSync(path.join(dir, 'dist'));
@@ -28,7 +30,7 @@ export async function startServer(port) {
     name: 'brigade-test', compatibility_date: flags[1], compatibility_flags: ['nodejs_compat'], pages_build_output_dir: './dist',
     d1_databases: [{ binding: 'DB', database_name: 'brigade-test', database_id: '00000000-0000-0000-0000-000000000000' }],
   }));
-  writeFileSync(path.join(dir, '.dev.vars'), `AUTH_SECRET=test-secret\nADMIN_EMAILS=${ADMIN.email}, second.admin@example.test\nCRON_SECRET=${CRON_SECRET}\n`);
+  writeFileSync(path.join(dir, '.dev.vars'), `AUTH_SECRET=test-secret\nADMIN_EMAILS=${ADMIN.email}, second.admin@example.test\nCRON_SECRET=${CRON_SECRET}\n${Object.entries(vars).map(([k, v]) => `${k}=${v}\n`).join('')}`);
   const child = spawn(path.join(ROOT, 'node_modules', '.bin', 'wrangler'),
     ['pages', 'dev', 'dist', '--port', String(port), '--persist-to', path.join(dir, 'state')],
     { cwd: dir, env: { ...process.env, CI: '1', WRANGLER_SEND_METRICS: 'false', CLOUDFLARE_API_TOKEN: '' }, detached: true });

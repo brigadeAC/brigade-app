@@ -359,8 +359,10 @@ async function attachRights(env, user) {
  * - Money (rates, prices, payments): managers and admins only. */
 const MONEY_FIELDS = ['price', 'price_label', 'price_cents', 'rate', 'rate_cents', 'amount', 'amount_cents', 'balance', 'balance_cents',
   'billing', 'payment', 'payments', 'payment_method', 'payment_status', 'last_payment', 'last_payment_date', 'next_payment', 'next_payment_date',
-  'stripe_customer_id', 'stripe_subscription_id', 'card_last4', 'card_brand', 'autopay', 'discount', 'invoice', 'invoices', 'failed_payments'];
-const MONEY_TYPES = new Set(['Client', 'Membership', 'MembershipPlan']);
+  'stripe_customer_id', 'stripe_subscription_id', 'card_last4', 'card_brand', 'autopay', 'discount', 'invoice', 'invoices', 'failed_payments',
+  'billing_status', 'tax_cents', 'discount_cents', 'refunded_cents', 'buyout_cents', 'bank_discount_pct', 'tax_rate_pct', 'stripe_product_id', 'stripe_price_id', 'stripe_price_bank_id', 'stripe_price_signature', 'stripe_tax_rate_id', 'stripe_invoice_id', 'stripe_payment_intent_id', // Phase 4 CORE
+];
+const MONEY_TYPES = new Set(['Client', 'Membership', 'MembershipPlan', 'Payment']);
 const HEALTH_FIELDS = ['medical_notes', 'injuries', 'medical_conditions', 'medications', 'allergies', 'health_notes', 'health_history',
   'parq', 'emergency_notes', 'body_fat', 'weight', 'measurements', 'notes'];
 // Coaching-detail records about a member, keyed by client_id.
@@ -430,7 +432,8 @@ const TYPE_PERMISSION = {
 };
 const isMemberUser = (user) => !!user && user.role !== 'admin' && (user.user_type === 'client' || user.user_type === 'independent');
 const staffWriteDenied = (type, user) => ((STAFF_LIBRARY_TYPES.has(type) || STAFF_WRITE_TYPES.has(type)) && !isStaff(user))
-  || (TYPE_PERMISSION[type] && isStaff(user) && !can(user, TYPE_PERMISSION[type]));
+  || (TYPE_PERMISSION[type] && isStaff(user) && !can(user, TYPE_PERMISSION[type]))
+  || GYM_BILLING_WRITE_LOCKED.has(type); // Phase 4 CORE: Payment rows come only from Stripe
 
 // Ownership scoping: admins see everything; everyone else only rows they own —
 // rows they created, rows assigned to them as trainer, or rows about them as
@@ -542,7 +545,7 @@ const ACTIVE_SUB_STATUSES = new Set(['active', 'trialing', 'past_due']);
 async function stripe(env, path, { method = 'POST', data } = {}) {
   if (!env.STRIPE_SECRET_KEY) throw new Error('Stripe is not configured.');
   const body = data ? new URLSearchParams(flattenForStripe(data)).toString() : undefined;
-  const resp = await fetch(`https://api.stripe.com/v1/${path}`, {
+  const resp = await fetch(`${String(env.STRIPE_API_BASE || 'https://api.stripe.com').replace(/\/$/, '')}/v1/${path}`, { // base overridable for tests (Phase 4 CORE)
     method,
     headers: {
       authorization: `Bearer ${env.STRIPE_SECRET_KEY}`,
@@ -670,6 +673,7 @@ const COACH_PRIVATE_TYPES = new Set(['ClientNote', 'ClientNotebookPage']);
 
 async function entityScope(env, type, user) {
   if (type === 'Workout') return workoutReadScope(user); // Phase 3 editor
+  if (type === 'Payment') return paymentReadScope(user); // Phase 4 CORE
   if (SHARED_TYPES.has(type) || STAFF_LIBRARY_TYPES.has(type)) return null;
   if (isStaff(user) && !STAFF_PRIVATE_TYPES.has(type)) {
     if (COACHING_DETAIL_TYPES.has(type) && !seesAllCoaching(user)) {
@@ -1928,7 +1932,7 @@ function membershipCoversDate(m, date) {
 const membershipCoversType = (m, typeId) => !Array.isArray(m.class_type_ids) || m.class_type_ids.length === 0 || m.class_type_ids.includes(typeId);
 function membershipLimit(m) {
   if (NO_LIMIT_KINDS.has(m.kind)) return null;
-  if (m.kind === 'punch' || m.kind === 'drop_in' || m.limit_period === 'total') {
+  if (m.kind === 'punch' || m.kind === 'punch_card' || m.kind === 'drop_in' || m.limit_period === 'total') {
     return { period: 'total', count: numOr(m.sessions_total, numOr(m.limit_count, 0)) };
   }
   if ((m.limit_period === 'week' || m.limit_period === 'month') && numOr(m.limit_count, null) !== null) {
@@ -2897,6 +2901,7 @@ async function normalizeMembership(env, fields) {
       fields.end_date = pAddDays(fields.start_date, Number(plan.duration_days) - 1);
     }
   }
+  gymBillingMembershipDefaults(fields, plan); // Phase 4 CORE
   fill('start_date', programToday());
   fill('end_date', null);
   fill('sessions_used', 0);
@@ -4594,6 +4599,7 @@ async function runFunction(name, payload, ctx) {
         if (!staff) return { success: false, error: who.guardianId ? `${shortName(who.client.full_name)} needs a signed waiver before booking. Ask the front desk.` : 'Sign the liability waiver before booking a class. You can find it under Documents.', code: 'waiver_required' };
         warnings.push('No signed waiver on file.');
       }
+      { const bb = await gymBillingBookingBlock(env, who, staff); if (bb && !override) return bb; if (bb) warnings.push('Payment past due (staff override).'); } // Phase 4 CORE
       let reservation = null;
       for (let attempt = 0; attempt < 3 && !reservation; attempt++) {
         const pick = await findClassMembership(env, who, session, s);
@@ -4867,6 +4873,10 @@ async function runFunction(name, payload, ctx) {
     case 'getCuratedRecipes':
     case 'searchResourceSources':
       return { results: [], items: [], recipes: [] };
+
+    // Phase 4 CORE: gym billing
+    case 'billingStatus': case 'syncPlanToStripe': case 'startCheckout': case 'billingPortal': case 'myBilling':
+      return runGymBillingFunction(name, payload, ctx);
 
     default:
       return { __unimplemented: true };
@@ -5174,6 +5184,534 @@ async function runMemberScoreFunction(name, payload, { env, user }) {
   }
 }
 // ===== end Phase 3: MEMBER =====
+
+// ===== Phase 4: CORE =====
+// Gym billing: Stripe holds the cards, runs autopay and retries failures; the
+// app reads whether a membership is paid. Everything works with no Stripe key
+// (billing "isn't connected yet"). All Stripe calls go through stripe(), whose
+// base URL tests point at a fake (STRIPE_API_BASE).
+//
+// Plan `kind` keeps the booking vocabulary it already had (unlimited, limited,
+// punch, drop_in, intro, comp). The billing contract's kinds (membership,
+// drop_in, trial, intro, punch_card) are also accepted. planBillingKind()
+// maps either one to the contract's kind; use it, not plan.kind, for billing.
+const GYM_BILLING_DEFAULTS = { bank_discount_pct: 2.89, tax_rate_pct: 2.98 };
+const BILLING_STATUSES = new Set(['none', 'active', 'past_due', 'paused', 'canceled', 'unpaid', 'comped']);
+const BILLING_BLOCKED = new Set(['past_due', 'unpaid']);
+// Rows written only by the server (webhooks, refunds): no entity-API writes.
+const GYM_BILLING_WRITE_LOCKED = new Set(['Payment']);
+const GYM_BILLING_NOT_CONNECTED = { success: false, error: 'Billing isn\'t connected yet.', code: 'billing_not_connected' };
+
+const billingConnected = (env) => !!env.STRIPE_SECRET_KEY;
+const billingMode = (env) => {
+  const k = String(env.STRIPE_SECRET_KEY || '');
+  if (!k) return null;
+  return /^(sk|rk)_live_/.test(k) ? 'live' : 'test';
+};
+function planBillingKind(plan) {
+  const k = plan?.kind;
+  if (['membership', 'drop_in', 'trial', 'intro', 'punch_card'].includes(k)) return k;
+  if (k === 'punch') return 'punch_card';
+  if (k === 'comp') return 'comp';
+  return 'membership'; // unlimited, limited, or not set
+}
+const planInterval = (plan) => (['month', 'year', 'week', 'once'].includes(plan?.interval) ? plan.interval : 'month');
+const centsOf = (v) => (Number.isFinite(Number(v)) ? Math.round(Number(v)) : 0);
+
+async function gymBillingSettings(env) {
+  const row = parseRow(await env.DB.prepare(
+    `SELECT * FROM entities WHERE entity_type='GymSettings' ORDER BY created_date ASC LIMIT 1`
+  ).first());
+  return {
+    tax_rate_pct: numOr(row?.tax_rate_pct, GYM_BILLING_DEFAULTS.tax_rate_pct),
+    bank_discount_pct: numOr(row?.bank_discount_pct, GYM_BILLING_DEFAULTS.bank_discount_pct),
+    retry_notice_text: row?.retry_notice_text || '',
+  };
+}
+// Plan's own percentages win; the gym setting is the fallback.
+async function planRates(env, plan) {
+  const g = await gymBillingSettings(env);
+  return {
+    tax_rate_pct: numOr(plan?.tax_rate_pct, g.tax_rate_pct),
+    bank_discount_pct: numOr(plan?.bank_discount_pct, g.bank_discount_pct),
+  };
+}
+const bankPriceCents = (cents, pct) => Math.max(0, Math.round(cents * (1 - pct / 100)));
+
+// Unix seconds -> gym date key.
+const unixToKey = (unix) => (Number(unix) > 0 ? programToday(Number(unix) * 1000) : null);
+function addMonthsKey(key, months) {
+  const [y, m, d] = key.split('-').map(Number);
+  const last = new Date(Date.UTC(y, m - 1 + months + 1, 0)).getUTCDate();
+  return new Date(Date.UTC(y, m - 1 + months, Math.min(d, last))).toISOString().slice(0, 10);
+}
+const idOf = (v) => (typeof v === 'string' ? v : v?.id || null);
+
+// Membership defaults (hooked into normalizeMembership for staff creates).
+function gymBillingMembershipDefaults(fields, plan) {
+  if (fields.billing_status === undefined || !BILLING_STATUSES.has(fields.billing_status)) fields.billing_status = 'none';
+  if (fields.failed_payments === undefined) fields.failed_payments = 0;
+  if (fields.commitment_ends === undefined) {
+    const months = numOr(plan?.commitment_months, 0);
+    fields.commitment_ends = months > 0 && isDateKey(fields.start_date) ? addMonthsKey(fields.start_date, months) : null;
+  }
+}
+
+// Payment rows: admins and staff with billing.view. Members get theirs only
+// through myBilling.
+function paymentReadScope(user) {
+  if (isStaff(user) && can(user, 'billing.view')) return null;
+  return { sql: '0', binds: [] };
+}
+
+// Booking rule: a Stripe-linked membership that is past due or unpaid can't
+// book. Only when billing is connected; memberships with no Stripe link are
+// untouched. -> null | failure result (staff get can_override).
+async function gymBillingBookingBlock(env, who, staff) {
+  if (!billingConnected(env)) return null;
+  const all = await clientMemberships(env, who);
+  const bad = all.find((m) => m.stripe_subscription_id && BILLING_BLOCKED.has(m.billing_status) && m.status !== 'ended');
+  if (!bad) return null;
+  return staff
+    ? { success: false, error: 'This client\'s payment didn\'t go through. Ask them to update their card.', code: 'payment_past_due', can_override: true }
+    : { success: false, error: 'Your payment didn\'t go through. Update your card to book.', code: 'payment_past_due' };
+}
+
+// The Stripe tax rate for a percentage (rates can't change, so one per pct).
+async function stripeTaxRateFor(env, pct) {
+  const key = `stripe_tax_rate:${pct}`;
+  const saved = (await getState(env, key))?.value;
+  if (saved) return saved;
+  const tr = await stripe(env, 'tax_rates', { data: { display_name: 'Sales tax', percentage: pct, inclusive: false, metadata: { brigade: 'gym' } } });
+  await setState(env, key, tr.id);
+  return tr.id;
+}
+
+// Create or update the plan's Stripe product, card price, bank price and tax
+// rate. Prices can't change in Stripe, so a changed amount makes new prices
+// and archives the old ones. Returns the patched plan.
+async function syncPlan(env, plan) {
+  const price = centsOf(plan.price_cents);
+  if (!(price > 0)) throw Object.assign(new Error('Set a price for this plan first.'), { code: 'no_price' });
+  const interval = planInterval(plan);
+  const count = Math.max(1, Math.round(numOr(plan.interval_count, 1)));
+  const rates = await planRates(env, plan);
+  const bank = bankPriceCents(price, rates.bank_discount_pct);
+  const meta = { brigade: 'gym', plan_id: plan.id };
+  const patch = {};
+  if (plan.stripe_product_id) {
+    await stripe(env, `products/${plan.stripe_product_id}`, { data: { name: plan.name || 'Membership', active: plan.is_active !== false } });
+  } else {
+    const prod = await stripe(env, 'products', { data: { name: plan.name || 'Membership', metadata: meta } });
+    patch.stripe_product_id = prod.id;
+  }
+  const product = patch.stripe_product_id || plan.stripe_product_id;
+  const signature = `${price}|${bank}|${interval}|${count}`;
+  if (signature !== plan.stripe_price_signature || !plan.stripe_price_id || !plan.stripe_price_bank_id) {
+    const recurring = interval === 'once' ? undefined : { interval, interval_count: count };
+    const card = await stripe(env, 'prices', { data: { product, currency: 'usd', unit_amount: price, recurring, nickname: 'Card', metadata: { ...meta, method: 'card' } } });
+    const bankP = await stripe(env, 'prices', { data: { product, currency: 'usd', unit_amount: bank, recurring, nickname: 'Bank', metadata: { ...meta, method: 'bank' } } });
+    for (const old of [plan.stripe_price_id, plan.stripe_price_bank_id]) {
+      if (old) await stripe(env, `prices/${old}`, { data: { active: false } }).catch(() => null);
+    }
+    Object.assign(patch, { stripe_price_id: card.id, stripe_price_bank_id: bankP.id, stripe_price_signature: signature });
+  }
+  patch.stripe_tax_rate_id = await stripeTaxRateFor(env, rates.tax_rate_pct);
+  const fresh = await getEntityById(env, 'MembershipPlan', plan.id);
+  await patchEntity(env, fresh, patch);
+  return { ...fresh, ...patch };
+}
+
+// The client's Stripe customer: saved on the Client (or a membership), else new.
+async function stripeCustomerFor(env, client) {
+  if (client.stripe_customer_id) return client.stripe_customer_id;
+  const mems = await selectEntities(env, 'Membership', `json_extract(data,'$.client_id') = ? AND json_extract(data,'$.stripe_customer_id') IS NOT NULL`, [client.id]);
+  let id = mems[0]?.stripe_customer_id;
+  if (!id) {
+    const c = await stripe(env, 'customers', { data: { email: client.email || undefined, name: client.full_name || undefined, phone: client.phone || undefined, metadata: { brigade: 'gym', client_id: client.id } } });
+    id = c.id;
+  }
+  const fresh = await getEntityById(env, 'Client', client.id);
+  if (fresh) await patchEntity(env, fresh, { stripe_customer_id: id });
+  return id;
+}
+
+/* Internal: start a Stripe Checkout for a plan. Used by startCheckout and by
+ * SALES' publicCheckout. No permission checks here: callers do them.
+ *   createCheckoutSession(env, { plan, client, method: 'card'|'bank', promo_code?,
+ *     agreement_id?, membership_id?, success_url, cancel_url })
+ *   -> { success: true, url, session_id } | { success: false, error, code }
+ * Recurring plans -> subscription mode; interval 'once' -> payment mode. Bank
+ * uses the plan's bank price. The tax rate is applied; promo codes are allowed
+ * (or the given one is applied). Kind 'membership' needs a signed Agreement. */
+async function createCheckoutSession(env, { plan, client, method = 'card', promo_code, agreement_id, membership_id, success_url, cancel_url } = {}) {
+  if (!billingConnected(env)) return GYM_BILLING_NOT_CONNECTED;
+  if (!plan || !client) return { success: false, error: 'Plan or member not found.', code: 'not_found' };
+  if (plan.is_active === false) return { success: false, error: 'That plan isn\'t available.', code: 'plan_inactive' };
+  if (!(centsOf(plan.price_cents) > 0)) return { success: false, error: 'That plan has no price yet.', code: 'no_price' };
+  const bank = method === 'bank';
+  if (typeof requireAgreement === 'function') { // RULES owns the agreement rule
+    // eslint-disable-next-line no-undef
+    const no = await requireAgreement(env, plan, agreement_id, { client_id: client.id });
+    if (no) return no;
+  } else if (planBillingKind(plan) === 'membership') { // fallback until RULES is merged
+    const ag = agreement_id ? await getEntityById(env, 'Agreement', agreement_id) : null;
+    if (!ag || ag.client_id !== client.id || (ag.plan_id && ag.plan_id !== plan.id)) {
+      return { success: false, error: 'Sign the membership agreement first.', code: 'agreement_required' };
+    }
+  }
+  try {
+    const rates = await planRates(env, plan);
+    const sig = `${centsOf(plan.price_cents)}|${bankPriceCents(centsOf(plan.price_cents), rates.bank_discount_pct)}|${planInterval(plan)}|${Math.max(1, Math.round(numOr(plan.interval_count, 1)))}`;
+    let p = plan;
+    if (!p.stripe_price_id || !p.stripe_price_bank_id || p.stripe_price_signature !== sig || !p.stripe_tax_rate_id) p = await syncPlan(env, plan);
+    const taxRate = await stripeTaxRateFor(env, rates.tax_rate_pct);
+    let discounts;
+    if (promo_code) {
+      const found = await stripe(env, `promotion_codes?code=${encodeURIComponent(String(promo_code).trim())}&active=true&limit=1`, { method: 'GET' });
+      const promo = found?.data?.[0];
+      if (!promo) return { success: false, error: 'That promo code isn\'t valid.', code: 'bad_promo' };
+      discounts = [{ promotion_code: promo.id }];
+    }
+    const customer = await stripeCustomerFor(env, client);
+    const once = planInterval(p) === 'once';
+    const metadata = { brigade: 'gym', client_id: client.id, plan_id: p.id, membership_id: membership_id || undefined, agreement_id: agreement_id || undefined, method: bank ? 'bank' : 'card' };
+    const session = await stripe(env, 'checkout/sessions', {
+      data: {
+        mode: once ? 'payment' : 'subscription',
+        customer,
+        client_reference_id: client.id,
+        payment_method_types: [bank ? 'us_bank_account' : 'card'],
+        line_items: [{ price: bank ? p.stripe_price_bank_id : p.stripe_price_id, quantity: 1, tax_rates: [taxRate] }],
+        ...(discounts ? { discounts } : { allow_promotion_codes: true }),
+        metadata,
+        ...(once ? { payment_intent_data: { metadata } } : { subscription_data: { metadata } }),
+        success_url, cancel_url,
+      },
+    });
+    return { success: true, url: session.url, session_id: session.id };
+  } catch (e) {
+    return { success: false, error: e?.code === 'no_price' ? e.message : 'Couldn\'t start checkout. Try again.', code: e?.code || 'stripe_error', detail: String(e?.message || e).slice(0, 200) };
+  }
+}
+
+// Which client a billing call is about: members -> themselves (or a linked
+// child); staff -> client_id, with billing.view (and members.manage to change).
+async function billingWho(env, user, clientId, { change = false } = {}) {
+  if (isStaff(user)) {
+    if (!can(user, 'billing.view') || (change && !can(user, 'members.manage'))) return { denied: true };
+  }
+  return resolveClassClient(env, user, clientId);
+}
+
+const membershipBillingSummary = (m) => ({
+  id: m.id, plan_id: m.plan_id || null, plan_name: m.plan_name || '', status: m.status || 'active',
+  start_date: m.start_date || null, end_date: m.end_date || null,
+  billing_status: m.billing_status || 'none', payment_method: m.payment_method || null,
+  card_brand: m.card_brand || null, card_last4: m.card_last4 || null,
+  next_payment_date: m.next_payment_date || null, last_payment_date: m.last_payment_date || null,
+  commitment_ends: m.commitment_ends || null, failed_payments: numOr(m.failed_payments, 0),
+  stripe_linked: !!m.stripe_subscription_id,
+});
+const paymentSummary = (p) => ({
+  id: p.id, membership_id: p.membership_id || null, amount_cents: centsOf(p.amount_cents), tax_cents: centsOf(p.tax_cents),
+  discount_cents: centsOf(p.discount_cents), refunded_cents: centsOf(p.refunded_cents), status: p.status, method: p.method || null,
+  paid_at: p.paid_at || null, description: p.description || '',
+});
+
+async function runGymBillingFunction(name, payload, { env, user, url }) {
+  if (!user) return { success: false, error: 'Not logged in' };
+  const origin = appOrigin(env, url);
+  switch (name) {
+    case 'billingStatus':
+      return { success: true, connected: billingConnected(env), mode: billingMode(env) };
+
+    case 'syncPlanToStripe': {
+      if (!can(user, 'settings.manage') || !can(user, 'billing.view')) return NO_PERMISSION;
+      if (!billingConnected(env)) return GYM_BILLING_NOT_CONNECTED;
+      const ids = payload?.all ? (await selectEntities(env, 'MembershipPlan', `COALESCE(json_extract(data,'$.is_active'),1) NOT IN (0,'false')`)).filter((p) => centsOf(p.price_cents) > 0).map((p) => p.id) : [payload?.plan_id];
+      const synced = []; const failed = [];
+      for (const id of ids) {
+        const plan = await getEntityById(env, 'MembershipPlan', id);
+        if (!plan) { failed.push({ plan_id: id, error: 'Plan not found.' }); continue; }
+        try {
+          const p = await syncPlan(env, plan);
+          synced.push({ plan_id: p.id, name: p.name, stripe_product_id: p.stripe_product_id, stripe_price_id: p.stripe_price_id, stripe_price_bank_id: p.stripe_price_bank_id, stripe_tax_rate_id: p.stripe_tax_rate_id });
+          await audit(env, { actor: user.email, action: 'billing_plan_synced', target: 'MembershipPlan', targetId: p.id, detail: `${p.name}: ${p.stripe_price_id} / ${p.stripe_price_bank_id}`, request: null });
+        } catch (e) {
+          failed.push({ plan_id: id, name: plan.name, error: e?.code === 'no_price' ? e.message : 'Stripe didn\'t accept this plan.' });
+        }
+      }
+      if (!payload?.all && failed.length) return { success: false, error: failed[0].error, failed };
+      return { success: true, synced, failed, plan: synced[0] || null };
+    }
+
+    case 'startCheckout': {
+      if (!billingConnected(env)) return GYM_BILLING_NOT_CONNECTED;
+      const who = await billingWho(env, user, payload?.client_id, { change: true });
+      if (who.denied) return NO_PERMISSION;
+      if (who.error) return { success: false, error: who.error, code: 'no_client' };
+      const plan = await getEntityById(env, 'MembershipPlan', payload?.plan_id);
+      if (!plan) return { success: false, error: 'Plan not found.', code: 'not_found' };
+      const method = payload?.method === 'bank' ? 'bank' : 'card';
+      const r = await createCheckoutSession(env, {
+        plan, client: who.client, method, promo_code: payload?.promo_code || undefined, agreement_id: payload?.agreement_id || undefined,
+        membership_id: payload?.membership_id || undefined,
+        success_url: `${origin}/Settings?billing=success`, cancel_url: `${origin}/Settings?billing=cancelled`,
+      });
+      if (r.success) await audit(env, { actor: user.email, action: 'billing_checkout_started', target: 'Client', targetId: who.client.id, detail: `${plan.name} (${method})${payload?.promo_code ? ` promo ${String(payload.promo_code).slice(0, 30)}` : ''}`, request: null });
+      return r;
+    }
+
+    case 'billingPortal': {
+      if (!billingConnected(env)) return GYM_BILLING_NOT_CONNECTED;
+      const who = await billingWho(env, user, payload?.client_id);
+      if (who.denied) return NO_PERMISSION;
+      if (who.error) return { success: false, error: who.error, code: 'no_client' };
+      const mems = await clientMemberships(env, who);
+      const customer = who.client.stripe_customer_id || mems.find((m) => m.stripe_customer_id)?.stripe_customer_id;
+      if (!customer) return { success: false, error: 'There\'s no card on file yet.', code: 'no_customer' };
+      try {
+        const s = await stripe(env, 'billing_portal/sessions', { data: { customer, return_url: `${origin}/Settings` } });
+        return { success: true, url: s.url };
+      } catch {
+        return { success: false, error: 'Couldn\'t open billing. Try again.', code: 'stripe_error' };
+      }
+    }
+
+    case 'myBilling': {
+      const who = await billingWho(env, user, payload?.client_id);
+      if (who.denied) return NO_PERMISSION;
+      if (who.error) return { success: false, error: who.error, code: 'no_client' };
+      const mems = await clientMemberships(env, who);
+      const payments = (await selectEntities(env, 'Payment', `json_extract(data,'$.client_id') IN (${inList(who.clientIds)})`, who.clientIds))
+        .sort((a, b) => String(b.paid_at || b.created_date).localeCompare(String(a.paid_at || a.created_date)))
+        .slice(0, 50);
+      const memberships = mems.filter((m) => m.status !== 'ended' || m.stripe_subscription_id).map(membershipBillingSummary);
+      return {
+        success: true, connected: billingConnected(env), mode: billingMode(env),
+        client_id: who.client.id,
+        past_due: memberships.some((m) => m.stripe_linked && BILLING_BLOCKED.has(m.billing_status)),
+        has_card: !!(who.client.stripe_customer_id || mems.some((m) => m.stripe_customer_id)),
+        memberships, payments: payments.map(paymentSummary),
+      };
+    }
+    default:
+      return { __unimplemented: true };
+  }
+}
+
+/* ---- webhooks ---- */
+// Gym events carry metadata.brigade = 'gym' (set at checkout) or point at a
+// membership/payment we already know.
+const metaOf = (o) => ({ ...(o?.subscription_details?.metadata || {}), ...(o?.parent?.subscription_details?.metadata || {}), ...(o?.metadata || {}) });
+const subIdOf = (o) => idOf(o?.subscription) || idOf(o?.parent?.subscription_details?.subscription) || null;
+const piIdOf = (o) => idOf(o?.payment_intent) || idOf(o?.payments?.data?.[0]?.payment?.payment_intent) || null;
+
+async function membershipBySub(env, subId) {
+  if (!subId) return null;
+  return (await selectEntities(env, 'Membership', `json_extract(data,'$.stripe_subscription_id') = ?`, [subId]))[0] || null;
+}
+async function paymentBy(env, field, value) {
+  if (!value) return null;
+  return (await selectEntities(env, 'Payment', `json_extract(data,'$.${field}') = ?`, [value]))[0] || null;
+}
+async function isGymBillingEvent(env, event) {
+  const o = event?.data?.object || {};
+  const meta = metaOf(o);
+  if (meta.brigade === 'gym' || meta.client_id) return true;
+  if (event.type === 'charge.refunded') return !!(await paymentBy(env, 'stripe_payment_intent_id', piIdOf(o)) || await paymentBy(env, 'stripe_invoice_id', idOf(o.invoice)));
+  const sub = event.type?.startsWith('customer.subscription.') ? o.id : subIdOf(o);
+  return !!(await membershipBySub(env, sub));
+}
+
+// Card/bank details and period end from the subscription (expanded).
+async function subscriptionDetails(env, subId) {
+  try {
+    const sub = await stripe(env, `subscriptions/${subId}?expand[]=default_payment_method`, { method: 'GET' });
+    return subFields(sub);
+  } catch { return {}; }
+}
+function subFields(sub) {
+  const out = {};
+  const pm = sub?.default_payment_method;
+  if (pm && typeof pm === 'object') {
+    if (pm.card) Object.assign(out, { card_brand: pm.card.brand || null, card_last4: pm.card.last4 || null, payment_method: 'card' });
+    else if (pm.us_bank_account) Object.assign(out, { card_brand: pm.us_bank_account.bank_name || 'Bank', card_last4: pm.us_bank_account.last4 || null, payment_method: 'bank' });
+  }
+  const end = sub?.current_period_end || sub?.items?.data?.[0]?.current_period_end;
+  if (end) out.next_payment_date = unixToKey(end);
+  return out;
+}
+function statusFromSub(sub, current) {
+  if (current === 'comped') return 'comped';
+  if (sub.pause_collection) return 'paused';
+  return { active: 'active', trialing: 'active', past_due: 'past_due', unpaid: 'unpaid', canceled: 'canceled', incomplete: 'past_due', incomplete_expired: 'canceled', paused: 'paused' }[sub.status] || current || 'none';
+}
+
+async function upsertPayment(env, existing, fields) {
+  if (existing) { await patchEntity(env, existing, fields); return { ...existing, ...fields }; }
+  return insertEntity(env, 'Payment', fields, 'stripe');
+}
+
+async function notifyBillingMember(env, membership, { title, message }) {
+  const client = await getEntityById(env, 'Client', membership.client_id);
+  const login = await clientLogin(env, client);
+  if (!login) return false;
+  await insertEntity(env, 'Notification', { user_id: login.id, type: 'billing', title, message, link: '/Settings', read: false }, 'system');
+  const p = sendPushToUser(env, login.id, { title, body: String(message).slice(0, 140), url: '/Settings', tag: 'billing' });
+  if (env.__waitUntil) env.__waitUntil(p); else await p;
+  return true;
+}
+
+async function handleCheckoutCompleted(env, s) {
+  const meta = metaOf(s);
+  const client = await getEntityById(env, 'Client', meta.client_id);
+  const plan = await getEntityById(env, 'MembershipPlan', meta.plan_id);
+  if (!client || !plan) return 'unknown client or plan';
+  const subId = idOf(s.subscription);
+  const customer = idOf(s.customer);
+  const method = meta.method === 'bank' || (s.payment_method_types || []).includes('us_bank_account') ? 'bank' : 'card';
+  // Link: the membership named at checkout, the one already on this
+  // subscription, an unlinked live one on this plan, or a new one.
+  let m = (meta.membership_id && await getEntityById(env, 'Membership', meta.membership_id)) || await membershipBySub(env, subId);
+  if (!m) {
+    m = (await selectEntities(env, 'Membership', `json_extract(data,'$.client_id') = ? AND json_extract(data,'$.plan_id') = ?`, [client.id, plan.id]))
+      .find((x) => x.status !== 'ended' && !x.stripe_subscription_id && (!isDateKey(x.end_date) || x.end_date >= programToday())) || null;
+  }
+  if (!m) {
+    const fields = { client_id: client.id, plan_id: plan.id, start_date: programToday(), status: 'active' };
+    await normalizeMembership(env, fields);
+    m = await insertEntity(env, 'Membership', fields, 'stripe');
+  }
+  const patch = {
+    stripe_customer_id: customer || m.stripe_customer_id || null,
+    stripe_subscription_id: subId || m.stripe_subscription_id || null,
+    payment_method: method,
+    agreement_id: meta.agreement_id || m.agreement_id || null,
+    billing_status: subId ? 'active' : (m.billing_status || 'none'),
+    failed_payments: 0,
+  };
+  if (!m.commitment_ends && numOr(plan.commitment_months, 0) > 0) patch.commitment_ends = addMonthsKey(isDateKey(m.start_date) ? m.start_date : programToday(), Number(plan.commitment_months));
+  if (subId) Object.assign(patch, await subscriptionDetails(env, subId));
+  if (!subId && s.payment_status === 'paid') {
+    const pi = piIdOf(s);
+    await upsertPayment(env, await paymentBy(env, 'stripe_payment_intent_id', pi), {
+      client_id: client.id, membership_id: m.id, stripe_invoice_id: idOf(s.invoice), stripe_payment_intent_id: pi,
+      amount_cents: centsOf(s.amount_total), tax_cents: centsOf(s.total_details?.amount_tax), discount_cents: centsOf(s.total_details?.amount_discount),
+      refunded_cents: 0, status: 'paid', method, paid_at: s.created ? new Date(s.created * 1000).toISOString() : nowISO(), description: plan.name || 'Payment',
+    });
+    patch.last_payment_date = programToday();
+  }
+  const fresh = await getEntityById(env, 'Membership', m.id);
+  await patchEntity(env, fresh, patch);
+  if (customer && client.stripe_customer_id !== customer) await patchEntity(env, client, { stripe_customer_id: customer });
+  return `membership ${m.id} linked`;
+}
+
+async function handleInvoice(env, inv, paid) {
+  const meta = metaOf(inv);
+  const m = await membershipBySub(env, subIdOf(inv)) || (meta.membership_id && await getEntityById(env, 'Membership', meta.membership_id));
+  if (!m) return 'no membership';
+  const existing = await paymentBy(env, 'stripe_invoice_id', inv.id);
+  const taxes = Array.isArray(inv.total_taxes) ? inv.total_taxes.reduce((n, t) => n + centsOf(t.amount), 0)
+    : Array.isArray(inv.total_tax_amounts) ? inv.total_tax_amounts.reduce((n, t) => n + centsOf(t.amount), 0) : centsOf(inv.tax);
+  const discount = Array.isArray(inv.total_discount_amounts) ? inv.total_discount_amounts.reduce((n, d) => n + centsOf(d.amount), 0) : 0;
+  const line = inv.lines?.data?.[0];
+  const base = {
+    client_id: m.client_id, membership_id: m.id, stripe_invoice_id: inv.id, stripe_payment_intent_id: piIdOf(inv),
+    tax_cents: taxes, discount_cents: discount, method: m.payment_method || 'card',
+    description: line?.description || m.plan_name || 'Membership',
+  };
+  if (paid) {
+    const paidAt = inv.status_transitions?.paid_at ? new Date(inv.status_transitions.paid_at * 1000).toISOString() : nowISO();
+    await upsertPayment(env, existing, { ...base, amount_cents: centsOf(inv.amount_paid ?? inv.total), refunded_cents: centsOf(existing?.refunded_cents), status: existing?.status === 'refunded' || existing?.status === 'partially_refunded' ? existing.status : 'paid', paid_at: paidAt });
+    const patch = { failed_payments: 0, last_payment_date: programToday(Date.parse(paidAt)) };
+    if (!['comped', 'paused', 'canceled'].includes(m.billing_status)) patch.billing_status = 'active';
+    if (line?.period?.end) patch.next_payment_date = unixToKey(line.period.end);
+    await patchEntity(env, await getEntityById(env, 'Membership', m.id), patch);
+    return 'paid';
+  }
+  if (!existing || existing.status === 'failed') {
+    await upsertPayment(env, existing, { ...base, amount_cents: centsOf(inv.amount_due ?? inv.total), refunded_cents: 0, status: 'failed', paid_at: null });
+  }
+  const failed = numOr(m.failed_payments, 0) + 1;
+  await patchEntity(env, await getEntityById(env, 'Membership', m.id), { billing_status: 'past_due', failed_payments: failed });
+  const g = await gymBillingSettings(env);
+  await notifyBillingMember(env, m, {
+    title: 'Your payment didn\'t go through',
+    message: g.retry_notice_text || 'We couldn\'t take your membership payment. Update your card in Settings to keep booking classes.',
+  });
+  return `failed (${failed})`;
+}
+
+async function handleSubscription(env, sub, deleted) {
+  const m = await membershipBySub(env, sub.id) || (metaOf(sub).membership_id && await getEntityById(env, 'Membership', metaOf(sub).membership_id));
+  if (!m) return 'no membership';
+  const patch = { ...subFields(sub), stripe_subscription_id: sub.id };
+  if (deleted) {
+    patch.billing_status = m.billing_status === 'comped' ? 'comped' : 'canceled';
+    patch.next_payment_date = null;
+    if (!isDateKey(m.end_date)) patch.end_date = programToday();
+  } else {
+    patch.billing_status = statusFromSub(sub, m.billing_status);
+  }
+  await patchEntity(env, await getEntityById(env, 'Membership', m.id), patch);
+  return patch.billing_status;
+}
+
+async function handleRefund(env, charge) {
+  const p = await paymentBy(env, 'stripe_payment_intent_id', piIdOf(charge)) || await paymentBy(env, 'stripe_invoice_id', idOf(charge.invoice));
+  if (!p) return 'no payment';
+  const refunded = centsOf(charge.amount_refunded);
+  const total = centsOf(p.amount_cents) || centsOf(charge.amount);
+  await patchEntity(env, p, { refunded_cents: refunded, status: refunded >= total ? 'refunded' : refunded > 0 ? 'partially_refunded' : p.status });
+  return `refunded ${refunded}`;
+}
+
+const GYM_EVENT_TYPES = new Set(['checkout.session.completed', 'invoice.paid', 'invoice.payment_failed', 'customer.subscription.updated', 'customer.subscription.deleted', 'charge.refunded']);
+
+// Apply one verified event. Same event id twice = applied once.
+async function processGymBillingEvent(env, event, request) {
+  if (!event?.id || !GYM_EVENT_TYPES.has(event.type)) return { received: true, ignored: true };
+  const key = `stripe_evt:${event.id}`;
+  const claim = await env.DB.prepare(
+    'INSERT INTO app_state (key, value, updated_date) VALUES (?,?,?) ON CONFLICT(key) DO NOTHING'
+  ).bind(key, event.type, nowISO()).run();
+  if (!claim?.meta?.changes) return { received: true, duplicate: true };
+  const o = event.data?.object || {};
+  let result;
+  try {
+    if (event.type === 'checkout.session.completed') result = await handleCheckoutCompleted(env, o);
+    else if (event.type === 'invoice.paid') result = await handleInvoice(env, o, true);
+    else if (event.type === 'invoice.payment_failed') result = await handleInvoice(env, o, false);
+    else if (event.type === 'customer.subscription.updated') result = await handleSubscription(env, o, false);
+    else if (event.type === 'customer.subscription.deleted') result = await handleSubscription(env, o, true);
+    else if (event.type === 'charge.refunded') result = await handleRefund(env, o);
+  } catch (e) {
+    // Let Stripe retry: forget the claim.
+    await env.DB.prepare('DELETE FROM app_state WHERE key = ?').bind(key).run();
+    throw e;
+  }
+  await audit(env, { actor: 'stripe', action: `gym_billing_${event.type.replace(/\./g, '_')}`, target: 'Membership', targetId: o.id || '', detail: String(result || ''), request });
+  return { received: true, result };
+}
+
+// POST /api/stripe/gym-webhook (the old /api/stripe/webhook also forwards gym events here).
+async function handleGymWebhook(request, env) {
+  const raw = await request.text();
+  const ok = await verifyStripeSignature(raw, request.headers.get('stripe-signature'), env.STRIPE_GYM_WEBHOOK_SECRET || env.STRIPE_WEBHOOK_SECRET);
+  if (!ok) return err('Invalid signature.', 400);
+  let event;
+  try { event = JSON.parse(raw); } catch { return err('Bad payload.', 400); }
+  try {
+    return json(await processGymBillingEvent(env, event, request));
+  } catch (e) {
+    await recordError(env, { source: 'job', message: `Stripe webhook ${event?.type}: ${String(e?.message || e).slice(0, 200)}`, page: 'billing' });
+    return err('Webhook failed.', 500);
+  }
+}
+// ===== end Phase 4: CORE =====
 
 /* -------------------------------- LLM ----------------------------------- */
 
@@ -6435,6 +6973,7 @@ export async function onRequest(context) {
     /* ---- audit log (admin only) ---- */
     /* ---- billing (Stripe) ---- */
     if (segs[0] === 'stripe') {
+      if (segs[1] === 'gym-webhook' && method === 'POST') return handleGymWebhook(request, env); // Phase 4 CORE
       // Webhook first: it is unauthenticated by design and verified by signature.
       if (segs[1] === 'webhook' && method === 'POST') {
         const raw = await request.text();
@@ -6443,6 +6982,7 @@ export async function onRequest(context) {
 
         let event;
         try { event = JSON.parse(raw); } catch { return err('Bad payload.', 400); }
+        if (await isGymBillingEvent(env, event)) return json(await processGymBillingEvent(env, event, request)); // Phase 4 CORE
         const obj = event?.data?.object || {};
 
         // Find the user this event belongs to: metadata first, then customer id.

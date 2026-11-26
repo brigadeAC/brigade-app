@@ -26,6 +26,7 @@ import { isScheduledOn, todayKey, gymToday } from "@/lib/programs";
 import ClientTodayCard from "@/components/programs/client/ClientTodayCard";
 import NextClassCard from "@/components/classes/member/NextClassCard";
 import MembershipNoticeCard from "@/components/classes/member/MembershipNoticeCard";
+import BillingPastDueBanner from "@/components/billing/BillingPastDueBanner"; // Phase 4 CORE
 
 const todayStr = todayKey;
 
@@ -362,6 +363,7 @@ export default function ClientDashboard() {
       </div>
 
       {/* ---- Membership hold / end date ---- */}
+      <BillingPastDueBanner />
       <MembershipNoticeCard />
 
       {/* ---- Next booked class ---- */}
