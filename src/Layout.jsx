@@ -34,7 +34,8 @@ import {
   Upload,
   CalendarCheck,
   SlidersHorizontal,
-  BarChart3
+  BarChart3,
+  Sparkles
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -70,7 +71,8 @@ const navGroups = [
     items: [
       { name: "Classes", icon: CalendarCheck, page: "Classes" },
       { name: "Class Setup", icon: SlidersHorizontal, page: "ClassSetup" },
-      { name: "Class Reports", icon: BarChart3, page: "ClassReports" }
+      { name: "Class Reports", icon: BarChart3, page: "ClassReports" },
+      { name: "Ask Brigade", icon: Sparkles, page: "AskBrigade" }
     ]
   },
   {
@@ -133,6 +135,7 @@ const adminNavGroups = [
       { name: 'Classes', icon: CalendarCheck, page: 'Classes' },
       { name: 'Class Setup', icon: SlidersHorizontal, page: 'ClassSetup' },
       { name: 'Class Reports', icon: BarChart3, page: 'ClassReports' },
+      { name: 'Ask Brigade', icon: Sparkles, page: 'AskBrigade' },
     ]
   },
   {
@@ -397,7 +400,7 @@ export default function Layout({ children, currentPageName }) {
   // them back to their dashboard. The API scopes data either way — this keeps
   // trainer screens from rendering at all.
   if (isClient) {
-    const clientAllowed = [...clientPages, 'Settings', 'Dashboard', 'IndependentDashboard', 'IndependentOnboarding'];
+    const clientAllowed = [...clientPages, 'AskBrigade', 'Settings', 'Dashboard', 'IndependentDashboard', 'IndependentOnboarding'];
     if (!clientAllowed.includes(currentPageName)) {
       return <Navigate to={createPageUrl('ClientDashboard')} replace />;
     }

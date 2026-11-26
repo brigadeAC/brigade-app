@@ -9,6 +9,7 @@ import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard,
+  Sparkles,
   Dumbbell,
   Utensils,
   LineChart,
@@ -41,6 +42,7 @@ const clientNavGroups = [
     title: "Overview",
     items: [
       { name: "Dashboard", icon: LayoutDashboard, page: "ClientDashboard" },
+      { name: "Ask Brigade", icon: Sparkles, page: "AskBrigade" },
     ]
   },
   {

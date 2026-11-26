@@ -4,6 +4,7 @@ import Home from './pages/Home';
 import __Layout from './Layout.jsx';
 
 const About = lazy(() => import('./pages/About'));
+const AskBrigade = lazy(() => import('./pages/AskBrigade'));
 const AdminBugs = lazy(() => import('./pages/AdminBugs'));
 const AdminContactMessages = lazy(() => import('./pages/AdminContactMessages'));
 const BusinessHub = lazy(() => import('./pages/BusinessHub'));
@@ -60,6 +61,7 @@ const Workouts = lazy(() => import('./pages/Workouts'));
 
 export const PAGES = {
     "About": About,
+    "AskBrigade": AskBrigade,
     "AdminBugs": AdminBugs,
     "AdminContactMessages": AdminContactMessages,
     "BusinessHub": BusinessHub,

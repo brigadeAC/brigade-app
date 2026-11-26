@@ -3949,6 +3949,11 @@ async function runFunction(name, payload, ctx) {
       return classReports(env, payload || {});
     }
 
+    case 'askBrigade': {
+      if (!user) return { success: false, error: 'Not logged in' };
+      return askBrigade(env, user, url, payload || {});
+    }
+
     case 'classCoaches': {
       // Staff picker for slots/sessions (User.list is admin-only for trainers).
       if (!isStaff(user)) return { success: false, error: 'Only coaches can see this.' };
@@ -4265,6 +4270,145 @@ async function loadImage(url) {
     return { bytes, base64: btoa(bin), mediaType };
   } catch {
     return null;
+  }
+}
+
+
+/* ------------------------------ Ask Brigade ------------------------------ */
+// A chat assistant for members (and parents). It reads through the same
+// functions the screens use, so every rule still applies, and it never books or
+// cancels by itself: it proposes an action and the member taps Confirm, which
+// calls bookClass / cancelReservation like the buttons do.
+const ASK_LIMIT_PER_HOUR = 40;
+const ASK_MAX_TURNS = 12;
+const ASK_MAX_CHARS = 1500;
+const ASK_TOOLS = [
+  { name: 'list_classes', description: 'Classes on the gym schedule between two dates (YYYY-MM-DD, at most 14 days), with spots left and whether the member is already booked. Use for "what classes are tomorrow", "is 6am full", and before proposing a booking.',
+    input_schema: { type: 'object', properties: { from: { type: 'string' }, to: { type: 'string' }, for_child_id: { type: 'string', description: 'Only when acting for one of the member\'s linked children (id from my_family).' } }, required: ['from', 'to'] } },
+  { name: 'my_bookings', description: 'The member\'s upcoming bookings and waitlist spots, recent visits, and membership (plan, holds, end date).',
+    input_schema: { type: 'object', properties: { for_child_id: { type: 'string' } } } },
+  { name: 'my_family', description: 'Children the member can book for, if any.', input_schema: { type: 'object', properties: {} } },
+  { name: 'propose_booking', description: 'Offer to book a class (or join its waitlist if full). Does NOT book: the member must tap Confirm. Call list_classes first to get the class id.',
+    input_schema: { type: 'object', properties: { session_id: { type: 'string' }, for_child_id: { type: 'string' } }, required: ['session_id'] } },
+  { name: 'propose_cancel', description: 'Offer to cancel one of the member\'s bookings or waitlist spots. Does NOT cancel: the member must tap Confirm. Get the booking id from my_bookings or list_classes.',
+    input_schema: { type: 'object', properties: { reservation_id: { type: 'string' } }, required: ['reservation_id'] } },
+];
+const fmtClassTime = (iso) => (iso ? new Date(iso).toLocaleString('en-US', { timeZone: PROGRAM_TZ, weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '');
+const compactSession = (c) => ({
+  id: c.id, when: fmtClassTime(c.start_at), date: c.date, class: c.class_type_name, coach: c.coach_name || null,
+  status: c.status, spots_left: c.spots_left ?? null, full: !!c.is_full, waitlist: c.waitlist_enabled !== false,
+  booking_opens: fmtClassTime(c.windows?.booking_opens_at), booking_closes: fmtClassTime(c.windows?.booking_closes_at),
+  late_cancel_after: fmtClassTime(c.windows?.late_cancel_at),
+  mine: c.my_reservation ? { reservation_id: c.my_reservation.id, status: c.my_reservation.status, waitlist_position: c.my_reservation.waitlist_position } : null,
+});
+async function askTool(name, input, ctx, actions) {
+  const child = input?.for_child_id ? String(input.for_child_id) : null;
+  if (name === 'list_classes') {
+    const from = isDateKey(input?.from) ? input.from : programToday();
+    let to = isDateKey(input?.to) ? input.to : from;
+    if (to < from) to = from;
+    if (pDaysBetween(from, to) > 14) to = pAddDays(from, 14);
+    const r = await runFunction('classSchedule', { from, to, ...(child ? { client_id: child } : {}) }, ctx);
+    if (r?.success === false) return { error: r.error };
+    return { classes: (r.sessions || []).filter((c) => c.status !== 'cancelled').map(compactSession) };
+  }
+  if (name === 'my_bookings') {
+    const r = await runFunction('myClasses', child ? { client_id: child } : {}, ctx);
+    if (r?.success === false) return { error: r.error };
+    const pick = (x) => ({ reservation_id: x.id, when: fmtClassTime(x.start_at), class: x.class_type_name || x.class_name, status: x.status, waitlist_position: x.waitlist_position ?? null });
+    return {
+      upcoming: (r.upcoming || []).map(pick), recent: (r.recent || []).slice(0, 5).map(pick),
+      memberships: (r.memberships || []).map((m) => ({ plan: m.plan_name || m.name, status: m.status, end_date: m.end_date || null, hold_from: m.hold_from || null, hold_to: m.hold_to || null })),
+      on_hold: r.hold_now || null, notice: r.notice || null,
+    };
+  }
+  if (name === 'my_family') {
+    const r = await runFunction('myFamily', {}, ctx);
+    return { children: r?.children || [] };
+  }
+  if (name === 'propose_booking') {
+    const session = await getEntityById(ctx.env, 'ClassSession', String(input?.session_id || ''));
+    if (!session || session.status !== 'scheduled') return { error: 'That class was not found or is cancelled.' };
+    let who = 'you';
+    if (child) {
+      const fam = await runFunction('myFamily', {}, ctx);
+      const kid = (fam?.children || []).find((c) => c.id === child);
+      if (!kid) return { error: 'That child is not linked to this account.' };
+      who = kid.full_name;
+    }
+    const summary = `Book ${who === 'you' ? '' : `${who} into `}${session.class_type_name} on ${fmtClassTime(session.start_at)}`;
+    actions.push({ kind: 'book', session_id: session.id, ...(child ? { client_id: child } : {}), summary });
+    return { proposed: summary, note: 'Shown to the member with a Confirm button. Tell them to tap Confirm; do not say it is booked.' };
+  }
+  if (name === 'propose_cancel') {
+    const resv = await getEntityById(ctx.env, 'Reservation', String(input?.reservation_id || ''));
+    const mineIds = await actableClientIds(ctx.env, ctx.user);
+    if (!resv || (!mineIds.includes(resv.client_id) && resv.client_user_id !== ctx.user.id)) return { error: 'That booking was not found.' };
+    if (!['reserved', 'waitlisted'].includes(resv.status)) return { error: 'That booking can no longer be cancelled.' };
+    const session = await getEntityById(ctx.env, 'ClassSession', resv.session_id);
+    const late = session && Date.now() >= Date.parse(sessionWindows(session, await getGymSettings(ctx.env)).late_cancel_at || 0) && resv.status === 'reserved';
+    const summary = `Cancel ${resv.status === 'waitlisted' ? 'waitlist spot for ' : ''}${session?.class_type_name || 'class'} on ${fmtClassTime(session?.start_at || resv.start_at)}${late ? ' (late cancel)' : ''}`;
+    actions.push({ kind: 'cancel', reservation_id: resv.id, summary, late: !!late });
+    return { proposed: summary, late_cancel: !!late, note: 'Shown with a Confirm button. Do not say it is cancelled.' };
+  }
+  return { error: 'Unknown tool.' };
+}
+async function askBrigade(env, user, url, payload) {
+  if (!env.LLM_API_KEY) return { success: false, error: 'Ask Brigade isn\'t switched on yet.' };
+  const since = new Date(Date.now() - 3600000).toISOString();
+  const used = await env.DB.prepare(`SELECT COUNT(*) AS n FROM audit_log WHERE actor = ? AND action = 'ask_brigade' AND created_date > ?`).bind(user.email, since).first();
+  if ((used?.n || 0) >= ASK_LIMIT_PER_HOUR) return { success: false, error: 'You\'ve asked a lot this hour. Try again a bit later.' };
+  const turns = (Array.isArray(payload?.messages) ? payload.messages : [])
+    .filter((m) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.text === 'string' && m.text.trim())
+    .slice(-ASK_MAX_TURNS)
+    .map((m) => ({ role: m.role, content: m.text.slice(0, ASK_MAX_CHARS) }));
+  while (turns.length && turns[0].role !== 'user') turns.shift();
+  if (!turns.length || turns[turns.length - 1].role !== 'user') return { success: false, error: 'Type a question first.' };
+  await audit(env, { actor: user.email, action: 'ask_brigade', request: null });
+  const now = new Date().toLocaleString('en-US', { timeZone: PROGRAM_TZ, weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+  const system = [
+    'You are Ask Brigade, the assistant inside the Brigade Athletic Club app. Brigade is a CrossFit and strength gym.',
+    `Right now it is ${now} (gym time, US Eastern). Today's date is ${programToday()}. Resolve "today", "tomorrow", "Thursday" from this.`,
+    `You are talking with ${user.full_name || 'a member'}. Refer to people neutrally (they/them) unless told otherwise.`,
+    'Keep answers short and plain: a sentence or two, or a short list. No markdown headings.',
+    'Classes: use the tools to look things up. Never say a class is booked or cancelled. To book or cancel, call propose_booking or propose_cancel; the member then sees a Confirm button. If a class is full and has a waitlist, booking puts them on the waitlist; say so.',
+    'If the member mentions a child, call my_family and act for that child with for_child_id.',
+    'General fitness and nutrition questions (calories, protein, macros, technique, scaling, recovery): answer from your own knowledge. For branded or restaurant items say the number is an estimate. Give typical ranges for macros and suggest they confirm targets with their coach.',
+    'Never diagnose injuries or illness; suggest talking with their coach or a doctor. You cannot change memberships, payments or accounts; point them to the front desk.',
+  ].join('\n');
+  const client = new Anthropic({ apiKey: env.LLM_API_KEY });
+  const ctx = { env, user, url };
+  const actions = [];
+  const messages = [...turns];
+  try {
+    for (let step = 0; step < 6; step += 1) {
+      const res = await client.messages.create({
+        model: env.ASK_MODEL || env.LLM_MODEL || CLAUDE_DEFAULT_MODEL,
+        max_tokens: 1200,
+        system,
+        tools: ASK_TOOLS,
+        messages,
+      });
+      if (res.stop_reason === 'refusal') return { success: true, reply: 'I can\'t help with that one. Try asking your coach.', actions: [] };
+      const uses = res.content.filter((b) => b.type === 'tool_use');
+      if (res.stop_reason !== 'tool_use' || !uses.length) {
+        const reply = res.content.filter((b) => b.type === 'text').map((b) => b.text).join('').trim();
+        return { success: true, reply: reply || 'Done.', actions };
+      }
+      messages.push({ role: 'assistant', content: res.content });
+      const results = [];
+      for (const u of uses) {
+        let out;
+        try { out = await askTool(u.name, u.input || {}, ctx, actions); } catch (e) { out = { error: 'That lookup failed.' }; console.error('ask tool', u.name, e?.message); }
+        results.push({ type: 'tool_result', tool_use_id: u.id, content: JSON.stringify(out).slice(0, 12000) });
+      }
+      messages.push({ role: 'user', content: results });
+    }
+    return { success: true, reply: 'That took too many steps. Try asking in a simpler way.', actions };
+  } catch (e) {
+    if (e instanceof Anthropic.AuthenticationError) console.error('ask brigade: check LLM_API_KEY');
+    else console.error('ask brigade failed', e?.message);
+    return { success: false, error: 'Ask Brigade is having trouble right now. Try again in a minute.' };
   }
 }
 
