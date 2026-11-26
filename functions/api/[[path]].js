@@ -3728,6 +3728,391 @@ async function runSalesFunction(name, payload, ctx) {
 }
 // ===== end Phase 4: SALES =====
 
+// ===== Scheduling: REMIND =====
+// Coach reminders, schedule-change notices and the phone calendar feed.
+//
+// Reminder settings live on the staff user's own record:
+//   users.data.schedule_reminders = { shifts, classes, pt }  (minutes before, or null = off)
+// Defaults 60 / 60 / 30. The 15-minute cron (cron/program-tick) runs
+// runScheduleReminders; each reminder is claimed once in app_state
+// (key sremind_<kind>_<id>_<start ms>), so overlapping runs never repeat one and
+// a moved shift/class gets a fresh reminder for its new time.
+//
+// Calendar feed: GET /api/calendar/<token>.ics, no sign-in. The token is the
+// only auth: 32 random chars (feed id, 192 bits) + 32 chars of HMAC(AUTH_SECRET)
+// over the id. app_state holds calfeed_id_<feed id> -> user id and
+// calfeed_user_<user id> -> feed id, so a database copy alone can't build a
+// working link, and reset deletes the old id (old link stops at once). The token
+// is never written to logs, audit rows or error reports.
+
+// stub: owned by CORE — the scheduling entities are staff-only to write.
+STAFF_WRITE_TYPES.add('StaffShift');
+STAFF_WRITE_TYPES.add('TimeOffRequest');
+// end stub
+
+const SCHED_REMINDER_CHOICES = [15, 30, 60, 120, 180, 1440];
+const SCHED_REMINDER_DEFAULTS = { shifts: 60, classes: 60, pt: 30 };
+const SCHED_REMINDER_KINDS = ['shifts', 'classes', 'pt'];
+const SCHED_FEED_PAST_DAYS = 14;
+const SCHED_FEED_FUTURE_DAYS = 60;
+const SCHED_PT_LABELS = { personal_training: 'PT', assessment: 'Assessment', video_call: 'Video call', group_class: 'Group session' };
+
+function schedReminderPrefs(userData) {
+  const saved = (userData && typeof userData === 'object' && userData.schedule_reminders) || {};
+  const out = {};
+  for (const k of SCHED_REMINDER_KINDS) {
+    if (!(k in saved)) out[k] = SCHED_REMINDER_DEFAULTS[k];
+    else out[k] = saved[k] === null ? null : (SCHED_REMINDER_CHOICES.includes(Number(saved[k])) ? Number(saved[k]) : SCHED_REMINDER_DEFAULTS[k]);
+  }
+  return out;
+}
+
+async function schedUserData(env, userId) {
+  const row = await env.DB.prepare('SELECT data FROM users WHERE id = ?').bind(userId).first();
+  if (!row) return null;
+  try { return JSON.parse(row.data || '{}'); } catch { return {}; }
+}
+
+// In-app notification + push to each user. BOARD calls it on publish/decide,
+// CORE may call it for time-off requests. Never throws; returns how many got one.
+async function notifyScheduleChange(env, userIds, { title, message, link = '/MySchedule', tag, createdBy = null } = {}) {
+  const ids = [...new Set((Array.isArray(userIds) ? userIds : [userIds]).filter((x) => typeof x === 'string' && x))];
+  const t = String(title || 'Schedule update').slice(0, 80);
+  const m = String(message || '').slice(0, 500);
+  let n = 0;
+  for (const id of ids) {
+    try {
+      await insertEntity(env, 'Notification', { user_id: id, type: 'schedule', title: t, message: m, link, read: false }, createdBy);
+      const p = sendPushToUser(env, id, { title: t, body: m.slice(0, 140), url: link, tag: tag || 'schedule' });
+      if (env.__waitUntil) env.__waitUntil(p); else await p;
+      n++;
+    } catch (e) {
+      console.error('schedule notice failed', e?.message);
+    }
+  }
+  return n;
+}
+
+const schedClock = (hm) => {
+  const mins = hmToMin(hm);
+  if (mins === null) return '';
+  const h = Math.floor(mins / 60) % 24;
+  return `${h % 12 === 0 ? 12 : h % 12}:${String(mins % 60).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
+};
+const schedWhen = (date, hm, today) => {
+  const day = date === today ? 'today' : date === pAddDays(today, 1) ? 'tomorrow'
+    : new Date(`${date}T12:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', weekday: 'short', month: 'short', day: 'numeric' });
+  return `${day} at ${schedClock(hm)}`;
+};
+// "HH:MM" of an instant on the gym's wall clock.
+const schedGymHm = (ms) => new Intl.DateTimeFormat('en-GB', { timeZone: PROGRAM_TZ, hourCycle: 'h23', hour: '2-digit', minute: '2-digit' }).format(new Date(ms));
+const schedFirstName = (name) => String(name || '').trim().split(/\s+/)[0].slice(0, 40);
+
+// First names only for PT clients: Session.client_name, else the Client record
+// (or member login) its client_id points at.
+async function schedClientFirstNames(env, sessions) {
+  const out = new Map();
+  const need = [...new Set(sessions.filter((s) => !s.client_name && s.client_id).map((s) => s.client_id))];
+  for (let i = 0; i < need.length; i += 50) {
+    const chunk = need.slice(i, i + 50);
+    const { results: cs } = await env.DB.prepare(
+      `SELECT id, json_extract(data,'$.full_name') AS n FROM entities WHERE entity_type='Client' AND id IN (${inList(chunk)})`
+    ).bind(...chunk).all();
+    for (const c of cs) out.set(c.id, c.n);
+    const left = chunk.filter((id) => !out.has(id));
+    if (left.length) {
+      const { results: us } = await env.DB.prepare(`SELECT id, full_name AS n FROM users WHERE id IN (${inList(left)})`).bind(...left).all();
+      for (const u of us) out.set(u.id, u.n);
+    }
+  }
+  return (s) => schedFirstName(s.client_name || out.get(s.client_id) || '');
+}
+
+const schedPtTitle = (s, first) => {
+  const label = SCHED_PT_LABELS[s.type] || 'PT';
+  return first ? `${label}: ${first}` : `${label} session`;
+};
+const schedPtMinutes = (s) => {
+  const n = Number(s.duration_min ?? s.duration);
+  return Number.isFinite(n) && n > 0 && n <= 600 ? n : 60;
+};
+const schedSpan = (date, start, end) => {
+  const a = easternToUTC(date, start);
+  let b = hmToMin(end) !== null ? easternToUTC(date, end) : a + 3600000;
+  if (b <= a) b += 864e5;
+  return [a, b];
+};
+
+/* ---- reminders (run by the 15-minute cron) ---- */
+async function runScheduleReminders(env, nowMs = Date.now()) {
+  const summary = { success: true, sent: 0 };
+  const today = programToday(nowMs);
+  const lastDay = pAddDays(today, 2);
+  const horizonMs = nowMs + Math.max(...SCHED_REMINDER_CHOICES) * 60000;
+  const items = [];
+  for (const s of await selectEntities(env, 'StaffShift',
+    `json_extract(data,'$.status') = 'published' AND json_extract(data,'$.date') BETWEEN ? AND ?`, [today, lastDay])) {
+    if (!s.user_id || hmToMin(s.start) === null) continue;
+    items.push({ kind: 'shifts', id: s.id, userId: s.user_id, start: easternToUTC(s.date, s.start), date: s.date, hm: s.start,
+      title: 'Shift reminder', what: `${s.role_label || 'Your'} shift` });
+  }
+  for (const c of await selectEntities(env, 'ClassSession',
+    `json_extract(data,'$.status') = 'scheduled' AND json_extract(data,'$.coach_user_id') IS NOT NULL
+     AND json_extract(data,'$.start_at') > ? AND json_extract(data,'$.start_at') <= ?`,
+    [new Date(nowMs).toISOString(), new Date(horizonMs).toISOString()])) {
+    const start = Date.parse(c.start_at);
+    if (!Number.isFinite(start)) continue;
+    items.push({ kind: 'classes', id: c.id, userId: c.coach_user_id, start, date: programToday(start), hm: schedGymHm(start),
+      title: 'Coaching reminder', what: `You coach ${c.class_type_name || 'a class'}` });
+  }
+  const pts = (await selectEntities(env, 'Session',
+    `json_extract(data,'$.trainer_id') IS NOT NULL AND json_extract(data,'$.date') BETWEEN ? AND ?
+     AND COALESCE(json_extract(data,'$.status'),'scheduled') NOT IN ('cancelled','completed','no_show')`, [today, lastDay]))
+    .filter((s) => hmToMin(s.start_time) !== null);
+  const firstOf = await schedClientFirstNames(env, pts);
+  for (const s of pts) {
+    const first = firstOf(s);
+    items.push({ kind: 'pt', id: s.id, userId: s.trainer_id, start: easternToUTC(s.date, s.start_time), date: s.date, hm: s.start_time,
+      title: 'PT reminder', what: first ? `${SCHED_PT_LABELS[s.type] || 'PT'} with ${first}` : `${SCHED_PT_LABELS[s.type] || 'PT'} session` });
+  }
+
+  const people = new Map();
+  const personOf = async (id) => {
+    if (!people.has(id)) {
+      const u = await staffLogin(env, id);
+      people.set(id, u && !u.disabled ? { prefs: schedReminderPrefs(u) } : null);
+    }
+    return people.get(id);
+  };
+  const nowIso = new Date(nowMs).toISOString();
+  for (const it of items) {
+    if (!(it.start > nowMs)) continue;
+    const who = await personOf(it.userId);
+    const mins = who?.prefs?.[it.kind];
+    if (!who || mins === null || mins === undefined) continue;
+    if (nowMs < it.start - mins * 60000) continue; // not yet
+    const claim = await env.DB.prepare('INSERT OR IGNORE INTO app_state (key, value, updated_date) VALUES (?,?,?)')
+      .bind(`sremind_${it.kind}_${it.id}_${it.start}`, '1', nowIso).run();
+    if (!claim?.meta?.changes) continue; // already sent
+    const n = await notifyScheduleChange(env, [it.userId], {
+      title: it.title, message: `${it.what} ${schedWhen(it.date, it.hm, today)}.`, tag: `sremind-${it.kind}-${it.id}`,
+    });
+    summary.sent += n;
+  }
+  await env.DB.prepare(`DELETE FROM app_state WHERE key LIKE 'sremind\\_%' ESCAPE '\\' AND updated_date < ?`)
+    .bind(new Date(nowMs - 4 * 864e5).toISOString()).run();
+  return summary;
+}
+
+/* ---- calendar feed ---- */
+const SCHED_FEED_ID_LEN = 32;
+async function schedFeedMac(env, feedId) {
+  const key = await hmacKey(env.AUTH_SECRET || 'dev-insecure-secret');
+  const sig = await crypto.subtle.sign('HMAC', key, enc.encode(`calfeed:${feedId}`));
+  return b64uEncode(sig).slice(0, 32);
+}
+async function schedFeedUrl(env, url, feedId) {
+  const httpUrl = `${appOrigin(env, url)}/api/calendar/${feedId}${await schedFeedMac(env, feedId)}.ics`;
+  return { url: httpUrl, webcal_url: httpUrl.replace(/^https?:/, 'webcal:') };
+}
+async function schedNewFeed(env, userId) {
+  const feedId = b64uEncode(crypto.getRandomValues(new Uint8Array(24)));
+  const now = nowISO();
+  await env.DB.batch([
+    env.DB.prepare('INSERT INTO app_state (key, value, updated_date) VALUES (?,?,?)').bind(`calfeed_id_${feedId}`, userId, now),
+    env.DB.prepare('INSERT INTO app_state (key, value, updated_date) VALUES (?1,?2,?3) ON CONFLICT(key) DO UPDATE SET value = ?2, updated_date = ?3')
+      .bind(`calfeed_user_${userId}`, feedId, now),
+  ]);
+  return feedId;
+}
+// The user id a token belongs to, or null. Constant-time MAC check.
+async function schedFeedUser(env, token) {
+  if (typeof token !== 'string' || !/^[A-Za-z0-9_-]{64}$/.test(token)) return null;
+  const feedId = token.slice(0, SCHED_FEED_ID_LEN);
+  const want = await schedFeedMac(env, feedId);
+  const given = token.slice(SCHED_FEED_ID_LEN);
+  let diff = 0;
+  for (let i = 0; i < want.length; i++) diff |= want.charCodeAt(i) ^ given.charCodeAt(i);
+  if (diff !== 0) return null;
+  const row = await getState(env, `calfeed_id_${feedId}`);
+  if (!row?.value) return null;
+  const current = await getState(env, `calfeed_user_${row.value}`);
+  return current?.value === feedId ? row.value : null;
+}
+
+// Per-IP counter, one bucket per 10 minutes. bump=false only reads.
+async function schedFeedLimited(env, request, bucket, max, bump = true) {
+  const ip = request?.headers?.get('cf-connecting-ip') || 'local';
+  const key = `rl_calfeed_${bucket}_${ip}_${Math.floor(Date.now() / 600000)}`;
+  let n;
+  if (bump) {
+    const row = await env.DB.prepare(
+      `INSERT INTO app_state (key, value, updated_date) VALUES (?1,'1',?2)
+       ON CONFLICT(key) DO UPDATE SET value = CAST(app_state.value AS INTEGER) + 1, updated_date = ?2 RETURNING value`
+    ).bind(key, nowISO()).first();
+    n = Number(row?.value || 0);
+    if (Math.random() < 0.05) {
+      await env.DB.prepare(`DELETE FROM app_state WHERE key LIKE 'rl\\_calfeed\\_%' ESCAPE '\\' AND updated_date < ?`)
+        .bind(new Date(Date.now() - 3600000).toISOString()).run();
+    }
+  } else {
+    n = Number((await getState(env, key))?.value || 0);
+  }
+  return n > max;
+}
+
+// iCalendar text helpers (RFC 5545).
+const icsText = (s) => String(s ?? '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
+const icsUtc = (ms) => new Date(ms).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+const icsDate = (key) => String(key).replace(/-/g, '');
+// Fold to 75 octets per line without splitting a UTF-8 character.
+function icsFold(line) {
+  const bytes = utf8(line);
+  if (bytes.length <= 75) return line;
+  const out = [];
+  let cur = '';
+  let curLen = 0;
+  let limit = 75;
+  for (const ch of line) {
+    const len = utf8(ch).length;
+    if (curLen + len > limit) { out.push(cur); cur = ''; curLen = 0; limit = 74; }
+    cur += ch; curLen += len;
+  }
+  out.push(cur);
+  return out.join('\r\n ');
+}
+
+// The user's items for the feed: published shifts, scheduled classes they
+// coach, their PT sessions (client first name only) and approved time off.
+async function schedFeedEvents(env, userId, nowMs = Date.now()) {
+  const today = programToday(nowMs);
+  const from = pAddDays(today, -SCHED_FEED_PAST_DAYS);
+  const to = pAddDays(today, SCHED_FEED_FUTURE_DAYS);
+  const stamp = (row) => icsUtc(Date.parse(row.updated_date || '') || nowMs);
+  const events = [];
+  for (const s of await selectEntities(env, 'StaffShift',
+    `json_extract(data,'$.user_id') = ? AND json_extract(data,'$.status') = 'published' AND json_extract(data,'$.date') BETWEEN ? AND ?`, [userId, from, to])) {
+    if (!isDateKey(s.date) || hmToMin(s.start) === null) continue;
+    const [a, b] = schedSpan(s.date, s.start, s.end);
+    events.push({ uid: `shift-${s.id}`, stamp: stamp(s), start: a, end: b, summary: `${s.role_label || 'Shift'} shift` });
+  }
+  for (const c of await selectEntities(env, 'ClassSession',
+    `json_extract(data,'$.coach_user_id') = ? AND json_extract(data,'$.status') = 'scheduled' AND json_extract(data,'$.date') BETWEEN ? AND ?`, [userId, from, to])) {
+    const a = Date.parse(c.start_at);
+    if (!Number.isFinite(a)) continue;
+    const b = Date.parse(c.end_at || '') || a + (Number(c.duration_min) || 60) * 60000;
+    events.push({ uid: `class-${c.id}`, stamp: stamp(c), start: a, end: b > a ? b : a + 3600000, summary: `Coach: ${c.class_type_name || 'Class'}` });
+  }
+  const pts = (await selectEntities(env, 'Session',
+    `json_extract(data,'$.trainer_id') = ? AND json_extract(data,'$.date') BETWEEN ? AND ? AND COALESCE(json_extract(data,'$.status'),'scheduled') != 'cancelled'`,
+    [userId, from, to])).filter((s) => isDateKey(s.date) && hmToMin(s.start_time) !== null);
+  const firstOf = await schedClientFirstNames(env, pts);
+  for (const s of pts) {
+    const a = easternToUTC(s.date, s.start_time);
+    events.push({ uid: `pt-${s.id}`, stamp: stamp(s), start: a, end: a + schedPtMinutes(s) * 60000, summary: schedPtTitle(s, firstOf(s)) });
+  }
+  for (const t of await selectEntities(env, 'TimeOffRequest',
+    `json_extract(data,'$.user_id') = ? AND json_extract(data,'$.status') = 'approved'
+     AND json_extract(data,'$.start_date') <= ? AND json_extract(data,'$.end_date') >= ?`, [userId, to, from])) {
+    if (!isDateKey(t.start_date) || !isDateKey(t.end_date)) continue;
+    const ev = { uid: `timeoff-${t.id}`, stamp: stamp(t), summary: 'Time off', transparent: false };
+    if (t.part_day && t.start_date === t.end_date && hmToMin(t.part_day.start) !== null) {
+      [ev.start, ev.end] = schedSpan(t.start_date, t.part_day.start, t.part_day.end);
+    } else {
+      ev.allDay = [t.start_date, pAddDays(t.end_date, 1)];
+    }
+    events.push(ev);
+  }
+  return events.sort((x, y) => (x.start ?? keyToUTC(x.allDay[0])) - (y.start ?? keyToUTC(y.allDay[0])));
+}
+
+function schedBuildIcs(events, nowMs = Date.now()) {
+  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Brigade Athletic Club//Coach schedule//EN', 'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH', 'X-WR-CALNAME:Brigade schedule', `X-WR-TIMEZONE:${PROGRAM_TZ}`,
+    'REFRESH-INTERVAL;VALUE=DURATION:PT1H', 'X-PUBLISHED-TTL:PT1H'];
+  for (const e of events) {
+    lines.push('BEGIN:VEVENT', `UID:${e.uid}@brigade-schedule`, `DTSTAMP:${e.stamp || icsUtc(nowMs)}`);
+    if (e.allDay) lines.push(`DTSTART;VALUE=DATE:${icsDate(e.allDay[0])}`, `DTEND;VALUE=DATE:${icsDate(e.allDay[1])}`);
+    else lines.push(`DTSTART:${icsUtc(e.start)}`, `DTEND:${icsUtc(e.end)}`);
+    lines.push(`SUMMARY:${icsText(e.summary)}`, 'STATUS:CONFIRMED', 'END:VEVENT');
+  }
+  lines.push('END:VCALENDAR');
+  return `${lines.map(icsFold).join('\r\n')}\r\n`;
+}
+
+// GET /api/calendar/<token>.ics. Errors are caught here so the token (part of
+// the path) never reaches the error log.
+async function serveCalendarFeed(env, request, file) {
+  const plain = (status, text) => new Response(text, { status, headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store', 'referrer-policy': 'no-referrer' } });
+  try {
+    if (!['GET', 'HEAD'].includes(request.method.toUpperCase())) return plain(405, 'Method not allowed.');
+    if (await schedFeedLimited(env, request, 'bad', 30, false)) return plain(429, 'Too many requests.');
+    if (await schedFeedLimited(env, request, 'all', 600)) return plain(429, 'Too many requests.');
+    const m = /^([A-Za-z0-9_-]+)\.ics$/.exec(String(file || ''));
+    const userId = m ? await schedFeedUser(env, m[1]) : null;
+    const person = userId ? await staffLogin(env, userId) : null;
+    if (!person || person.disabled) {
+      await schedFeedLimited(env, request, 'bad', 30);
+      return plain(404, 'Calendar not found.');
+    }
+    const body = schedBuildIcs(await schedFeedEvents(env, userId));
+    return new Response(request.method.toUpperCase() === 'HEAD' ? null : body, {
+      headers: {
+        'content-type': 'text/calendar; charset=utf-8',
+        'content-disposition': 'inline; filename="brigade-schedule.ics"',
+        'cache-control': 'private, max-age=300',
+        'referrer-policy': 'no-referrer',
+        'x-robots-tag': 'noindex',
+        'x-content-type-options': 'nosniff',
+      },
+    });
+  } catch (e) {
+    await recordError(env, { source: 'server', message: e?.message, page: '/api/calendar' }).catch(() => {});
+    return plain(500, 'Calendar is not available right now.');
+  }
+}
+
+async function runScheduleRemindFunction(name, payload, { env, user, url, request }) {
+  if (!isStaff(user)) return NO_PERMISSION;
+  switch (name) {
+    case 'getReminderPrefs':
+      return { success: true, prefs: schedReminderPrefs(await schedUserData(env, user.id)), choices: SCHED_REMINDER_CHOICES, defaults: SCHED_REMINDER_DEFAULTS };
+
+    case 'saveReminderPrefs': {
+      const data = (await schedUserData(env, user.id)) || {};
+      const next = schedReminderPrefs(data);
+      for (const k of SCHED_REMINDER_KINDS) {
+        if (!(k in (payload || {}))) continue;
+        const v = payload[k];
+        if (v === null || v === false) next[k] = null;
+        else if (SCHED_REMINDER_CHOICES.includes(Number(v))) next[k] = Number(v);
+        else return { success: false, error: 'Pick one of the reminder times in the list.', code: 'bad_minutes' };
+      }
+      data.schedule_reminders = next;
+      await env.DB.prepare('UPDATE users SET data = ?, updated_date = ? WHERE id = ?').bind(JSON.stringify(data), nowISO(), user.id).run();
+      return { success: true, prefs: next };
+    }
+
+    case 'calendarFeedLink': {
+      let feedId = (await getState(env, `calfeed_user_${user.id}`))?.value;
+      if (!feedId || !(await getState(env, `calfeed_id_${feedId}`))) feedId = await schedNewFeed(env, user.id);
+      return { success: true, ...(await schedFeedUrl(env, url, feedId)) };
+    }
+
+    case 'resetCalendarFeed': {
+      const old = (await getState(env, `calfeed_user_${user.id}`))?.value;
+      if (old) await env.DB.prepare('DELETE FROM app_state WHERE key = ?').bind(`calfeed_id_${old}`).run();
+      const feedId = await schedNewFeed(env, user.id);
+      await audit(env, { actor: user.email, action: 'calendar_feed_reset', target: 'User', targetId: user.id, detail: 'old calendar link turned off', request });
+      return { success: true, ...(await schedFeedUrl(env, url, feedId)) };
+    }
+
+    default:
+      return { success: false, error: 'Unknown schedule function.' };
+  }
+}
+// ===== end Scheduling: REMIND =====
+
 const PUBLIC_FUNCTIONS = new Set(['getAppLogo', 'submitContact',
   'publicPlans', 'publicCheckout', // Phase 4: SALES
 ]);
@@ -5218,6 +5603,10 @@ async function runFunction(name, payload, ctx) {
     case 'billingDashboard': case 'exportPaymentsCsv':
       return runSalesFunction(name, payload, ctx);
     // ===== end Phase 4: SALES (cases) =====
+    // ===== Scheduling: REMIND (cases) =====
+    case 'getReminderPrefs': case 'saveReminderPrefs': case 'calendarFeedLink': case 'resetCalendarFeed':
+      return runScheduleRemindFunction(name, payload, ctx);
+    // ===== end Scheduling: REMIND (cases) =====
 
     // Content browse helpers — empty until curated content sources are added.
     // Phase 3: MEMBER (scores, leaderboard, streak)
@@ -7920,10 +8309,17 @@ export async function onRequest(context) {
       if (classes?.success === false) await recordError(env, { source: 'job', message: classes.error, page: 'classes' });
       if (reminders?.success === false) await recordError(env, { source: 'job', message: reminders.error, page: 'class reminders' });
       if (programs?.success === false) await recordError(env, { source: 'job', message: programs.error, page: 'programs' });
+      const scheduleReminders = await runScheduleReminders(env).catch((e) => ({ success: false, error: String(e?.message || e).slice(0, 200) })); // Scheduling: REMIND
+      if (scheduleReminders?.success === false) await recordError(env, { source: 'job', message: scheduleReminders.error, page: 'schedule reminders' }); // Scheduling: REMIND
       const billingRules = await runBillingRenewals(env).catch((e) => ({ success: false, error: String(e?.message || e).slice(0, 200) })); // Phase 4: RULES
       await setState(env, 'cron_last_ok', 'ok');
-      return json({ ...programs, classes, reminders, billingRules });
+      return json({ ...programs, classes, reminders, billingRules, scheduleReminders });
     }
+
+    // ===== Scheduling: REMIND (calendar feed route) =====
+    // Public: the secret token in the path is the only auth. Never log it.
+    if (segs[0] === 'calendar' && segs.length === 2) return serveCalendarFeed(env, request, segs[1]);
+    // ===== end Scheduling: REMIND (calendar feed route) =====
 
     if (segs[0] === 'client-error' && method === 'POST') {
       const user = await currentUser(request, env);
