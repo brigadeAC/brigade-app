@@ -4706,7 +4706,7 @@ async function logScore(env, user, payload) {
       // checkPr is defined by the LIFTS block once merged.
       pr = await checkPr(env, {
         client_id: clientId, movement_id: section.kind === 'strength' ? (section.movement_ids || [])[0] || null : null,
-        load: norm.value.load ?? null, reps: norm.value.reps ?? null, scoring: section.scoring, sort_value: norm.sort_value,
+        load: norm.value.load ?? null, unit: norm.value.unit || section.scoring?.unit || null, reps: norm.value.reps ?? null, scoring: section.scoring, sort_value: norm.sort_value,
         benchmark_id: section.benchmark_id || null, workout_id: workout.id, section_id: section.id, exclude_id: existing?.id || null,
       });
       fields.is_pr = !!pr?.is_pr;
