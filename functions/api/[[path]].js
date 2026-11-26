@@ -3390,18 +3390,15 @@ async function runLiftsFunction(name, payload, ctx) {
 // promo codes are changed with settings.manage. All Stripe calls go through
 // stripe(env, ...), so tests point them at a fake Stripe.
 TYPE_PERMISSION.PromoCode = 'settings.manage';
-const SALES_TRY_KINDS = new Set(['trial', 'intro', 'drop_in', 'punch', 'punch_card']);
+const SALES_TRY_KINDS = new Set(['trial', 'intro', 'drop_in', 'punch_card']); // planBillingKind() values
 const SALES_DEFAULT_TAX_PCT = 2.98;
 const SALES_DEFAULT_BANK_PCT = 2.89;
-const SALES_DEFAULT_AGREEMENT = 'I agree to pay the membership price shown, plus tax, each billing period until I cancel. '
-  + 'If my plan has a commitment, I agree to stay through it or pay the buyout shown. Holds and cancellations follow the gym\'s posted policy.';
 const SALES_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const salesConnected = (env) => !!env.STRIPE_SECRET_KEY;
 const salesNum = (v, d) => { const n = Number(v); return Number.isFinite(n) ? n : d; };
 const salesIsActive = (p) => p.is_active !== false && p.is_active !== 0 && p.is_active !== 'false';
 const salesIsPublic = (p) => p.public === true || p.public === 1 || p.public === 'true';
-const salesGroup = (p) => (SALES_TRY_KINDS.has(p.kind) || salesNum(p.price_cents, 0) === 0 ? 'try' : 'membership');
-const salesNeedsAgreement = (p) => p.group === 'membership' && p.interval !== 'once';
+const salesGroup = (p) => (SALES_TRY_KINDS.has(planBillingKind(p)) || salesNum(p.price_cents, 0) === 0 ? 'try' : 'membership');
 
 async function salesGymSettings(env) {
   return parseRow(await env.DB.prepare(
@@ -3434,7 +3431,7 @@ function salesPublicPlan(p, gym) {
   return {
     id: p.id,
     name: String(p.name || 'Plan'),
-    kind: p.kind || null,
+    kind: planBillingKind(p),
     group,
     free: price === 0,
     description: String(p.description || ''),
@@ -3458,46 +3455,8 @@ async function salesFindOrCreateLead(env, { full_name, email, phone, plan }) {
 }
 
 async function salesSignAgreement(env, { client, plan, signed_name, ip }) {
-  if (typeof createAgreement === 'function') { // RULES' helper
-    // eslint-disable-next-line no-undef
-    const rec = await createAgreement(env, { client_id: client.id, plan: await getEntityById(env, 'MembershipPlan', plan.id), signed_name, actor: client.email || 'join_page', ip });
-    return { agreement_id: rec?.agreement_id || rec?.id || null };
-  }
-  // stub: owned by RULES
-  const gym = await salesGymSettings(env);
-  const rec = await insertEntity(env, 'Agreement', {
-    client_id: client.id, membership_id: null, plan_id: plan.id, text_version: String(gym.agreement_version || '1'),
-    signed_name, signed_at: nowISO(), ip: ip || '',
-  }, 'join_page');
-  return { agreement_id: rec.id };
-}
-
-async function salesCheckout(env, args) {
-  // eslint-disable-next-line no-undef
-  if (typeof createCheckoutSession === 'function') return createCheckoutSession(env, args); // CORE's helper
-  // stub: owned by CORE
-  const { plan, client, method, promo_code, agreement_id, success_url, cancel_url } = args;
-  const recurring = plan.interval !== 'once';
-  const price = method === 'bank' ? plan.bank_price_cents : plan.price_cents;
-  const stored = method === 'bank' ? plan.stripe_price_bank_id : plan.stripe_price_id;
-  const data = {
-    mode: recurring ? 'subscription' : 'payment',
-    customer_email: client.email,
-    payment_method_types: [method === 'bank' ? 'us_bank_account' : 'card'],
-    line_items: [stored ? { price: stored, quantity: 1 } : {
-      quantity: 1,
-      price_data: { currency: 'usd', unit_amount: price, product_data: { name: plan.name }, ...(recurring ? { recurring: { interval: plan.interval, interval_count: plan.interval_count } } : {}) },
-    }],
-    success_url, cancel_url,
-    metadata: { client_id: client.id, plan_id: plan.id, agreement_id: agreement_id || '' },
-  };
-  if (promo_code) {
-    const found = await stripe(env, `promotion_codes?active=true&code=${encodeURIComponent(promo_code)}`, { method: 'GET' });
-    if (!found?.data?.length) return { error: 'That promo code isn\'t valid.' };
-    data.discounts = [{ promotion_code: found.data[0].id }];
-  } else data.allow_promotion_codes = true;
-  const session = await stripe(env, 'checkout/sessions', { data });
-  return { url: session.url };
+  const rec = await createAgreement(env, { client_id: client.id, plan: await getEntityById(env, 'MembershipPlan', plan.id), signed_name, actor: client.email || 'join_page', ip });
+  return { agreement_id: rec?.id || null };
 }
 
 // QuickBooks-friendly CSV cell: neutralize formulas, quote when needed.
@@ -3551,7 +3510,7 @@ async function runSalesFunction(name, payload, ctx) {
         .sort((a, b) => (a.group === b.group ? a.price_cents - b.price_cents : a.group === 'try' ? -1 : 1));
       return {
         success: true, connected: salesConnected(env), plans,
-        agreement: { text: String(gym.agreement_text || SALES_DEFAULT_AGREEMENT), version: String(gym.agreement_version || '1') },
+        agreement: await currentAgreement(env),
       };
     }
 
@@ -3595,18 +3554,18 @@ async function runSalesFunction(name, payload, ctx) {
       const promo = p.promo_code ? String(p.promo_code).trim().toUpperCase() : '';
       if (promo && !/^[A-Z0-9_-]{2,40}$/.test(promo)) return { success: false, error: 'That promo code isn\'t valid.' };
       const signed = String(p.signed_name || '').trim().replace(/\s+/g, ' ');
-      if (salesNeedsAgreement(plan) && signed.toLowerCase() !== full_name.toLowerCase()) {
+      if (planNeedsAgreement(raw) && signed.toLowerCase() !== full_name.toLowerCase()) {
         return { success: false, code: 'agreement_required', error: 'Type your full name to sign the agreement.' };
       }
 
       const client = await salesFindOrCreateLead(env, { full_name, email, phone, plan });
       let agreement_id = null;
-      if (salesNeedsAgreement(plan)) agreement_id = (await salesSignAgreement(env, { client, plan, signed_name: signed, ip }))?.agreement_id || null;
+      if (planNeedsAgreement(raw)) agreement_id = (await salesSignAgreement(env, { client, plan, signed_name: signed, ip }))?.agreement_id || null;
       const origin = appOrigin(env, url);
       let out;
       try {
-        out = await salesCheckout(env, {
-          plan, plan_id: plan.id, client: { id: client.id, email, full_name }, client_id: client.id, method, promo_code: promo || null, agreement_id,
+        out = await createCheckoutSession(env, {
+          plan: raw, client, method, promo_code: promo || undefined, agreement_id: agreement_id || undefined,
           success_url: `${origin}/JoinBrigade?joined=1`, cancel_url: `${origin}/JoinBrigade?canceled=1`,
         });
       } catch (e) {
@@ -5646,7 +5605,7 @@ async function currentAgreement(env) {
 // Which plans need a signed agreement: recurring memberships. Drop-ins, trials,
 // intro offers, punch cards and one-time payments don't.
 const NO_AGREEMENT_KINDS = new Set(['drop_in', 'trial', 'intro', 'punch_card', 'comp']);
-const planNeedsAgreement = (plan) => !!plan && !NO_AGREEMENT_KINDS.has(plan.kind) && plan.interval !== 'once';
+const planNeedsAgreement = (plan) => !!plan && !NO_AGREEMENT_KINDS.has(planBillingKind(plan)) && plan.interval !== 'once';
 
 async function createAgreement(env, { client_id, plan, signed_name, actor, ip = '', membership_id = null }) {
   const a = await currentAgreement(env);
@@ -6203,15 +6162,9 @@ async function createCheckoutSession(env, { plan, client, method = 'card', promo
   if (plan.is_active === false) return { success: false, error: 'That plan isn\'t available.', code: 'plan_inactive' };
   if (!(centsOf(plan.price_cents) > 0)) return { success: false, error: 'That plan has no price yet.', code: 'no_price' };
   const bank = method === 'bank';
-  if (typeof requireAgreement === 'function') { // RULES owns the agreement rule
-    // eslint-disable-next-line no-undef
+  { // RULES owns the agreement rule
     const no = await requireAgreement(env, plan, agreement_id, { client_id: client.id });
     if (no) return no;
-  } else if (planBillingKind(plan) === 'membership') { // fallback until RULES is merged
-    const ag = agreement_id ? await getEntityById(env, 'Agreement', agreement_id) : null;
-    if (!ag || ag.client_id !== client.id || (ag.plan_id && ag.plan_id !== plan.id)) {
-      return { success: false, error: 'Sign the membership agreement first.', code: 'agreement_required' };
-    }
   }
   try {
     const rates = await planRates(env, plan);
@@ -6479,7 +6432,7 @@ async function handleInvoice(env, inv, paid) {
   if (paid) {
     const paidAt = inv.status_transitions?.paid_at ? new Date(inv.status_transitions.paid_at * 1000).toISOString() : nowISO();
     await upsertPayment(env, existing, { ...base, amount_cents: centsOf(inv.amount_paid ?? inv.total), refunded_cents: centsOf(existing?.refunded_cents), status: existing?.status === 'refunded' || existing?.status === 'partially_refunded' ? existing.status : 'paid', paid_at: paidAt });
-    const patch = { failed_payments: 0, last_payment_date: programToday(Date.parse(paidAt)) };
+    const patch = { failed_payments: 0, past_due_since: null, last_payment_date: programToday(Date.parse(paidAt)) };
     if (!['comped', 'paused', 'canceled'].includes(m.billing_status)) patch.billing_status = 'active';
     if (line?.period?.end) patch.next_payment_date = unixToKey(line.period.end);
     await patchEntity(env, await getEntityById(env, 'Membership', m.id), patch);
@@ -6489,7 +6442,7 @@ async function handleInvoice(env, inv, paid) {
     await upsertPayment(env, existing, { ...base, amount_cents: centsOf(inv.amount_due ?? inv.total), refunded_cents: 0, status: 'failed', paid_at: null });
   }
   const failed = numOr(m.failed_payments, 0) + 1;
-  await patchEntity(env, await getEntityById(env, 'Membership', m.id), { billing_status: 'past_due', failed_payments: failed });
+  await patchEntity(env, await getEntityById(env, 'Membership', m.id), { billing_status: 'past_due', failed_payments: failed, past_due_since: m.billing_status === 'past_due' && m.past_due_since ? m.past_due_since : programToday() });
   const g = await gymBillingSettings(env);
   await notifyBillingMember(env, m, {
     title: 'Your payment didn\'t go through',
@@ -6518,7 +6471,7 @@ async function handleRefund(env, charge) {
   if (!p) return 'no payment';
   const refunded = centsOf(charge.amount_refunded);
   const total = centsOf(p.amount_cents) || centsOf(charge.amount);
-  await patchEntity(env, p, { refunded_cents: refunded, status: refunded >= total ? 'refunded' : refunded > 0 ? 'partially_refunded' : p.status });
+  await patchEntity(env, p, { ...(refunded > centsOf(p.refunded_cents) ? { refunded_at: nowISO() } : {}), refunded_cents: refunded, status: refunded >= total ? 'refunded' : refunded > 0 ? 'partially_refunded' : p.status });
   return `refunded ${refunded}`;
 }
 

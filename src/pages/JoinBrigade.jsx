@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ArrowLeft, ArrowRight, Check, CreditCard, Landmark, Loader2 } from "lucide-react";
 import { BrandWordmarkImage } from "@/components/BrandMark";
-import { formatCents, intervalLabel, commitmentLabel } from "@/components/billing/sales/format";
+import { formatCents, intervalLabel, commitmentLabel } from "@/lib/money";
 
 // Public join page: pick a plan, tell us who you are, sign (memberships),
 // then Stripe Checkout. Free trials skip payment. No sign-in needed.

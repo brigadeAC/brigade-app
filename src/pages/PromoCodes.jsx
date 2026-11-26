@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Loader2, Plus, Tag } from "lucide-react";
 import { toast } from "sonner";
 import { invoke, errorMessage } from "@/components/classes/coach/api";
-import { formatCents } from "@/components/billing/sales/format";
+import { formatCents } from "@/lib/money";
 
 // Promo codes live in Stripe (coupon + promotion code); this page creates
 // and retires them. billing.view to see, settings.manage to change.

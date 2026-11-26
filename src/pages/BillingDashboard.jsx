@@ -7,7 +7,7 @@ import { Download, Loader2, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { todayKey, fromKey } from "@/lib/programs";
 import { invoke, errorMessage } from "@/components/classes/coach/api";
-import { formatCents } from "@/components/billing/sales/format";
+import { formatCents } from "@/lib/money";
 
 // Money at a glance: this month's revenue, who's behind, who renews soon,
 // recent refunds, and a CSV of payments for QuickBooks. billing.view only.

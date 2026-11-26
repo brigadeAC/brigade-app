@@ -4,7 +4,7 @@
 import test, { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { startServer, client, eastern, addDays, tokenOf, ADMIN, CRON_SECRET } from './server.mjs';
-import { startFakeStripe } from './fake-stripe-rules.mjs'; // stub: owned by CORE
+import { startFakeStripe, postWebhook } from './fake-stripe.mjs';
 
 let srv; let api; let fake; let admin; let coach; let manager; let member;
 let planA; let planB; let dropIn; let maxClient;
@@ -18,7 +18,8 @@ async function staff(email, name) {
   return { token: reg.data.token, id: reg.data.user.id };
 }
 const get = async (type, id) => (await api.call('GET', `entities/${type}/${id}`, undefined, admin.token)).data;
-const reqsTo = (method, path) => fake.requests.filter((r) => r.method === method && r.path === path);
+const WHSEC = 'whsec_fake';
+const reqsTo = (method, path) => fake.requests.filter((r) => r.method === method && r.path === `/v1/${path}`);
 const auditLog = async () => JSON.stringify((await api.call('GET', 'audit?limit=500', undefined, admin.token)).data);
 
 // A Stripe-linked membership with a live subscription in the fake.
@@ -26,8 +27,8 @@ let subN = 0;
 async function stripeMembership(extra = {}) {
   subN += 1;
   const subId = `sub_seed_${subN}`;
-  fake.seed({
-    id: subId, object: 'subscription', status: 'active', customer: `cus_seed_${subN}`,
+  fake.seed('subscriptions', {
+    id: subId, status: 'active', customer: `cus_seed_${subN}`,
     current_period_start: unix(addDays(today, -10)), current_period_end: unix(addDays(today, 20)),
     items: { object: 'list', data: [{ id: `si_seed_${subN}`, price: { id: 'price_a' } }] },
   });
@@ -38,12 +39,24 @@ async function stripeMembership(extra = {}) {
   }, admin.token);
 }
 const localMembership = (extra = {}) => api.create('Membership', {
-  client_id: maxClient.id, plan_id: planA.id, start_date: addDays(today, -40), status: 'active', billing_status: 'none', ...extra,
+  client_id: maxClient.id, plan_id: planA.id, start_date: addDays(today, -40), status: 'active', billing_status: 'none', commitment_ends: null, ...extra, // null: no commitment unless the test sets one
 }, admin.token);
+
+// A paid Payment the real way: a Stripe-linked membership and a signed
+// invoice.paid webhook (Payments can't be written through the entity API).
+async function paidPayment(amount) {
+  const m = await stripeMembership();
+  const inv = fake.invoiceFor(m.stripe_subscription_id, { amount_paid: amount });
+  const r = await postWebhook(srv.base, WHSEC, fake.event('invoice.paid', inv));
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+  const p = (await api.list('Payment', admin.token)).find((x) => x.stripe_invoice_id === inv.id);
+  assert.ok(p, 'webhook wrote the Payment');
+  return p;
+}
 
 before(async () => {
   fake = await startFakeStripe();
-  srv = await startServer(undefined, { vars: { STRIPE_SECRET_KEY: 'sk_test_fake', STRIPE_API_BASE: fake.url } });
+  srv = await startServer(undefined, { vars: { STRIPE_SECRET_KEY: 'sk_test_fake', STRIPE_WEBHOOK_SECRET: WHSEC, STRIPE_API_BASE: fake.url } });
   api = client(srv.base);
   const first = await api.call('POST', 'auth/register', { email: ADMIN.email, password: ADMIN.password, full_name: 'Ada Admin' });
   admin = { token: first.data.token, id: first.data.user.id };
@@ -107,8 +120,8 @@ test('a hold pauses Stripe collection and ending it resumes', async () => {
   assert.equal(h.success, true, JSON.stringify(h));
   const pause = reqsTo('POST', `subscriptions/${m.stripe_subscription_id}`);
   assert.equal(pause.length, 1);
-  assert.equal(pause[0].body['pause_collection[behavior]'], 'void');
-  assert.ok(Number(pause[0].body['pause_collection[resumes_at]']) > unix(addDays(today, 5)) - 86400);
+  assert.equal(pause[0].body.pause_collection.behavior, 'void');
+  assert.ok(Number(pause[0].body.pause_collection.resumes_at) > unix(addDays(today, 5)) - 86400);
   let fresh = await get('Membership', m.id);
   assert.equal(fresh.billing_status, 'paused');
   const holdId = fresh.holds[0].id;
@@ -133,8 +146,8 @@ test('changePlan now prorates; next_cycle schedules at the period end', async ()
   assert.equal(now.success, true, JSON.stringify(now));
   const upd = reqsTo('POST', `subscriptions/${m.stripe_subscription_id}`);
   assert.equal(upd.length, 1);
-  assert.equal(upd[0].body['items[0][id]'], `si_seed_${subN}`);
-  assert.equal(upd[0].body['items[0][price]'], 'price_b');
+  assert.equal(upd[0].body.items[0].id, `si_seed_${subN}`);
+  assert.equal(upd[0].body.items[0].price, 'price_b');
   assert.equal(upd[0].body.proration_behavior, 'create_prorations');
   assert.equal(now.membership.plan_id, planB.id);
 
@@ -145,10 +158,10 @@ test('changePlan now prorates; next_cycle schedules at the period end', async ()
   const created = reqsTo('POST', 'subscription_schedules');
   assert.equal(created.length, 1);
   assert.equal(created[0].body.from_subscription, m2.stripe_subscription_id);
-  const sched = fake.requests.find((r) => r.method === 'POST' && r.path.startsWith('subscription_schedules/'));
-  assert.equal(sched.body['phases[0][items][0][price]'], 'price_a');
-  assert.equal(sched.body['phases[1][items][0][price]'], 'price_b');
-  assert.equal(sched.body['phases[1][proration_behavior]'], 'none');
+  const sched = fake.requests.find((r) => r.method === 'POST' && r.path.startsWith('/v1/subscription_schedules/'));
+  assert.equal(sched.body.phases[0].items[0].price, 'price_a');
+  assert.equal(sched.body.phases[1].items[0].price, 'price_b');
+  assert.equal(sched.body.phases[1].proration_behavior, 'none');
   assert.equal(reqsTo('POST', `subscriptions/${m2.stripe_subscription_id}`).length, 0, 'no immediate price change');
   assert.equal(later.membership.plan_id, planA.id);
   assert.equal(later.membership.pending_plan_id, planB.id);
@@ -171,7 +184,7 @@ test('cancel inside the commitment needs a confirmed buyout, then charges it and
   assert.equal(item[0].body.amount, '30000');
   assert.equal(item[0].body.customer, m.stripe_customer_id);
   assert.equal(reqsTo('POST', 'invoices').length, 1);
-  assert.ok(fake.requests.some((r) => /^invoices\/.+\/pay$/.test(r.path)));
+  assert.ok(fake.requests.some((r) => /^\/v1\/invoices\/.+\/pay$/.test(r.path)));
   assert.equal(reqsTo('DELETE', `subscriptions/${m.stripe_subscription_id}`).length, 1);
   const fresh = await get('Membership', m.id);
   assert.equal(fresh.billing_status, 'canceled');
@@ -195,7 +208,7 @@ test('cancel after the commitment ends at the period end', async () => {
 });
 
 test('refunds: partial then the rest, through Stripe; Payment updated', async () => {
-  const p = await api.create('Payment', { client_id: maxClient.id, amount_cents: 15000, refunded_cents: 0, status: 'paid', stripe_payment_intent_id: 'pi_test_1', paid_at: new Date().toISOString(), description: 'Unlimited' }, admin.token);
+  const p = await paidPayment(15000);
   fake.clear();
   const part = await api.fn('refundPayment', { payment_id: p.id, amount_cents: 5000, reason: 'Missed week' }, manager.token);
   assert.equal(part.success, true, JSON.stringify(part));
@@ -203,7 +216,7 @@ test('refunds: partial then the rest, through Stripe; Payment updated', async ()
   assert.equal(part.payment.status, 'partially_refunded');
   const r = reqsTo('POST', 'refunds');
   assert.equal(r.length, 1);
-  assert.equal(r[0].body.payment_intent, 'pi_test_1');
+  assert.equal(r[0].body.payment_intent, p.stripe_payment_intent_id);
   assert.equal(r[0].body.amount, '5000');
   assert.equal((await api.fn('refundPayment', { payment_id: p.id, amount_cents: 20000 }, manager.token)).success, false, 'not more than is left');
   assert.equal((await api.fn('refundPayment', { payment_id: p.id, amount_cents: -5 }, manager.token)).success, false);
@@ -223,8 +236,8 @@ test('comp: no charges until the date, then back to normal', async () => {
   assert.equal(c.membership.billing_status, 'comped');
   assert.equal(c.membership.comped_until, addDays(today, 30));
   const upd = reqsTo('POST', `subscriptions/${m.stripe_subscription_id}`);
-  assert.equal(upd[0].body['pause_collection[behavior]'], 'void');
-  assert.ok(upd[0].body['pause_collection[resumes_at]']);
+  assert.equal(upd[0].body.pause_collection.behavior, 'void');
+  assert.ok(upd[0].body.pause_collection.resumes_at);
   assert.equal((await api.fn('compMembership', { membership_id: m.id, until: addDays(today, -1) }, manager.token)).success, false, 'no past dates');
   const end = await api.fn('compMembership', { membership_id: m.id, end: true }, manager.token);
   assert.equal(end.success, true, JSON.stringify(end));
@@ -233,7 +246,7 @@ test('comp: no charges until the date, then back to normal', async () => {
 
 test('permissions: coaches and members cannot change billing; managers can', async () => {
   const m = await localMembership();
-  const p = await api.create('Payment', { client_id: maxClient.id, amount_cents: 1000, refunded_cents: 0, status: 'paid' }, admin.token);
+  const p = await paidPayment(1000);
   const calls = [
     ['changePlan', { membership_id: m.id, plan_id: planB.id, when: 'now' }],
     ['cancelMembership', { membership_id: m.id, reason: 'x' }],
@@ -283,10 +296,7 @@ test('memberships with no Stripe link change locally, with no Stripe calls', asy
   const comp = await api.fn('compMembership', { membership_id: a.id, until: null }, manager.token);
   assert.equal(comp.success, true, JSON.stringify(comp));
   assert.equal(comp.membership.billing_status, 'comped');
-  const cash = await api.create('Payment', { client_id: maxClient.id, amount_cents: 2500, refunded_cents: 0, status: 'paid', method: 'cash' }, admin.token);
-  const r = await api.fn('refundPayment', { payment_id: cash.id }, manager.token);
-  assert.equal(r.success, true, JSON.stringify(r));
-  assert.equal(r.payment.status, 'refunded');
+  // (No local cash refund here: Payments come only from Stripe webhooks now.)
   assert.equal(fake.requests.length, 0);
 });
 

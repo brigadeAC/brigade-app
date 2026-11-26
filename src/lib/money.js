@@ -3,9 +3,11 @@ const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" 
 const usdWhole = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 
 // formatCents(18900) -> "$189.00"; { whole: true } drops ".00" on round amounts.
+// Blank (null/undefined/"") shows as "—".
 export function formatCents(cents, { whole = false } = {}) {
+  if (cents === null || cents === undefined || cents === "") return "—";
   const n = Number(cents);
-  if (!Number.isFinite(n)) return "";
+  if (!Number.isFinite(n)) return "—";
   if (whole && n % 100 === 0) return usdWhole.format(n / 100);
   return usd.format(n / 100);
 }
@@ -25,4 +27,20 @@ export function planPriceLabel(plan) {
   const per = { month: "month", year: "year", week: "week" }[plan.interval || "month"];
   if (plan.interval === "once") return `${formatCents(plan.price_cents)} one time`;
   return `${formatCents(plan.price_cents)}/${n > 1 ? `${n} ${per}s` : per}`;
+}
+
+// "/month", "every 3 months", "one time".
+export function intervalLabel(plan) {
+  const n = Number(plan?.interval_count) || 1;
+  switch (plan?.interval) {
+    case "month": return n === 1 ? "/month" : `every ${n} months`;
+    case "year": return n === 1 ? "/year" : `every ${n} years`;
+    case "week": return n === 1 ? "/week" : `every ${n} weeks`;
+    default: return "one time";
+  }
+}
+
+export function commitmentLabel(months) {
+  const m = Number(months) || 0;
+  return m > 0 ? `${m}-month commitment` : "Month to month";
 }

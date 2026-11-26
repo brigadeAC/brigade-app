@@ -3,7 +3,7 @@
 import test, { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { startServer, client, eastern, addDays, tokenOf, ADMIN } from './server.mjs';
-import { startFakeStripe } from './fake-stripe-sales.mjs';
+import { startFakeStripe, postWebhook } from './fake-stripe.mjs';
 
 let fake; let srv; let off; let api; let offApi; let admin; let coach; let manager;
 let unlimited; let privatePlan; let trial; let intro; let offPlan; let offTrial;
@@ -17,12 +17,28 @@ async function staff(a, email, name, role) {
   if (role) assert.equal((await a.fn('setStaffRole', { user_id: reg.data.user.id, role }, admin.token)).success, true);
   return { token: reg.data.token, id: reg.data.user.id };
 }
-const checkoutCalls = () => fake.requests.filter((r) => r.path === '/v1/checkout/sessions');
+const WHSEC = 'whsec_fake';
+const checkoutCalls = () => fake.requests.filter((r) => r.method === 'POST' && r.path === '/v1/checkout/sessions');
+const unixOf = (iso) => Math.floor(Date.parse(iso) / 1000);
+// Payments come only from Stripe: send a signed invoice webhook for a Stripe-linked membership.
+async function invoiceEvent({ id, sub, amount, tax = 0, discount = 0, at, description, failed = false, periodEnd }) {
+  const inv = {
+    id, object: 'invoice', subscription: sub, status: failed ? 'open' : 'paid',
+    amount_paid: failed ? 0 : amount, amount_due: amount, total: amount, payment_intent: `pi_${id}`,
+    total_tax_amounts: tax ? [{ amount: tax }] : [], total_discount_amounts: discount ? [{ amount: discount }] : [],
+    status_transitions: { paid_at: failed ? null : unixOf(at) },
+    lines: { object: 'list', data: [{ description, period: { start: unixOf(at), end: periodEnd || unixOf(at) + 30 * 86400 } }] },
+  };
+  const r = await postWebhook(srv.base, WHSEC, fake.event(failed ? 'invoice.payment_failed' : 'invoice.paid', inv));
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+  return inv;
+}
 
 before(async () => {
   fake = await startFakeStripe();
+  fake.seed('products', { id: 'prod_secret', name: 'Unlimited' }); // the plan below says it is already in Stripe
   [srv, off] = await Promise.all([
-    startServer(0, { vars: { STRIPE_SECRET_KEY: 'sk_test_fake', STRIPE_API_BASE: fake.base, SALES_RATE_LIMIT: 8 } }),
+    startServer(0, { vars: { STRIPE_SECRET_KEY: 'sk_test_fake', STRIPE_WEBHOOK_SECRET: WHSEC, STRIPE_API_BASE: fake.url, SALES_RATE_LIMIT: 8 } }),
     startServer(0),
   ]);
   api = client(srv.base);
@@ -46,7 +62,7 @@ before(async () => {
   offPlan = await offApi.create('MembershipPlan', { name: 'Unlimited', kind: 'unlimited', is_active: true, public: true, price_cents: 18900, interval: 'month' }, offAdmin);
   offTrial = await offApi.create('MembershipPlan', { name: 'Free Trial Class', kind: 'trial', is_active: true, public: true, price_cents: 0 }, offAdmin);
 });
-after(() => { srv?.stop(); off?.stop(); fake?.stop(); });
+after(async () => { srv?.stop(); off?.stop(); await fake?.stop(); });
 
 test('publicPlans works signed out, lists only public active plans, and hides private fields', async () => {
   const r = await api.fn('publicPlans', {});
@@ -84,16 +100,16 @@ test('publicCheckout creates a lead, signs the agreement and opens Stripe Checko
     plan_id: unlimited.id, full_name: 'Pat Prospect', email: 'Pat@Example.test', phone: '423-555-0100', method: 'bank', signed_name: 'pat prospect',
   });
   assert.equal(r.success, true, JSON.stringify(r));
-  assert.match(r.url, /^https:\/\/checkout\.stripe\.test\/cs_test_/);
+  assert.match(r.url, /^https:\/\/checkout\.stripe\.test\/c\/pay\/cs_test_/);
   const call = checkoutCalls().at(-1);
   assert.equal(call.body.mode, 'subscription');
-  assert.equal(call.body['payment_method_types[0]'], 'us_bank_account');
-  assert.equal(call.body.customer_email, 'pat@example.test');
+  assert.deepEqual(call.body.payment_method_types, ['us_bank_account']);
+  assert.equal(fake.get('customers', call.body.customer).email, 'pat@example.test');
   assert.match(call.body.success_url, /\/JoinBrigade\?joined=1$/);
   const clients = await api.list('Client', admin.token);
   const lead = clients.find((c) => c.email === 'pat@example.test');
   assert.equal(lead.status, 'lead');
-  assert.equal(call.body['metadata[client_id]'], lead.id);
+  assert.equal(call.body.metadata.client_id, lead.id);
   const agreements = await api.list('Agreement', admin.token);
   assert.ok(agreements.some((a) => a.client_id === lead.id && a.plan_id === unlimited.id && a.signed_name === 'pat prospect'));
 });
@@ -159,7 +175,7 @@ test('promo codes: create sends a coupon and a promotion code to Stripe; only se
   assert.equal(list.codes.length, 2);
   const arch = await api.fn('archivePromoCode', { id: r.promo_code.id }, admin.token);
   assert.equal(arch.promo_code.active, false);
-  assert.equal(fake.store.promotion_codes.find((x) => x.code === 'SUMMER25').active, false);
+  assert.equal(fake.all('promotion_codes').find((x) => x.code === 'SUMMER25').active, false);
   const off = await offApi.call('POST', 'auth/login', { email: ADMIN.email, password: ADMIN.password });
   const offList = await offApi.fn('listPromoCodes', {}, off.data.token);
   assert.equal(offList.connected, false);
@@ -170,16 +186,19 @@ test('billing dashboard and QuickBooks CSV from seeded payments', async () => {
   const a = await api.create('Client', { full_name: 'Alex Able', email: 'alex@example.test', status: 'active' }, admin.token);
   const b = await api.create('Client', { full_name: '=HYPERLINK("http://evil")', email: 'evil@example.test', status: 'active' }, admin.token);
   const c = await api.create('Client', { full_name: 'Casey, "CJ" Jones', email: 'cj@example.test', status: 'active' }, admin.token);
-  const mA = await api.create('Membership', { client_id: a.id, plan_id: unlimited.id, start_date: addDays(today, -60), status: 'active', billing_status: 'active', next_payment_date: addDays(today, 3) }, admin.token);
-  const mB = await api.create('Membership', { client_id: b.id, plan_id: unlimited.id, start_date: addDays(today, -60), status: 'active', billing_status: 'past_due', failed_payments: 2 }, admin.token);
-  await api.create('Membership', { client_id: c.id, plan_id: unlimited.id, start_date: addDays(today, -60), status: 'active', billing_status: 'paused' }, admin.token);
+  const linked = { stripe_customer_id: 'cus_dash', payment_method: 'card' };
+  const mA = await api.create('Membership', { client_id: a.id, plan_id: unlimited.id, start_date: addDays(today, -60), status: 'active', billing_status: 'active', stripe_subscription_id: 'sub_dash_a', ...linked }, admin.token);
+  const mB = await api.create('Membership', { client_id: b.id, plan_id: unlimited.id, start_date: addDays(today, -60), status: 'active', billing_status: 'active', failed_payments: 1, stripe_subscription_id: 'sub_dash_b', ...linked }, admin.token);
+  await api.create('Membership', { client_id: c.id, plan_id: unlimited.id, start_date: addDays(today, -60), status: 'active', billing_status: 'paused', stripe_subscription_id: 'sub_dash_c', ...linked, payment_method: 'bank' }, admin.token);
   await api.create('Membership', { client_id: c.id, plan_id: unlimited.id, start_date: addDays(today, -60), status: 'active', billing_status: 'comped' }, admin.token);
   const at = `${today}T16:00:00.000Z`;
-  await api.create('Payment', { client_id: a.id, membership_id: mA.id, stripe_invoice_id: 'in_1', amount_cents: 19463, tax_cents: 563, discount_cents: 0, refunded_cents: 0, status: 'paid', method: 'card', paid_at: at, description: 'Unlimited' }, admin.token);
-  await api.create('Payment', { client_id: c.id, stripe_invoice_id: 'in_2', amount_cents: 10000, tax_cents: 290, discount_cents: 500, refunded_cents: 2500, status: 'partially_refunded', method: 'bank', paid_at: at, refunded_at: at, description: '-1+1 tricky' }, admin.token);
-  await api.create('Payment', { client_id: b.id, membership_id: mB.id, stripe_invoice_id: 'in_3', amount_cents: 19463, status: 'failed', method: 'card', paid_at: at }, admin.token);
   const lastMonth = addDays(`${month}-01`, -5);
-  await api.create('Payment', { client_id: a.id, stripe_invoice_id: 'in_old', amount_cents: 99999, tax_cents: 0, status: 'paid', method: 'card', paid_at: `${lastMonth}T16:00:00.000Z` }, admin.token);
+  await invoiceEvent({ id: 'in_old', sub: 'sub_dash_a', amount: 99999, at: `${lastMonth}T16:00:00.000Z` });
+  await invoiceEvent({ id: 'in_1', sub: 'sub_dash_a', amount: 19463, tax: 563, at, description: 'Unlimited', periodEnd: unixOf(`${addDays(today, 3)}T16:00:00.000Z`) });
+  const in2 = await invoiceEvent({ id: 'in_2', sub: 'sub_dash_c', amount: 10000, tax: 290, discount: 500, at, description: '-1+1 tricky' });
+  await postWebhook(srv.base, WHSEC, fake.event('charge.refunded', { id: 'ch_dash_2', object: 'charge', amount: 10000, amount_refunded: 2500, payment_intent: in2.payment_intent }));
+  await invoiceEvent({ id: 'in_3', sub: 'sub_dash_b', amount: 19463, at, failed: true }); // second failed payment for mB
+  assert.equal((await api.list('Payment', admin.token)).length, 4);
 
   assert.equal((await api.fn('billingDashboard', {}, coach.token)).code, 'forbidden');
   assert.equal((await api.fn('exportPaymentsCsv', {}, coach.token)).code, 'forbidden');
@@ -209,7 +228,7 @@ test('billing dashboard and QuickBooks CSV from seeded payments', async () => {
   assert.ok(!e.csv.includes('HYPERLINK'), 'failed payment not exported');
 
   // Formula guard on a customer name in an exported row.
-  await api.create('Payment', { client_id: b.id, stripe_invoice_id: 'in_4', amount_cents: 100, status: 'paid', method: 'card', paid_at: at, description: '@SUM(A1)' }, admin.token);
+  await invoiceEvent({ id: 'in_4', sub: 'sub_dash_b', amount: 100, at, description: '@SUM(A1)' });
   const e2 = await api.fn('exportPaymentsCsv', { from: today, to: today }, admin.token);
   assert.ok(e2.csv.includes(`${us},"'=HYPERLINK(""http://evil"")",'@SUM(A1),1.00`), e2.csv);
   assert.equal((await api.fn('exportPaymentsCsv', { from: today, to: addDays(today, -1) }, admin.token)).success, false);

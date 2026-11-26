@@ -1,17 +1,8 @@
 // Money and date display for the membership billing screens.
-// (Swap for the shared Phase 4 money formatter at merge if one exists.)
+// Money comes from the shared formatter in src/lib/money.js.
 import { fromKey } from "@/lib/programs";
 
-export const formatCents = (cents) =>
-  cents === null || cents === undefined || cents === ""
-    ? "—"
-    : (Number(cents) / 100).toLocaleString("en-US", { style: "currency", currency: "USD" });
-
-// "12.50" -> 1250; blank/invalid -> null.
-export const dollarsToCents = (v) => {
-  const n = Number(String(v ?? "").replace(/[$,\s]/g, ""));
-  return Number.isFinite(n) && n > 0 ? Math.round(n * 100) : null;
-};
+export { formatCents, dollarsToCents } from "@/lib/money";
 
 export const fmtDay = (k) => (k ? fromKey(k).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "—");
 export const fmtStamp = (iso) => (iso ? new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "—");

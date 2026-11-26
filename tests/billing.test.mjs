@@ -28,8 +28,12 @@ const makeClass = async () => {
   return api.create('ClassSession', { class_type_id: crossfit.id, class_type_name: 'CrossFit', date, start_time: time, duration_min: 60, slot_id: null }, admin.token);
 };
 const hook = (event) => postWebhook(srv.base, WHSEC, event);
-// A membership agreement (RULES writes these through signAgreement; admin can create one directly here).
-const agreementFor = (c, plan) => api.create('Agreement', { client_id: c.id, plan_id: plan.id, text_version: 1, signed_name: c.full_name, signed_at: new Date().toISOString() }, admin.token);
+// A membership agreement, signed the real way (RULES' signAgreement).
+const agreementFor = async (who, plan) => {
+  const r = await api.fn('signAgreement', { plan_id: plan.id, signed_name: who.client.full_name }, who.token);
+  assert.equal(r.success, true, JSON.stringify(r));
+  return { id: r.agreement_id };
+};
 
 before(async () => {
   fake = await startFakeStripe();
@@ -113,7 +117,7 @@ test('syncPlanToStripe creates a product, a card price, a bank price and a tax r
 test('startCheckout: card vs bank subscription, one-time drop-in, promo codes, agreement', async () => {
   const noAgreement = await api.fn('startCheckout', { plan_id: monthly.id, method: 'card' }, max.token);
   assert.equal(noAgreement.code, 'agreement_required');
-  const ag = await agreementFor(max.client, monthly);
+  const ag = await agreementFor(max, monthly);
   const plan = (await api.list('MembershipPlan', admin.token)).find((p) => p.id === monthly.id);
 
   const card = await api.fn('startCheckout', { plan_id: monthly.id, method: 'card', agreement_id: ag.id }, max.token);
@@ -157,7 +161,7 @@ test('startCheckout: card vs bank subscription, one-time drop-in, promo codes, a
 
 let maxSub;
 test('webhooks: checkout + invoice.paid -> active membership and a Payment; duplicates applied once', async () => {
-  const ag = await agreementFor(max.client, monthly);
+  const ag = await agreementFor(max, monthly);
   const start = await api.fn('startCheckout', { plan_id: monthly.id, method: 'card', agreement_id: ag.id }, max.token);
   const { session, subscription } = fake.completeCheckout(start.session_id, { last4: '4242', brand: 'visa' });
   maxSub = subscription.id;

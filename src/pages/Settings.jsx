@@ -684,11 +684,10 @@ export default function Settings() {
         {!isClient && (
           <TabsContent value="compliance" className="space-y-6">
             <ComplianceSettings />
-            <MembershipAgreementSettings />
           </TabsContent>
         )}
 
-        {canGymBilling && <TabsContent value="billing" className="space-y-6"><GymBillingAdmin /></TabsContent>}
+        {canGymBilling && <TabsContent value="billing" className="space-y-6"><GymBillingAdmin /><MembershipAgreementSettings /></TabsContent>}
 
         <TabsContent value="account" className="space-y-6">
           <Passkeys />
