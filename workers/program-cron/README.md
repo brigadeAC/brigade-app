@@ -2,7 +2,8 @@
 
 A tiny Cloudflare Worker that runs every 15 minutes and POSTs to
 `https://brigade-app.pages.dev/api/cron/program-tick`, which sends any program
-messages that are due. The app itself also ticks lazily whenever a client opens
+messages that are due, runs the class jobs (new classes, no-shows) and sends
+class reminders (each booking gets one, never twice). The app itself also ticks lazily whenever a client opens
 it, so this Worker just makes sure messages go out on time even when nobody is
 in the app.
 

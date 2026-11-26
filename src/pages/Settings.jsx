@@ -25,6 +25,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -68,7 +69,9 @@ export default function Settings() {
     new_messages: true,
     gamification_alerts: true,
     new_plans: true,
-    trainer_feedback: true
+    trainer_feedback: true,
+    class_reminders: true,
+    class_reminder_minutes: 120
   });
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
@@ -109,7 +112,9 @@ export default function Settings() {
           new_messages: userNotes.new_messages ?? true,
           gamification_alerts: userNotes.gamification_alerts ?? true,
           new_plans: userNotes.new_plans ?? true,
-          trainer_feedback: userNotes.trainer_feedback ?? true
+          trainer_feedback: userNotes.trainer_feedback ?? true,
+          class_reminders: userNotes.class_reminders ?? true,
+          class_reminder_minutes: userNotes.class_reminder_minutes ?? 120
         });
       } catch (error) {
         console.error("Failed to load user:", error);
@@ -539,6 +544,34 @@ export default function Settings() {
 
               {isClient && (
                 <>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-foreground">Class Reminders</p>
+                      <p className="text-sm text-foreground">A reminder before each class you book</p>
+                    </div>
+                    <Switch
+                      checked={notifications.class_reminders}
+                      onCheckedChange={(v) => handleNotificationChange('class_reminders', v)} />
+                  </div>
+                  {notifications.class_reminders && (
+                    <div className="flex items-center justify-between gap-4">
+                      <Label htmlFor="class-reminder-time" className="text-sm text-foreground font-normal">Send it</Label>
+                      <Select
+                        value={String(notifications.class_reminder_minutes)}
+                        onValueChange={(v) => handleNotificationChange('class_reminder_minutes', Number(v))}>
+                        <SelectTrigger id="class-reminder-time" className="w-44">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="30">30 minutes before</SelectItem>
+                          <SelectItem value="60">1 hour before</SelectItem>
+                          <SelectItem value="120">2 hours before</SelectItem>
+                          <SelectItem value="180">3 hours before</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="font-medium text-foreground">New Plans</p>

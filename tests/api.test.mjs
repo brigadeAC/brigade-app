@@ -333,6 +333,57 @@ test('cancelling a class releases everyone and tells them', async () => {
   assert.equal((await api.fn('cancelClassSession', { session_id: s.id }, members.alice.token)).success, false);
 });
 
+test('booking, waitlist, cancel and moving up each tell the member', async () => {
+  const s = await makeClass(45, { capacity: 1 });
+  const name = s.class_type_name;
+  const mine = async (m) => (await api.list('Notification', m.token)).filter((n) => n.type === 'class' && n.message.includes(name));
+  const a = await book(members.alice, s);
+  assert.equal(a.status, 'reserved');
+  assert.equal((await book(members.bob, s)).status, 'waitlisted');
+  assert.ok((await mine(members.alice)).some((n) => n.title === 'You are booked'));
+  assert.ok((await mine(members.bob)).some((n) => /waitlist/i.test(n.title) && /number 1/.test(n.message)));
+  assert.equal((await mine(members.cara)).length, 0, 'nobody else hears about it');
+  assert.equal((await api.fn('cancelReservation', { reservation_id: a.reservation.id }, members.alice.token)).success, true);
+  assert.ok((await mine(members.alice)).some((n) => n.title === 'Booking cancelled' && /You cancelled/.test(n.message)));
+  assert.ok((await mine(members.bob)).some((n) => n.title === 'You are in'));
+  const b = await api.fn('bookClass', { session_id: (await makeClass(46)).id, client_id: members.cara.client.id }, coach.token);
+  assert.equal(b.success, true);
+  await api.fn('cancelReservation', { reservation_id: b.reservation.id }, coach.token);
+  const caraNotes = (await api.list('Notification', members.cara.token)).filter((n) => n.message.includes(b.session.class_type_name));
+  assert.ok(caraNotes.some((n) => n.title === 'You are booked'), 'a coach booking for a member tells the member');
+  assert.ok(caraNotes.some((n) => /The gym cancelled/.test(n.message)));
+});
+test('class reminders: sent once, at the right time, and not when turned off', async () => {
+  const dan = await addMember('dan');
+  const eve = await addMember('eve');
+  const off = await api.call('PUT', 'auth/me', { notifications: { class_reminders: false } }, eve.token);
+  assert.equal(off.status, 200);
+  const moveTo = (s, hoursOut) => { const { date, time } = eastern(Date.now() + hoursOut * 3600000); return api.update('ClassSession', s.id, { date, start_time: time }, coach.token); };
+  const due = await makeClass(26); // booked well ahead, then the class comes within 2 hours
+  const early = await makeClass(27); // still more than 2 hours away
+  assert.equal((await book(dan, due)).success, true);
+  assert.equal((await book(eve, due)).success, true);
+  assert.equal((await book(dan, early)).success, true);
+  await moveTo(due, 1.5);
+  await moveTo(early, 2.5);
+  const late = await makeClass(1.5); // booked inside the reminder window: the booking notice is enough
+  assert.equal((await book(dan, late)).success, true);
+  const ticks = await Promise.all([1, 2, 3].map(() => api.call('POST', 'cron/program-tick', {}, null, { 'x-cron-secret': CRON_SECRET })));
+  for (const t of ticks) assert.equal(t.status, 200);
+  await api.call('POST', 'cron/program-tick', {}, null, { 'x-cron-secret': CRON_SECRET });
+  const reminders = async (m, s) => (await api.list('Notification', m.token)).filter((n) => n.title === 'Class reminder' && n.message.includes(s.class_type_name));
+  const got = await reminders(dan, due);
+  assert.equal(got.length, 1, 'sent exactly once');
+  assert.match(got[0].message, /starts (today|tomorrow) at \d{1,2}:\d{2} (AM|PM)/);
+  assert.equal((await reminders(eve, due)).length, 0, 'turned off');
+  assert.equal((await reminders(dan, early)).length, 0, 'not early');
+  assert.equal((await reminders(dan, late)).length, 0, 'not right after booking');
+  // A member can choose 3 hours before; the class 2.5 hours out is then due.
+  await api.call('PUT', 'auth/me', { notifications: { class_reminder_minutes: 180 } }, dan.token);
+  await api.call('POST', 'cron/program-tick', {}, null, { 'x-cron-secret': CRON_SECRET });
+  assert.equal((await reminders(dan, early)).length, 1);
+});
+
 /* ---------------- schedule ---------------- */
 test('weekly slot: makes classes once, follows edits, keeps booked ones', async () => {
   const today = eastern().date;

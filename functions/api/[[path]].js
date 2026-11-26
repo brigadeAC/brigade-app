@@ -1553,12 +1553,139 @@ async function classActorEmail(env, actor, session) {
 }
 // Gym -> member notice (Notification row + push). Sent with server authority,
 // so it bypasses pushForNotification's member->member block on purpose.
-async function notifyClassMember(env, { loginId, title, message, createdBy }) {
+async function notifyClassMember(env, { loginId, title, message, createdBy, tag = 'classes' }) {
   if (!loginId) return false;
   await insertEntity(env, 'Notification', { user_id: loginId, type: 'class', title, message, link: '/ClientClasses', read: false }, createdBy);
-  const p = sendPushToUser(env, loginId, { title, body: String(message).slice(0, 140), url: '/ClientClasses', tag: 'classes' });
+  const p = sendPushToUser(env, loginId, { title, body: String(message).slice(0, 140), url: '/ClientClasses', tag });
   if (env.__waitUntil) env.__waitUntil(p); else await p;
   return true;
+}
+
+// Booking confirmations: tell the member when they book, join the waitlist or
+// cancel (themselves or by a coach). Best-effort: a failed notice never undoes
+// the booking.
+async function notifyBookingChange(env, { reservation, session, actor, kind, late = false }) {
+  const loginId = reservation?.client_user_id;
+  if (!loginId) return false;
+  const name = session?.class_type_name || reservation.class_name || 'class';
+  const when = session ? classWhen(session) : '';
+  const byCoach = actor && actor.id !== loginId;
+  const notes = {
+    reserved: { title: 'You are booked', message: `${name} on ${when}. See you there.` },
+    waitlisted: {
+      title: 'You are on the waitlist',
+      message: `${name} on ${when} is full. You are number ${reservation.waitlist_position || 1} on the waitlist. We will tell you if a spot opens.`,
+    },
+    cancelled: {
+      title: 'Booking cancelled',
+      message: `${byCoach ? 'The gym cancelled your spot in' : 'You cancelled your spot in'} ${name} on ${when}.${late ? ' This counts as a late cancel.' : ''}`,
+    },
+    left_waitlist: { title: 'Off the waitlist', message: `${byCoach ? 'The gym took you off' : 'You left'} the waitlist for ${name} on ${when}.` },
+  }[kind];
+  if (!notes) return false;
+  try {
+    return await notifyClassMember(env, { loginId, ...notes, createdBy: await classActorEmail(env, actor, session) });
+  } catch (e) {
+    console.error('booking notice failed', e?.message);
+    return false;
+  }
+}
+
+/* ---- class reminders (run by the 15-minute cron) ---- */
+// Members choose on/off and how long before class (users.data.notifications:
+// class_reminders, class_reminder_minutes). Default: on, 2 hours before.
+const REMINDER_CHOICES = [30, 60, 120, 180];
+const REMINDER_DEFAULT_MIN = 120;
+function reminderPrefs(userData) {
+  const n = (userData && typeof userData === 'object' && userData.notifications) || {};
+  const mins = Number(n.class_reminder_minutes);
+  return {
+    on: n.class_reminders !== false,
+    minutes: REMINDER_CHOICES.includes(mins) ? mins : REMINDER_DEFAULT_MIN,
+    email: n.email_reminders !== false,
+  };
+}
+const classTimeLabel = (session, today) => {
+  const mins = hmToMin(session.start_time) ?? 0;
+  const h = Math.floor(mins / 60);
+  const time = `${h % 12 === 0 ? 12 : h % 12}:${String(mins % 60).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
+  return session.date === today ? `today at ${time}` : session.date === pAddDays(today, 1) ? `tomorrow at ${time}` : classWhen(session);
+};
+
+// Send each booked member one reminder before class. Every reservation is
+// claimed with a conditional update before anything goes out, so a second
+// (or overlapping) run never sends it again. Bookings made after the reminder
+// time are skipped: the booking notice already told them.
+async function runClassReminders(env, nowMs = Date.now()) {
+  const summary = { success: true, reminders_sent: 0, reminders_skipped: 0 };
+  const nowIso = new Date(nowMs).toISOString();
+  const horizon = new Date(nowMs + Math.max(...REMINDER_CHOICES) * 60000).toISOString();
+  const { results } = await env.DB.prepare(
+    `SELECT r.id AS id, r.data AS rdata, cs.data AS sdata FROM entities r
+     JOIN entities cs ON cs.id = json_extract(r.data,'$.session_id') AND cs.entity_type = 'ClassSession'
+     WHERE r.entity_type = 'Reservation' AND json_extract(r.data,'$.status') = 'reserved'
+       AND json_extract(r.data,'$.reminder_sent_at') IS NULL
+       AND json_extract(cs.data,'$.status') = 'scheduled'
+       AND json_extract(cs.data,'$.start_at') > ? AND json_extract(cs.data,'$.start_at') <= ?
+     LIMIT 500`
+  ).bind(nowIso, horizon).all();
+  if (!results.length) return summary;
+  const rows = results.map((x) => {
+    let r = {}; let sess = {};
+    try { r = JSON.parse(x.rdata); } catch { /* skip bad row */ }
+    try { sess = JSON.parse(x.sdata); } catch { /* skip bad row */ }
+    return { id: x.id, r, sess };
+  });
+  const loginIds = [...new Set(rows.map((x) => x.r.client_user_id).filter(Boolean))];
+  const users = new Map();
+  for (let i = 0; i < loginIds.length; i += 50) {
+    const chunk = loginIds.slice(i, i + 50);
+    const { results: us } = await env.DB.prepare(`SELECT id, email, data FROM users WHERE id IN (${inList(chunk)})`).bind(...chunk).all();
+    for (const u of us) {
+      let data = {}; try { data = JSON.parse(u.data || '{}'); } catch { /* defaults */ }
+      users.set(u.id, { id: u.id, email: u.email, data });
+    }
+  }
+  const today = programToday(nowMs);
+  const emailOn = env.CLASS_EMAILS === 'on' && emailReady(env);
+  const createdByCache = new Map();
+  for (const { id, r, sess } of rows) {
+    const start = Date.parse(sess.start_at);
+    if (!Number.isFinite(start)) continue;
+    const u = users.get(r.client_user_id);
+    const prefs = reminderPrefs(u?.data);
+    const remindAt = start - prefs.minutes * 60000;
+    if (nowMs < remindAt) continue; // not yet; a later run picks it up
+    // Booked (or moved up) after the reminder time, judged by the class time
+    // when they booked. If the gym later moves the class, they still get one.
+    const bookedAt = Date.parse(r.promoted_at || r.booked_at || '');
+    const startWhenBooked = Date.parse(r.start_at || '') || start;
+    let outcome = 'sent';
+    if (!u) outcome = 'no_login';
+    else if (!prefs.on) outcome = 'off';
+    else if (Number.isFinite(bookedAt) && bookedAt > startWhenBooked - prefs.minutes * 60000) outcome = 'booked_late';
+    const claim = await env.DB.prepare(
+      `UPDATE entities SET data = json_set(data, '$.reminder_sent_at', ?, '$.reminder_outcome', ?), updated_date = ?
+       WHERE id = ? AND entity_type = 'Reservation' AND json_extract(data,'$.status') = 'reserved' AND json_extract(data,'$.reminder_sent_at') IS NULL`
+    ).bind(nowIso, outcome, nowIso, id).run();
+    if (!claim?.meta?.changes) continue; // another run has it
+    if (outcome !== 'sent') { summary.reminders_skipped++; continue; }
+    try {
+      if (!createdByCache.has(sess.coach_user_id || '')) createdByCache.set(sess.coach_user_id || '', await classActorEmail(env, null, sess));
+      const name = sess.class_type_name || r.class_name || 'Class';
+      const message = `${name} starts ${classTimeLabel(sess, today)}. Can't make it? Cancel in the app so someone else can have your spot.`;
+      await notifyClassMember(env, { loginId: u.id, title: 'Class reminder', message, createdBy: createdByCache.get(sess.coach_user_id || ''), tag: `reminder-${id}` });
+      if (emailOn && prefs.email && u.email) {
+        const p = sendEmail(env, { to: u.email, subject: `Reminder: ${name} ${classTimeLabel(sess, today)}`, html: emailShell('Class reminder', `<p>${escHtml(message)}</p>`) })
+          .catch(() => {});
+        if (env.__waitUntil) env.__waitUntil(p); else await p;
+      }
+      summary.reminders_sent++;
+    } catch (e) {
+      console.error('class reminder failed', e?.message);
+    }
+  }
+  return summary;
 }
 
 // Move waitlisted people into free spots, oldest first, only before the
@@ -3019,7 +3146,9 @@ async function runFunction(name, payload, ctx) {
       await recountSession(env, session.id);
       if (reservation.status === 'waitlisted') reservation = await getEntityById(env, 'Reservation', reservation.id);
       await audit(env, { actor: user.email, action: 'create', target: 'Reservation', targetId: reservation.id, detail: reservation.status, request: null });
-      return { success: true, status: reservation.status, reservation, session: await getEntityById(env, 'ClassSession', session.id), warnings };
+      const sessionNow = await getEntityById(env, 'ClassSession', session.id);
+      await notifyBookingChange(env, { reservation, session: sessionNow || session, actor: user, kind: reservation.status === 'waitlisted' ? 'waitlisted' : 'reserved' });
+      return { success: true, status: reservation.status, reservation, session: sessionNow, warnings };
     }
 
     case 'cancelReservation': {
@@ -3052,6 +3181,7 @@ async function runFunction(name, payload, ctx) {
         promoted = await promoteWaitlist(env, await getEntityById(env, 'ClassSession', session.id), s, user);
       }
       await audit(env, { actor: user.email, action: 'update', target: 'Reservation', targetId: resv.id, detail: newStatus, request: null });
+      await notifyBookingChange(env, { reservation: resv, session, actor: user, kind: resv.status === 'waitlisted' ? 'left_waitlist' : 'cancelled', late });
       return {
         success: true, late_cancel: late, status: newStatus, promoted: promoted.length,
         reservation: await getEntityById(env, 'Reservation', resv.id),
@@ -4470,10 +4600,13 @@ export async function onRequest(context) {
       const programs = await runProgramTick(env, {});
       let classes;
       try { classes = await runClassTick(env); } catch (e) { classes = { success: false, error: String(e?.message || e).slice(0, 200) }; }
+      let reminders;
+      try { reminders = await runClassReminders(env); } catch (e) { reminders = { success: false, error: String(e?.message || e).slice(0, 200) }; }
       if (classes?.success === false) await recordError(env, { source: 'job', message: classes.error, page: 'classes' });
+      if (reminders?.success === false) await recordError(env, { source: 'job', message: reminders.error, page: 'class reminders' });
       if (programs?.success === false) await recordError(env, { source: 'job', message: programs.error, page: 'programs' });
       await setState(env, 'cron_last_ok', 'ok');
-      return json({ ...programs, classes });
+      return json({ ...programs, classes, reminders });
     }
 
     if (segs[0] === 'client-error' && method === 'POST') {
