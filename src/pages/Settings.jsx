@@ -45,6 +45,7 @@ import ClientPortalSettings from "@/components/settings/ClientPortalSettings";
 import ComplianceSettings from "@/components/settings/ComplianceSettings";
 import ChangePassword from "@/components/settings/ChangePassword";
 import Passkeys from "@/components/settings/Passkeys";
+import MembershipAgreementSettings from "@/components/settings/MembershipAgreementSettings"; // Phase 4: RULES
 
 export default function Settings() {
   const [user, setUser] = useState(null);
@@ -677,6 +678,7 @@ export default function Settings() {
         {!isClient && (
           <TabsContent value="compliance" className="space-y-6">
             <ComplianceSettings />
+            <MembershipAgreementSettings />
           </TabsContent>
         )}
 

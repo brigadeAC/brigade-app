@@ -11,6 +11,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import {
   ArrowLeft,
+  CreditCard, // Phase 4: RULES
   Zap,
   Dumbbell,
   Apple,
@@ -498,6 +499,7 @@ export default function ClientProfile() {
                 <Zap className="w-4 h-4" />
                 <span className="hidden sm:inline">Fitness Tools</span>
               </Link>
+              {user?.permissions?.includes("billing.view") && <Link to={createPageUrl("MemberBilling") + `?client_id=${clientId}`} className="gap-2 px-3 py-1.5 flex items-center rounded-md border border-border hover:bg-accent text-foreground text-sm font-medium"><CreditCard className="w-4 h-4" /><span className="hidden sm:inline">Billing</span></Link>}
               <Button
                 variant="outline"
                 className="border-border text-foreground hover:bg-accent"

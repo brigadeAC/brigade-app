@@ -542,7 +542,7 @@ const ACTIVE_SUB_STATUSES = new Set(['active', 'trialing', 'past_due']);
 async function stripe(env, path, { method = 'POST', data } = {}) {
   if (!env.STRIPE_SECRET_KEY) throw new Error('Stripe is not configured.');
   const body = data ? new URLSearchParams(flattenForStripe(data)).toString() : undefined;
-  const resp = await fetch(`https://api.stripe.com/v1/${path}`, {
+  const resp = await fetch(`${env.STRIPE_API_BASE || 'https://api.stripe.com'}/v1/${path}`, {
     method,
     headers: {
       authorization: `Bearer ${env.STRIPE_SECRET_KEY}`,
@@ -4460,6 +4460,7 @@ async function runFunction(name, payload, ctx) {
         return { success: false, error: 'This membership just changed. Refresh and try again.', code: 'retry' };
       }
       m = await getEntityById(env, 'Membership', m.id);
+      if (name !== 'setMembershipEndDate') m = await rulesAfterHoldChange(env, m, user); // Phase 4: RULES
       const cancelled = release ? await releaseMembershipBookings(env, m, release[0], release[1], release[2], user) : 0;
       if (cancelled) {
         await notifyClassMember(env, {
@@ -4854,6 +4855,12 @@ async function runFunction(name, payload, ctx) {
     case 'todayWorkout':
       return workoutFunction(name, payload, user, env);
     // ===== end Phase 3: editor (cases) =====
+    // ===== Phase 4: RULES (cases) =====
+    case 'agreementText': case 'saveAgreementText': case 'signAgreement': case 'checkAgreement':
+    case 'changePlan': case 'cancelMembership': case 'refundPayment': case 'compMembership':
+    case 'upcomingRenewals': case 'memberBilling': case 'runBillingRules':
+      return runRulesFunction(name, payload, ctx);
+    // ===== end Phase 4: RULES (cases) =====
 
     // Content browse helpers — empty until curated content sources are added.
     // Phase 3: MEMBER (scores, leaderboard, streak)
@@ -5174,6 +5181,462 @@ async function runMemberScoreFunction(name, payload, { env, user }) {
   }
 }
 // ===== end Phase 3: MEMBER =====
+
+// ===== Phase 4: RULES =====
+// Membership rules: the membership agreement, holds pausing Stripe collection,
+// plan changes, cancel with commitment/buyout, refunds, comps and the daily
+// renewals step. Every money action needs members.manage AND billing.view and
+// is audited. Memberships with no stripe_subscription_id change local fields
+// only, so everything works before billing is connected.
+//
+// Exports for CORE/SALES checkout:
+//   requireAgreement(env, plan, agreement_id, { client_id }?) -> null when OK,
+//     else { success:false, error, code:'agreement_required' }. Call it before
+//     creating a Checkout session; it passes for plans that don't need one.
+//   createAgreement(env, { client_id, plan, signed_name, actor, ip }) -> Agreement
+//     (for the public join flow once the lead's Client exists).
+STAFF_WRITE_TYPES.add('Agreement'); // written only by signAgreement
+TYPE_PERMISSION.Agreement = 'members.manage';
+PUBLIC_FUNCTIONS.add('agreementText'); // read-only, no member data
+MONEY_FIELDS.push('buyout_cents', 'refunded_cents', 'refunds', 'tax_cents', 'discount_cents', 'billing_status', 'comped_until');
+
+const SAMPLE_AGREEMENT_TEXT = `SAMPLE MEMBERSHIP AGREEMENT. Replace this text with your own before taking real members.
+
+1. Membership. Your membership lets you book and attend the classes your plan includes, following the gym's booking rules.
+
+2. Payments. Your plan renews automatically each billing period and is charged to the card or bank account on file until you cancel. Prices include the sales tax shown at checkout.
+
+3. Commitment. If your plan has a commitment (for example 6 or 12 months), you agree to pay for the whole commitment. You can leave early by paying the buyout amount shown for your plan. After the commitment ends, the plan continues month to month.
+
+4. Cancelling. After any commitment, you can cancel at any time. Your membership stays active until the end of the period you already paid for. No partial refunds.
+
+5. Holds. You can ask to put your membership on hold (for travel, injury or illness). Billing pauses while the hold lasts and any end date moves back by the hold length.
+
+6. Failed payments. If a payment fails we retry it. You can't book classes until your payment goes through.
+
+7. Health and safety. CrossFit is hard exercise. You confirm you are fit to train, that you'll tell a coach about any injury or condition, and that you'll follow the coaches' instructions. You accept the risks that come with training.
+
+8. Conduct. Treat coaches, members and the space with respect. The gym may end a membership for unsafe or abusive behavior.
+
+9. Changes. The gym may change prices or these terms with 30 days' notice. Changes apply from your next billing period.`;
+
+const billingConnected = (env) => !!env.STRIPE_SECRET_KEY;
+const canChangeBilling = (user) => isStaff(user) && can(user, 'members.manage') && can(user, 'billing.view');
+const centsOf = (v) => { const n = Number(v); return Number.isInteger(n) && n > 0 ? n : null; };
+const rulesDateFromUnix = (secs) => (Number.isFinite(Number(secs)) && Number(secs) > 0 ? programToday(Number(secs) * 1000) : null);
+const rulesUnixOf = (key) => Math.floor(easternToUTC(key, '00:00') / 1000);
+const fmtUsd = (cents) => `$${(Number(cents || 0) / 100).toFixed(2)}`;
+
+async function rulesGymSettingsRow(env) {
+  return parseRow(await env.DB.prepare(
+    `SELECT * FROM entities WHERE entity_type='GymSettings' ORDER BY created_date ASC LIMIT 1`
+  ).first());
+}
+async function currentAgreement(env) {
+  const row = await rulesGymSettingsRow(env);
+  const custom = typeof row?.agreement_text === 'string' && row.agreement_text.trim();
+  return {
+    text: custom ? row.agreement_text : SAMPLE_AGREEMENT_TEXT,
+    version: Math.max(1, Math.round(numOr(row?.agreement_version, 1))),
+    is_sample: !custom,
+  };
+}
+
+// Which plans need a signed agreement: recurring memberships. Drop-ins, trials,
+// intro offers, punch cards and one-time payments don't.
+const NO_AGREEMENT_KINDS = new Set(['drop_in', 'trial', 'intro', 'punch_card', 'comp']);
+const planNeedsAgreement = (plan) => !!plan && !NO_AGREEMENT_KINDS.has(plan.kind) && plan.interval !== 'once';
+
+async function createAgreement(env, { client_id, plan, signed_name, actor, ip = '', membership_id = null }) {
+  const a = await currentAgreement(env);
+  return insertEntity(env, 'Agreement', {
+    client_id, membership_id, plan_id: plan.id, text_version: a.version, text: a.text,
+    signed_name: String(signed_name).trim().slice(0, 120), signed_at: nowISO(), ip: String(ip || '').slice(0, 64),
+  }, actor || 'system');
+}
+
+async function requireAgreement(env, plan, agreement_id, { client_id } = {}) {
+  if (!planNeedsAgreement(plan)) return null;
+  const need = { success: false, error: 'Please read and sign the membership agreement first.', code: 'agreement_required' };
+  const ag = agreement_id ? await getEntityById(env, 'Agreement', agreement_id) : null;
+  if (!ag || ag.plan_id !== plan.id) return need;
+  if (client_id && ag.client_id !== client_id) return need;
+  if (ag.text_version !== (await currentAgreement(env)).version) {
+    return { ...need, error: 'The membership agreement changed. Please read and sign the new version.' };
+  }
+  return null;
+}
+
+// Buyout to leave inside the commitment: the plan's buyout amount, else the
+// months left times the price.
+function buyoutFor(m, plan, today = programToday()) {
+  if (!isDateKey(m?.commitment_ends) || m.commitment_ends <= today) return null;
+  const set = numOr(plan?.buyout_cents, null);
+  if (set !== null && set >= 0) return Math.round(set);
+  const months = Math.max(1, Math.ceil(pDaysBetween(today, m.commitment_ends) / 30.44));
+  return months * Math.max(0, Math.round(numOr(plan?.price_cents, 0)));
+}
+const priceFor = (m, plan) => (m.payment_method === 'bank' && plan.stripe_price_bank_id ? plan.stripe_price_bank_id : plan.stripe_price_id);
+
+// Stripe failures never undo the local change silently: the caller decides.
+async function rulesStripe(env, path, opts) {
+  if (!billingConnected(env)) throw new Error("Billing isn't connected yet.");
+  return stripe(env, path, opts);
+}
+
+// Hold <-> Stripe: when a hold covers today, pause collection (invoices voided)
+// until the day after it ends; otherwise resume. Called from the hold
+// functions and the daily renewals step. Returns the updated membership.
+const activeHoldToday = (m, today) => (Array.isArray(m.holds) ? m.holds : [])
+  .find((h) => h.status !== 'cancelled' && isDateKey(h.from) && isDateKey(h.to) && h.from <= today && today <= h.to) || null;
+async function syncHoldBilling(env, m, actor = 'system') {
+  if (!m?.stripe_subscription_id || !billingConnected(env) || m.billing_status === 'comped' || m.billing_status === 'canceled') return m;
+  const today = programToday();
+  const hold = activeHoldToday(m, today);
+  try {
+    if (hold && (m.billing_status !== 'paused' || m.paused_until !== hold.to)) {
+      await rulesStripe(env, `subscriptions/${m.stripe_subscription_id}`, { data: { pause_collection: { behavior: 'void', resumes_at: rulesUnixOf(pAddDays(hold.to, 1)) } } });
+      m = await patchEntity(env, m, { billing_status: 'paused', paused_until: hold.to, billing_status_before_pause: m.billing_status === 'paused' ? (m.billing_status_before_pause || 'active') : (m.billing_status || 'active') });
+      await audit(env, { actor, action: 'billing_paused', target: 'Membership', targetId: m.id, detail: `collection paused for hold until ${hold.to}` });
+    } else if (!hold && m.billing_status === 'paused') {
+      await rulesStripe(env, `subscriptions/${m.stripe_subscription_id}`, { data: { pause_collection: '' } });
+      m = await patchEntity(env, m, { billing_status: m.billing_status_before_pause || 'active', paused_until: null, billing_status_before_pause: null });
+      await audit(env, { actor, action: 'billing_resumed', target: 'Membership', targetId: m.id, detail: 'collection resumed' });
+    }
+  } catch (e) {
+    await audit(env, { actor, action: 'billing_sync_failed', target: 'Membership', targetId: m.id, detail: String(e?.message || e) });
+  }
+  return m;
+}
+// One-line hook from holdMembership / endMembershipHold / cancelMembershipHold.
+async function rulesAfterHoldChange(env, m, user) {
+  return syncHoldBilling(env, m, user?.email || 'system');
+}
+
+async function rulesLoadMembership(env, id) {
+  const m = await getEntityById(env, 'Membership', id);
+  if (!m) return { error: { success: false, error: 'Membership not found.' } };
+  const plan = await getEntityById(env, 'MembershipPlan', m.plan_id);
+  return { m, plan };
+}
+
+async function runRulesFunction(name, payload, ctx) {
+  const { env, user } = ctx;
+  const ip = ctx.request?.headers?.get?.('cf-connecting-ip') || '';
+  const today = programToday();
+  const actor = user?.email || 'system';
+  // Public: the join page shows the text before the person has an account.
+  if (name === 'agreementText') return { success: true, ...(await currentAgreement(env)) };
+  if (!user) return { success: false, error: 'Not logged in' };
+
+  if (name === 'saveAgreementText') {
+    if (!isStaff(user) || !can(user, 'settings.manage')) return NO_PERMISSION;
+    const text = String(payload?.text ?? '').trim();
+    if (text.length < 20) return { success: false, error: 'The agreement text is too short.' };
+    if (text.length > 20000) return { success: false, error: 'The agreement text is too long.' };
+    const now = await currentAgreement(env);
+    const bump = payload?.bump_version !== false;
+    const version = bump ? now.version + 1 : now.version;
+    const row = await rulesGymSettingsRow(env);
+    if (row) await patchEntity(env, row, { agreement_text: text, agreement_version: version });
+    else await insertEntity(env, 'GymSettings', { agreement_text: text, agreement_version: version }, actor);
+    await audit(env, { actor, action: 'agreement_text_updated', target: 'GymSettings', targetId: row?.id || '', detail: `version ${version}` });
+    return { success: true, text, version, is_sample: false };
+  }
+
+  if (name === 'signAgreement') {
+    const plan = await getEntityById(env, 'MembershipPlan', payload?.plan_id);
+    if (!plan) return { success: false, error: 'Plan not found.' };
+    const signedName = String(payload?.signed_name || '').trim();
+    if (signedName.length < 2) return { success: false, error: 'Type your full name to sign.' };
+    let clientId;
+    if (isStaff(user)) {
+      if (!can(user, 'members.manage')) return NO_PERMISSION;
+      const c = await getEntityById(env, 'Client', payload?.client_id);
+      if (!c) return { success: false, error: 'Pick a member first.' };
+      clientId = c.id;
+    } else {
+      const who = await resolveClassClient(env, user, payload?.client_id || null);
+      if (who.error) return { success: false, error: who.error };
+      clientId = who.client?.id;
+      if (!clientId) return { success: false, error: 'No member record found for this account.' };
+    }
+    const ag = await createAgreement(env, { client_id: clientId, plan, signed_name: signedName, actor, ip, membership_id: payload?.membership_id || null });
+    await audit(env, { actor, action: 'agreement_signed', target: 'Agreement', targetId: ag.id, detail: `plan ${plan.name || plan.id}, version ${ag.text_version}` });
+    return { success: true, agreement_id: ag.id, text_version: ag.text_version };
+  }
+
+  if (name === 'checkAgreement') { // UI/checkout helper: does this agreement still count?
+    const plan = await getEntityById(env, 'MembershipPlan', payload?.plan_id);
+    if (!plan) return { success: false, error: 'Plan not found.' };
+    const r = await requireAgreement(env, plan, payload?.agreement_id);
+    return r || { success: true, required: planNeedsAgreement(plan) };
+  }
+
+  if (name === 'upcomingRenewals') {
+    if (!isStaff(user) || !can(user, 'billing.view')) return NO_PERMISSION;
+    const days = Math.max(1, Math.min(60, Math.round(numOr(payload?.days, 7))));
+    return { success: true, days, renewals: await collectRenewals(env, days) };
+  }
+
+  if (name === 'memberBilling') {
+    if (!isStaff(user) || !can(user, 'billing.view')) return NO_PERMISSION;
+    const client = await getEntityById(env, 'Client', payload?.client_id);
+    if (!client) return { success: false, error: 'Member not found.' };
+    const memberships = await selectEntities(env, 'Membership', "json_extract(data,'$.client_id') = ?", [client.id]);
+    const plans = await selectEntities(env, 'MembershipPlan');
+    const byId = Object.fromEntries(plans.map((p) => [p.id, p]));
+    const payments = (await selectEntities(env, 'Payment', "json_extract(data,'$.client_id') = ?", [client.id]))
+      .sort((a, b) => String(b.paid_at || b.created_date).localeCompare(String(a.paid_at || a.created_date)));
+    const agreements = (await selectEntities(env, 'Agreement', "json_extract(data,'$.client_id') = ?", [client.id]))
+      .map(({ text: _t, ...a }) => a).sort((a, b) => String(b.signed_at).localeCompare(String(a.signed_at)));
+    return {
+      success: true,
+      connected: billingConnected(env),
+      today,
+      can_change: canChangeBilling(user),
+      client: { id: client.id, full_name: client.full_name || '', email: client.email || '' },
+      memberships: memberships.sort((a, b) => String(b.start_date || '').localeCompare(String(a.start_date || ''))).map((m) => ({
+        ...m,
+        plan: byId[m.plan_id] || null,
+        pending_plan: m.pending_plan_id ? byId[m.pending_plan_id] || null : null,
+        inside_commitment: isDateKey(m.commitment_ends) && m.commitment_ends > today,
+        buyout_now_cents: buyoutFor(m, byId[m.plan_id], today),
+      })),
+      payments,
+      agreements,
+      plans: plans.filter((p) => p.is_active !== false).map((p) => ({ id: p.id, name: p.name, price_cents: p.price_cents ?? null, interval: p.interval || null, commitment_months: p.commitment_months ?? 0, stripe_price_id: p.stripe_price_id || null })),
+    };
+  }
+
+  if (name === 'runBillingRules') {
+    if (!canChangeBilling(user)) return NO_PERMISSION;
+    return runBillingRenewals(env, { force: true });
+  }
+
+  // ---- money actions: members.manage + billing.view ----
+  if (!isStaff(user) || !canChangeBilling(user)) return NO_PERMISSION;
+
+  if (name === 'refundPayment') {
+    const p = await getEntityById(env, 'Payment', payload?.payment_id);
+    if (!p) return { success: false, error: 'Payment not found.' };
+    const paid = Math.round(numOr(p.amount_cents, 0));
+    const already = Math.round(numOr(p.refunded_cents, 0));
+    const left = paid - already;
+    if (p.status === 'failed' || left <= 0) return { success: false, error: 'Nothing left to refund on this payment.' };
+    const amount = payload?.amount_cents === undefined || payload?.amount_cents === null ? left : centsOf(payload.amount_cents);
+    if (!amount) return { success: false, error: 'Enter an amount in cents above zero.' };
+    if (amount > left) return { success: false, error: `You can refund up to ${fmtUsd(left)}.` };
+    const reason = String(payload?.reason || '').trim().slice(0, 200);
+    let refundId = null;
+    if (p.stripe_payment_intent_id) {
+      if (!billingConnected(env)) return { success: false, error: "Billing isn't connected yet.", code: 'not_connected' };
+      try {
+        const r = await rulesStripe(env, 'refunds', { data: { payment_intent: p.stripe_payment_intent_id, amount, reason: 'requested_by_customer', metadata: { payment_id: p.id, note: reason || undefined } } });
+        refundId = r.id;
+      } catch (e) { return { success: false, error: `Stripe said: ${String(e?.message || e)}` }; }
+    }
+    const refunded = already + amount;
+    const updated = await patchEntity(env, p, {
+      refunded_cents: refunded,
+      status: refunded >= paid ? 'refunded' : 'partially_refunded',
+      refunds: [...(Array.isArray(p.refunds) ? p.refunds : []), { amount_cents: amount, reason, stripe_refund_id: refundId, by: actor, at: nowISO() }],
+    });
+    await audit(env, { actor, action: 'payment_refunded', target: 'Payment', targetId: p.id, detail: `${fmtUsd(amount)} of ${fmtUsd(paid)}${reason ? `: ${reason}` : ''}` });
+    return { success: true, payment: updated };
+  }
+
+  const { m, plan, error } = await rulesLoadMembership(env, payload?.membership_id);
+  if (error) return error;
+  const sub = m.stripe_subscription_id || null;
+  if (sub && !billingConnected(env)) return { success: false, error: "Billing isn't connected yet.", code: 'not_connected' };
+
+  if (name === 'changePlan') {
+    const next = await getEntityById(env, 'MembershipPlan', payload?.plan_id);
+    if (!next) return { success: false, error: 'Plan not found.' };
+    if (next.id === m.plan_id) return { success: false, error: 'They are already on this plan.' };
+    const when = payload?.when === 'next_cycle' ? 'next_cycle' : payload?.when === 'now' ? 'now' : null;
+    if (!when) return { success: false, error: "Choose 'now' or 'next_cycle'." };
+    if (m.billing_status === 'canceled' || m.status === 'ended') return { success: false, error: 'This membership has ended.' };
+    const newPrice = sub ? priceFor(m, next) : null;
+    if (sub && !newPrice) return { success: false, error: 'This plan is not set up in Stripe yet. Sync it first.' };
+    let patch;
+    try {
+      if (when === 'now') {
+        if (sub) {
+          const s = await rulesStripe(env, `subscriptions/${sub}`, { method: 'GET' });
+          const item = s.items?.data?.[0];
+          await rulesStripe(env, `subscriptions/${sub}`, { data: { items: [{ id: item?.id, price: newPrice }], proration_behavior: 'create_prorations' } });
+        }
+        const months = Math.round(numOr(next.commitment_months, 0));
+        const ends = months > 0 ? monthAnchorKey(Number(today.slice(0, 4)), Number(today.slice(5, 7)) + months, Number(today.slice(8, 10))) : null;
+        patch = { plan_id: next.id, pending_plan_id: null, pending_plan_from: null, previous_plan_id: m.plan_id, plan_changed_at: nowISO(),
+          commitment_ends: ends && (!isDateKey(m.commitment_ends) || ends > m.commitment_ends) ? ends : (m.commitment_ends ?? null) };
+      } else {
+        let from = null;
+        if (sub) {
+          const s = await rulesStripe(env, `subscriptions/${sub}`, { method: 'GET' });
+          const item = s.items?.data?.[0];
+          const curPrice = item?.price?.id || item?.price || priceFor(m, plan || {});
+          const start = s.current_period_start ?? item?.current_period_start;
+          const end = s.current_period_end ?? item?.current_period_end;
+          const sched = s.schedule ? { id: typeof s.schedule === 'string' ? s.schedule : s.schedule.id }
+            : await rulesStripe(env, 'subscription_schedules', { data: { from_subscription: sub } });
+          await rulesStripe(env, `subscription_schedules/${sched.id}`, { data: {
+            end_behavior: 'release',
+            phases: [
+              { items: [{ price: curPrice, quantity: 1 }], start_date: start, end_date: end },
+              { items: [{ price: newPrice, quantity: 1 }], proration_behavior: 'none' },
+            ],
+          } });
+          from = rulesDateFromUnix(end);
+        }
+        from = from || (isDateKey(m.next_payment_date) && m.next_payment_date > today ? m.next_payment_date : pAddDays(billingPeriod(m.start_date, today).end, 1));
+        patch = { pending_plan_id: next.id, pending_plan_from: from };
+      }
+    } catch (e) { return { success: false, error: `Stripe said: ${String(e?.message || e)}` }; }
+    if (!(await patchMembershipIf(env, m, patch))) return { success: false, error: 'This membership just changed. Refresh and try again.', code: 'retry' };
+    await audit(env, { actor, action: 'plan_changed', target: 'Membership', targetId: m.id, detail: `${plan?.name || m.plan_id} -> ${next.name || next.id} (${when}${patch.pending_plan_from ? ` from ${patch.pending_plan_from}` : ''})` });
+    return { success: true, when, membership: await getEntityById(env, 'Membership', m.id) };
+  }
+
+  if (name === 'cancelMembership') {
+    if (m.billing_status === 'canceled' || m.status === 'ended') return { success: false, error: 'This membership is already cancelled.' };
+    const reason = String(payload?.reason || '').trim().slice(0, 200);
+    if (!reason) return { success: false, error: 'Add a reason for cancelling.' };
+    const buyout = buyoutFor(m, plan, today);
+    let patch;
+    if (buyout !== null) {
+      if (payload?.confirm_buyout !== true) {
+        return { success: false, code: 'buyout_required', buyout_cents: buyout, commitment_ends: m.commitment_ends,
+          error: `They're in a commitment until ${shortDay(m.commitment_ends, today)}. Leaving now costs a ${fmtUsd(buyout)} buyout.` };
+      }
+      try {
+        if (sub && buyout > 0) {
+          const s = await rulesStripe(env, `subscriptions/${sub}`, { method: 'GET' });
+          const customer = m.stripe_customer_id || (typeof s.customer === 'string' ? s.customer : s.customer?.id);
+          await rulesStripe(env, 'invoiceitems', { data: { customer, amount: buyout, currency: 'usd', description: `Membership buyout (${plan?.name || 'plan'})`, metadata: { membership_id: m.id, kind: 'buyout' } } });
+          const inv = await rulesStripe(env, 'invoices', { data: { customer, collection_method: 'charge_automatically', pending_invoice_items_behavior: 'include', auto_advance: true, metadata: { membership_id: m.id, kind: 'buyout' } } });
+          await rulesStripe(env, `invoices/${inv.id}/pay`, {});
+        }
+        if (sub) await rulesStripe(env, `subscriptions/${sub}`, { method: 'DELETE' });
+      } catch (e) { return { success: false, error: `Stripe said: ${String(e?.message || e)}` }; }
+      patch = { billing_status: sub ? 'canceled' : (m.billing_status === 'none' || !m.billing_status ? 'none' : 'canceled'), end_date: today, buyout_cents: buyout, commitment_ends: today, cancel_at_period_end: false };
+    } else {
+      let end = null;
+      try {
+        if (sub) {
+          const s = await rulesStripe(env, `subscriptions/${sub}`, { data: { cancel_at_period_end: true, metadata: { cancel_reason: reason } } });
+          const periodEnd = rulesDateFromUnix(s.current_period_end ?? s.items?.data?.[0]?.current_period_end);
+          if (periodEnd) end = pAddDays(periodEnd, -1);
+        }
+      } catch (e) { return { success: false, error: `Stripe said: ${String(e?.message || e)}` }; }
+      end = end || (isDateKey(m.next_payment_date) && m.next_payment_date > today ? pAddDays(m.next_payment_date, -1) : billingPeriod(m.start_date, today).end);
+      if (isDateKey(m.end_date) && m.end_date < end) end = m.end_date;
+      patch = { end_date: end, cancel_at_period_end: !!sub, ...(sub ? {} : { billing_status: m.billing_status && m.billing_status !== 'none' ? 'canceled' : (m.billing_status || 'none') }) };
+    }
+    Object.assign(patch, { cancel_reason: reason, canceled_at: nowISO(), canceled_by: actor, end_reason: reason, end_set_by: actor, end_set_at: nowISO(), pending_plan_id: null, pending_plan_from: null });
+    if (!(await patchMembershipIf(env, m, patch))) return { success: false, error: 'This membership just changed. Refresh and try again.', code: 'retry' };
+    const fresh = await getEntityById(env, 'Membership', m.id);
+    const released = await releaseMembershipBookings(env, fresh, pAddDays(fresh.end_date, 1), null, 'Membership ended', user);
+    await audit(env, { actor, action: buyout !== null ? 'membership_buyout' : 'membership_canceled', target: 'Membership', targetId: m.id,
+      detail: `${buyout !== null ? `buyout ${fmtUsd(buyout)}, ` : ''}ends ${fresh.end_date}: ${reason}${released ? `; ${released} bookings cancelled` : ''}` });
+    return { success: true, membership: fresh, buyout_cents: buyout, ends: fresh.end_date };
+  }
+
+  if (name === 'compMembership') {
+    if (payload?.end === true) {
+      if (m.billing_status !== 'comped') return { success: false, error: 'This membership is not comped.' };
+      return endComp(env, m, actor);
+    }
+    const until = payload?.until === null || payload?.until === '' || payload?.until === undefined ? null : payload.until;
+    if (until !== null && (!isDateKey(until) || until < today)) return { success: false, error: 'Pick an end date from today on, or leave it open.' };
+    if (m.billing_status === 'canceled' || m.status === 'ended') return { success: false, error: 'This membership has ended.' };
+    const reason = String(payload?.reason || '').trim().slice(0, 200);
+    try {
+      if (sub) await rulesStripe(env, `subscriptions/${sub}`, { data: { pause_collection: { behavior: 'void', ...(until ? { resumes_at: rulesUnixOf(pAddDays(until, 1)) } : {}) } } });
+    } catch (e) { return { success: false, error: `Stripe said: ${String(e?.message || e)}` }; }
+    const patch = { billing_status: 'comped', comped_until: until, comp_reason: reason || null, comped_by: actor,
+      billing_status_before_comp: m.billing_status === 'comped' ? (m.billing_status_before_comp || 'active') : (m.billing_status || 'none') };
+    if (!(await patchMembershipIf(env, m, patch))) return { success: false, error: 'This membership just changed. Refresh and try again.', code: 'retry' };
+    await audit(env, { actor, action: 'membership_comped', target: 'Membership', targetId: m.id, detail: `comped ${until ? `until ${until}` : 'with no end date'}${reason ? `: ${reason}` : ''}` });
+    return { success: true, membership: await getEntityById(env, 'Membership', m.id) };
+  }
+
+  return { __unimplemented: true };
+}
+
+async function endComp(env, m, actor) {
+  try {
+    if (m.stripe_subscription_id && billingConnected(env)) await stripe(env, `subscriptions/${m.stripe_subscription_id}`, { data: { pause_collection: '' } });
+  } catch (e) { return { success: false, error: `Stripe said: ${String(e?.message || e)}` }; }
+  const back = m.billing_status_before_comp && m.billing_status_before_comp !== 'comped' ? m.billing_status_before_comp : (m.stripe_subscription_id ? 'active' : 'none');
+  const fresh = await patchEntity(env, m, { billing_status: back, comped_until: null, billing_status_before_comp: null, comp_ended_at: nowISO() });
+  await audit(env, { actor, action: 'comp_ended', target: 'Membership', targetId: m.id, detail: `billing back to ${back}` });
+  return { success: true, membership: fresh };
+}
+
+// Memberships renewing (next payment) or leaving a commitment in the next `days`.
+async function collectRenewals(env, days = 7) {
+  const today = programToday();
+  const until = pAddDays(today, days);
+  const all = await selectEntities(env, 'Membership', "COALESCE(json_extract(data,'$.status'),'active') <> 'ended'");
+  const plans = Object.fromEntries((await selectEntities(env, 'MembershipPlan')).map((p) => [p.id, p]));
+  const out = [];
+  for (const m of all) {
+    if (['canceled', 'comped', 'paused'].includes(m.billing_status) || m.cancel_at_period_end) continue;
+    if (isDateKey(m.end_date) && m.end_date < today) continue;
+    const plan = plans[m.plan_id];
+    const recurring = plan && plan.interval !== 'once' && (m.stripe_subscription_id || numOr(plan.price_cents, 0) > 0);
+    if (recurring) {
+      const next = isDateKey(m.next_payment_date) ? m.next_payment_date : pAddDays(billingPeriod(m.start_date, today).end, 1);
+      if (next >= today && next <= until && (!isDateKey(m.end_date) || next <= m.end_date)) {
+        out.push({ membership_id: m.id, client_id: m.client_id, plan_id: m.plan_id, plan_name: plan.name || '', date: next, reason: 'payment', amount_cents: numOr(plan.price_cents, null) });
+      }
+    }
+    if (isDateKey(m.commitment_ends) && m.commitment_ends >= today && m.commitment_ends <= until) {
+      out.push({ membership_id: m.id, client_id: m.client_id, plan_id: m.plan_id, plan_name: plan?.name || '', date: m.commitment_ends, reason: 'commitment_end', amount_cents: null });
+    }
+  }
+  return out.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+// Daily step in the program-tick cron: commitments that ended, local plan
+// changes that are due, comps that ran out, hold pauses, and the renewals list
+// for the billing dashboard (app_state 'billing_renewals').
+async function runBillingRenewals(env, { force = false } = {}) {
+  const today = programToday();
+  if (!force && (await getState(env, 'billing_rules_day'))?.value === today) return { success: true, skipped: true };
+  await setState(env, 'billing_rules_day', today);
+  const counts = { commitments_ended: 0, plan_changes: 0, comps_ended: 0, holds_synced: 0 };
+  const all = await selectEntities(env, 'Membership', "COALESCE(json_extract(data,'$.status'),'active') <> 'ended'");
+  for (let m of all) {
+    if (isDateKey(m.commitment_ends) && m.commitment_ends <= today && !m.commitment_ended) {
+      m = await patchEntity(env, m, { commitment_ended: true });
+      counts.commitments_ended += 1;
+      await audit(env, { actor: 'system', action: 'commitment_ended', target: 'Membership', targetId: m.id, detail: `commitment ended ${m.commitment_ends}; now month to month` });
+    }
+    if (m.pending_plan_id && isDateKey(m.pending_plan_from) && m.pending_plan_from <= today) {
+      const from = m.plan_id;
+      m = await patchEntity(env, m, { previous_plan_id: from, plan_id: m.pending_plan_id, pending_plan_id: null, pending_plan_from: null, plan_changed_at: nowISO() });
+      counts.plan_changes += 1;
+      await audit(env, { actor: 'system', action: 'plan_changed', target: 'Membership', targetId: m.id, detail: `scheduled change applied: ${from} -> ${m.plan_id}` });
+    }
+    if (m.billing_status === 'comped' && isDateKey(m.comped_until) && m.comped_until < today) {
+      const r = await endComp(env, m, 'system');
+      if (r.success) { m = r.membership; counts.comps_ended += 1; }
+    }
+    if (m.stripe_subscription_id && (m.billing_status === 'paused' || activeHoldToday(m, today))) {
+      const before = m.billing_status;
+      m = await syncHoldBilling(env, m, 'system');
+      if (m.billing_status !== before) counts.holds_synced += 1;
+    }
+  }
+  const renewals = await collectRenewals(env, 7);
+  await setState(env, 'billing_renewals', JSON.stringify({ date: today, renewals }));
+  return { success: true, ...counts, renewals: renewals.length };
+}
+// ===== end Phase 4: RULES =====
 
 /* -------------------------------- LLM ----------------------------------- */
 
@@ -6574,8 +7037,9 @@ export async function onRequest(context) {
       if (classes?.success === false) await recordError(env, { source: 'job', message: classes.error, page: 'classes' });
       if (reminders?.success === false) await recordError(env, { source: 'job', message: reminders.error, page: 'class reminders' });
       if (programs?.success === false) await recordError(env, { source: 'job', message: programs.error, page: 'programs' });
+      const billingRules = await runBillingRenewals(env).catch((e) => ({ success: false, error: String(e?.message || e).slice(0, 200) })); // Phase 4: RULES
       await setState(env, 'cron_last_ok', 'ok');
-      return json({ ...programs, classes, reminders });
+      return json({ ...programs, classes, reminders, billingRules });
     }
 
     if (segs[0] === 'client-error' && method === 'POST') {
