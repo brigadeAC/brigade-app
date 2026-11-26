@@ -223,5 +223,9 @@ test('a parent logs and sees lifts for a linked child, nobody else does', async 
 test('liftMovements lists only lifts from the library', async () => {
   const r = await api.fn('liftMovements', {}, m.ann.token);
   assert.equal(r.success, true);
-  assert.deepEqual(r.movements.map((x) => x.name), ['Back Squat', 'Clean', 'Deadlift', 'Strict Press']);
+  // The gym's sample library is added too, so check for ours and that nothing non-lift slips in.
+  const names = r.movements.map((x) => x.name);
+  for (const n of ['Back Squat', 'Clean', 'Deadlift', 'Strict Press']) assert.ok(names.includes(n), n);
+  assert.ok(!names.includes('Burpee'));
+  assert.ok(r.movements.every((x) => x.is_lift !== false));
 });
