@@ -1381,10 +1381,59 @@ async function resolveClassClient(env, user, clientId) {
   ).bind(user.email, user.id).all();
   const clients = results.map(rowToEntity);
   if (!clients.length) return { error: 'Your account is not linked to a client profile yet. Ask the front desk.' };
-  if (clientId && !clients.some((c) => c.id === clientId)) return { error: 'You can only book classes for yourself.' };
+  if (clientId && !clients.some((c) => c.id === clientId)) {
+    // A guardian may act for a child linked to them by staff. The child keeps
+    // its own records: its own plan, holds and reservations, never the parent's.
+    const child = (await guardedChildren(env, clients.map((c) => c.id))).find((c) => c.id === clientId);
+    if (!child) return { error: 'You can only book classes for yourself.' };
+    const login = await clientLogin(env, child);
+    return { client: child, clientIds: [child.id], loginId: login?.id || child.user_id || null, guardianId: user.id };
+  }
   const client = clients.find((c) => c.id === clientId) || clients.find((c) => c.user_id === user.id) || clients[0];
   return { client, clientIds: clients.map((c) => c.id), loginId: user.id };
 }
+
+/* ---- guardians: a parent's login can book for a linked child ---- */
+// Staff link a child's Client record to a guardian's Client record. The
+// guardian is whoever signs in as that Client (email/user_id), so a link made
+// before the parent accepts their invite starts working once they do.
+// Unlinking only marks the row removed; nothing about the member is deleted.
+const GUARDIAN_SCHEMA = [
+  `CREATE TABLE IF NOT EXISTS client_guardians (
+    client_id TEXT NOT NULL, guardian_client_id TEXT NOT NULL,
+    created_by TEXT, created_date TEXT NOT NULL, removed_by TEXT, removed_date TEXT,
+    PRIMARY KEY (client_id, guardian_client_id))`,
+  `CREATE INDEX IF NOT EXISTS idx_client_guardians_guardian ON client_guardians(guardian_client_id)`,
+];
+const MAX_GUARDIANS = 6;
+
+// Child Client records linked to any of these guardian Client ids (never the guardian's own).
+async function guardedChildren(env, guardianClientIds) {
+  if (!guardianClientIds.length) return [];
+  const { results } = await env.DB.prepare(
+    `SELECT DISTINCT e.* FROM client_guardians g JOIN entities e ON e.id = g.client_id AND e.entity_type = 'Client'
+     WHERE g.removed_date IS NULL AND g.guardian_client_id IN (${inList(guardianClientIds)}) ORDER BY e.created_date ASC`
+  ).bind(...guardianClientIds).all();
+  return results.map(rowToEntity).filter((c) => !guardianClientIds.includes(c.id));
+}
+
+// Client ids a signed-in member may act for in class functions: their own and their linked children.
+async function actableClientIds(env, user) {
+  const own = await myClientIds(env, user);
+  return [...own, ...(await guardedChildren(env, own)).map((c) => c.id)];
+}
+
+async function clientGuardians(env, clientId) {
+  const { results } = await env.DB.prepare(
+    `SELECT e.*, g.created_date AS linked_date FROM client_guardians g JOIN entities e ON e.id = g.guardian_client_id AND e.entity_type = 'Client'
+     WHERE g.removed_date IS NULL AND g.client_id = ? ORDER BY g.created_date ASC`
+  ).bind(clientId).all();
+  return results.map((r) => ({ ...rowToEntity(r), linked_date: r.linked_date }));
+}
+
+const familyPerson = async (env, c) => ({
+  id: c.id, full_name: c.full_name || '', email: c.email || '', has_login: !!(await clientLogin(env, c)),
+});
 
 const clientMatchSql = (who) => {
   const ors = [`json_extract(data,'$.client_id') IN (${inList(who.clientIds)})`];
@@ -2863,8 +2912,15 @@ async function runFunction(name, payload, ctx) {
       let mine = new Map();
       const attendees = new Map();
       if (!staff) {
-        const cids = await myClientIds(env, user);
-        const who = { clientIds: cids.length ? cids : ['__none__'], loginId: user.id };
+        // A guardian can view the schedule as one of their linked children.
+        let who;
+        if (payload?.client_id) {
+          who = await resolveClassClient(env, user, payload.client_id);
+          if (who.error) return { success: false, error: who.error, code: 'no_client' };
+        } else {
+          const cids = await myClientIds(env, user);
+          who = { clientIds: cids.length ? cids : ['__none__'], loginId: user.id };
+        }
         const cm = clientMatchSql(who);
         const myRes = await selectEntities(env, 'Reservation',
           `json_extract(data,'$.date') BETWEEN ? AND ? AND ${cm.sql}`, [from, to, ...cm.binds]);
@@ -2935,7 +2991,9 @@ async function runFunction(name, payload, ctx) {
     case 'myClasses': {
       if (!user) return { success: false, error: 'Not logged in' };
       const s = await getGymSettings(env);
-      const who = await resolveClassClient(env, isStaff(user) ? { ...user, role: 'user', user_type: 'client' } : user, null);
+      // payload.client_id: a guardian viewing a linked child (checked in resolveClassClient).
+      const who = await resolveClassClient(env, isStaff(user) ? { ...user, role: 'user', user_type: 'client' } : user, payload?.client_id || null);
+      if (who.error && payload?.client_id) return { success: false, error: who.error, code: 'no_client' };
       if (who.error) {
         return { success: true, client: null, today: programToday(), upcoming: [], recent: [], memberships: [], waiver: { required: !!s.waiver_required, signed: false, contract_id: null }, stats: null, settings: s, notice: who.error };
       }
@@ -2947,6 +3005,62 @@ async function runFunction(name, payload, ctx) {
       const who = await resolveClassClient(env, user, payload?.client_id);
       if (who.error) return { success: false, error: who.error };
       return classMemberSummary(env, who, await getGymSettings(env), { includeAll: true });
+    }
+
+    // The signed-in member and the children they can book for.
+    case 'myFamily': {
+      if (!user) return { success: false, error: 'Not logged in' };
+      const own = await myClientIds(env, user);
+      const kids = await guardedChildren(env, own);
+      return { success: true, children: kids.map((c) => ({ id: c.id, full_name: c.full_name || 'Child' })) };
+    }
+
+    // Staff: who a client's guardians are, and who they are guardian of.
+    case 'clientFamily': {
+      if (!isStaff(user)) return { success: false, error: 'Only coaches can see this.' };
+      const client = await getEntityById(env, 'Client', payload?.client_id);
+      if (!client) return { success: false, error: 'Client not found.' };
+      const guardians = await clientGuardians(env, client.id);
+      const children = await guardedChildren(env, [client.id]);
+      return {
+        success: true,
+        guardians: await Promise.all(guardians.map((g) => familyPerson(env, g))),
+        children: await Promise.all(children.map((c) => familyPerson(env, c))),
+      };
+    }
+
+    case 'linkGuardian':
+    case 'unlinkGuardian': {
+      if (!isStaff(user)) return { success: false, error: 'Only coaches can change guardians.' };
+      const child = await getEntityById(env, 'Client', payload?.client_id);
+      const guardian = await getEntityById(env, 'Client', payload?.guardian_client_id);
+      if (!child || !guardian) return { success: false, error: 'Client not found.' };
+      const ts = nowISO();
+      if (name === 'unlinkGuardian') {
+        const r = await env.DB.prepare(
+          'UPDATE client_guardians SET removed_by = ?, removed_date = ? WHERE client_id = ? AND guardian_client_id = ? AND removed_date IS NULL'
+        ).bind(user.email, ts, child.id, guardian.id).run();
+        if (!r?.meta?.changes) return { success: false, error: 'This person is not a guardian of this client.' };
+        await audit(env, { actor: user.email, action: 'guardian_unlinked', target: 'Client', targetId: child.id, detail: `guardian ${guardian.id}`, request: null });
+        return { success: true };
+      }
+      if (child.id === guardian.id) return { success: false, error: 'A client cannot be their own guardian.' };
+      if (!guardian.email) return { success: false, error: 'The guardian needs an email address so they can sign in.' };
+      if (String(guardian.email).toLowerCase() === String(child.email || '').toLowerCase()) {
+        return { success: false, error: 'This child uses the same email as the guardian. Remove the email from the child first.' };
+      }
+      if ((await guardedChildren(env, [child.id])).some((c) => c.id === guardian.id)) {
+        return { success: false, error: 'This person is already this client\'s child.' };
+      }
+      const current = await clientGuardians(env, child.id);
+      if (current.some((g) => g.id === guardian.id)) return { success: true, already: true };
+      if (current.length >= MAX_GUARDIANS) return { success: false, error: `A client can have up to ${MAX_GUARDIANS} guardians.` };
+      await env.DB.prepare(
+        `INSERT INTO client_guardians (client_id, guardian_client_id, created_by, created_date) VALUES (?,?,?,?)
+         ON CONFLICT (client_id, guardian_client_id) DO UPDATE SET created_by = excluded.created_by, created_date = excluded.created_date, removed_by = NULL, removed_date = NULL`
+      ).bind(child.id, guardian.id, user.email, ts).run();
+      await audit(env, { actor: user.email, action: 'guardian_linked', target: 'Client', targetId: child.id, detail: `guardian ${guardian.id}`, request: null });
+      return { success: true };
     }
 
     case 'classCoaches': {
@@ -2979,7 +3093,7 @@ async function runFunction(name, payload, ctx) {
       const warnings = [];
       const override = staff && !!payload?.override;
       if (s.waiver_required && !(await waiverStatus(env, who)).signed) {
-        if (!staff) return { success: false, error: 'Sign the liability waiver before booking a class. You can find it under Documents.', code: 'waiver_required' };
+        if (!staff) return { success: false, error: who.guardianId ? `${shortName(who.client.full_name)} needs a signed waiver before booking. Ask the front desk.` : 'Sign the liability waiver before booking a class. You can find it under Documents.', code: 'waiver_required' };
         warnings.push('No signed waiver on file.');
       }
       let reservation = null;
@@ -3018,7 +3132,7 @@ async function runFunction(name, payload, ctx) {
       if (!reservation) return { success: false, error: 'Could not book this class. Refresh and try again.', code: 'retry' };
       await recountSession(env, session.id);
       if (reservation.status === 'waitlisted') reservation = await getEntityById(env, 'Reservation', reservation.id);
-      await audit(env, { actor: user.email, action: 'create', target: 'Reservation', targetId: reservation.id, detail: reservation.status, request: null });
+      await audit(env, { actor: user.email, action: 'create', target: 'Reservation', targetId: reservation.id, detail: who.guardianId ? `${reservation.status} (by guardian)` : reservation.status, request: null });
       return { success: true, status: reservation.status, reservation, session: await getEntityById(env, 'ClassSession', session.id), warnings };
     }
 
@@ -3028,7 +3142,8 @@ async function runFunction(name, payload, ctx) {
       const resv = await getEntityById(env, 'Reservation', payload?.reservation_id);
       if (!resv) return { success: false, error: 'Reservation not found.' };
       if (!staff) {
-        const cids = await myClientIds(env, user);
+        // Their own reservations, or a linked child's (guardian).
+        const cids = await actableClientIds(env, user);
         if (!cids.includes(resv.client_id) && resv.client_user_id !== user.id) return { success: false, error: 'Reservation not found.' };
       }
       if (!['reserved', 'waitlisted'].includes(resv.status)) return { success: false, error: 'This reservation can no longer be cancelled.', code: 'not_cancellable' };
@@ -3089,7 +3204,7 @@ async function runFunction(name, payload, ctx) {
       const warnings = [];
       const override = staff && !!payload?.override;
       if (s.waiver_required && !(await waiverStatus(env, who)).signed) {
-        if (!staff) return { success: false, error: 'Sign the liability waiver before checking in. You can find it under Documents.', code: 'waiver_required' };
+        if (!staff) return { success: false, error: who.guardianId ? `${shortName(who.client.full_name)} needs a signed waiver before checking in. Ask the front desk.` : 'Sign the liability waiver before checking in. You can find it under Documents.', code: 'waiver_required' };
         warnings.push('No signed waiver on file.');
       }
       const ts = nowISO();
@@ -3466,6 +3581,7 @@ async function ensureSchema(env) {
     `CREATE INDEX IF NOT EXISTS idx_account_tokens_email ON account_tokens(email, kind)`,
     `CREATE INDEX IF NOT EXISTS idx_audit_actor ON audit_log(actor, created_date)`,
     ...PASSKEY_SCHEMA,
+    ...GUARDIAN_SCHEMA,
   ];
   for (const s of stmts) await env.DB.prepare(s).run();
   await seedCoachingContent(env);

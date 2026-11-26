@@ -22,8 +22,11 @@ async function call(name, payload) {
 export const errorMessage = (e, fallback = "Something went wrong. Try again.") =>
   e?.response?.data?.error || e?.data?.error || e?.message || fallback;
 
-export const classSchedule = ({ from, to }) => call("classSchedule", { from, to });
-export const myClasses = () => call("myClasses");
+// client_id: a guardian acting for a linked child (the server checks the link).
+const forChild = (clientId) => (clientId ? { client_id: clientId } : {});
+export const classSchedule = ({ from, to, client_id }) => call("classSchedule", { from, to, ...forChild(client_id) });
+export const myClasses = ({ client_id } = {}) => call("myClasses", forChild(client_id));
+export const myFamily = () => call("myFamily");
 export const classMemberStatus = ({ client_id }) => call("classMemberStatus", { client_id });
 export const classRoster = ({ session_id }) => call("classRoster", { session_id });
 export const bookClass = ({ session_id, client_id }) => call("bookClass", client_id ? { session_id, client_id } : { session_id });

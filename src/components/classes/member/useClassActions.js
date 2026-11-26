@@ -4,7 +4,8 @@ import { bookClass, cancelReservation, checkIn, errorMessage } from "@/lib/class
 import { useRefreshClasses } from "./useClassesData";
 
 // Runs one action at a time per session, refetches after each, toasts backend errors.
-export function useClassActions() {
+// clientId: act for a linked child (guardian); omit to act for yourself.
+export function useClassActions(clientId = null) {
   const refresh = useRefreshClasses();
   const [busy, setBusy] = useState(null);
 
@@ -23,8 +24,8 @@ export function useClassActions() {
 
   return {
     busy,
-    book: (session) => run(session.id, () => bookClass({ session_id: session.id }), (r) => (r?.reservation?.status === "waitlisted" || r?.status === "waitlisted" ? "Added to the waitlist" : "Booked")),
+    book: (session) => run(session.id, () => bookClass({ session_id: session.id, client_id: clientId }), (r) => (r?.reservation?.status === "waitlisted" || r?.status === "waitlisted" ? "Added to the waitlist" : "Booked")),
     cancel: (session, reservationId) => run(session.id, () => cancelReservation({ reservation_id: reservationId }), "Cancelled"),
-    checkIn: (session) => run(session.id, () => checkIn({ session_id: session.id }), "Checked in"),
+    checkIn: (session) => run(session.id, () => checkIn({ session_id: session.id, client_id: clientId }), "Checked in"),
   };
 }
