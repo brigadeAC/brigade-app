@@ -6,6 +6,7 @@ import { createPageUrl } from "@/utils";
 import { Plus, Activity, Mail, ChevronLeft, ChevronRight, Eye, GripHorizontal, Sparkles, Bot, FileText, AlertCircle, CheckCircle } from "lucide-react";
 import AdminFullDashboard from "@/components/admin/AdminFullDashboard";
 import CoachBriefing from "@/components/dashboard/CoachBriefing";
+import TodaysClasses from "@/components/dashboard/TodaysClasses";
 import { Responsive, WidthProvider } from "react-grid-layout";
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
@@ -102,6 +103,8 @@ export default function Dashboard() {
           </button>
         </div>
       </div>
+
+      <TodaysClasses />
 
       <CoachBriefing />
 

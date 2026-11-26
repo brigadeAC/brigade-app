@@ -4,6 +4,7 @@ import { createPageUrl } from "@/utils";
 import { ArrowRight, Monitor } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import TrainerManagement from "./TrainerManagement";
+import TodaysClasses from "@/components/dashboard/TodaysClasses";
 
 export default function AdminFullDashboard({ 
   user, 
@@ -62,6 +63,9 @@ export default function AdminFullDashboard({
       </div>
 
       <div className="space-y-8">
+        {/* Today's classes: tap through to check people in */}
+        <TodaysClasses />
+
         {/* Stats Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {stats.map((stat) => {

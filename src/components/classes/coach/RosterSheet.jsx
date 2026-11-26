@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Loader2, UserPlus, Check, Undo2, UserX, XCircle, CalendarPlus } from "lucide-react";
 import { toast } from "sonner";
-import { fromKey } from "@/lib/programs";
+import { fromKey, todayKey } from "@/lib/programs";
 import ClientPicker from "./ClientPicker";
 import BookingWindowRow from "./BookingWindowRow";
 import {
@@ -50,16 +50,19 @@ export default function RosterSheet({ session, open, onOpenChange, onChanged }) 
 
   // fn(override) runs the action; if the backend refuses with an overridable
   // rule (no membership, limit reached, class full) staff can confirm and retry.
+  // okMsg may be a string or (result) => toast args, e.g. to offer Undo.
   const run = async (key, fn, okMsg) => {
     setBusyId(key);
     try {
+      let result;
       try {
-        await fn(false);
+        result = await fn(false);
       } catch (e) {
         if (!e?.canOverride || !window.confirm(`${errorMessage(e)}\n\nDo it anyway?`)) throw e;
-        await fn(true);
+        result = await fn(true);
       }
-      if (okMsg) toast.success(okMsg);
+      if (typeof okMsg === "function") toast.success(...okMsg(result));
+      else if (okMsg) toast.success(okMsg);
       refresh();
     } catch (e) {
       toast.error(errorMessage(e));
@@ -68,12 +71,35 @@ export default function RosterSheet({ session, open, onOpenChange, onChanged }) 
     }
   };
 
+  // A check-in toast with a one-tap Undo.
+  const checkedInToast = (name) => (result) => {
+    const resv = result?.reservation;
+    const msg = result?.already ? `${name} was already checked in` : `${name} checked in`;
+    if (!resv?.id || result?.already) return [msg];
+    return [msg, {
+      action: {
+        label: "Undo",
+        onClick: async () => {
+          try {
+            await undoCheckIn(resv);
+            toast(`${name} is no longer checked in`);
+            refresh();
+          } catch (e) {
+            toast.error(errorMessage(e));
+          }
+        },
+      },
+      duration: 6000,
+    }];
+  };
+  const doCheckIn = (r) => run(r.id, (override) => checkInReservation(r, override), checkedInToast(r.client_name || "Member"));
+
   const handlePick = (client, kind) =>
     run("pick", async (override) => {
-      if (kind === "walkin") await walkIn(session.id, client.id, override);
-      else await bookClient(session.id, client.id, override);
+      const out = kind === "walkin" ? await walkIn(session.id, client.id, override) : await bookClient(session.id, client.id, override);
       setMode(null);
-    }, kind === "walkin" ? `${client.full_name} checked in` : `${client.full_name} booked`);
+      return out;
+    }, kind === "walkin" ? checkedInToast(client.full_name || "Member") : `${client.full_name} booked`);
 
   const confirmCancelClass = async () => {
     setCancelling(true);
@@ -95,6 +121,14 @@ export default function RosterSheet({ session, open, onOpenChange, onChanged }) 
   const notifyCount = live.filter((r) => r.status !== "no_show").length;
   const dateLabel = session.date ? fromKey(session.date).toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" }) : "";
   const existingIds = live.map((r) => r.client_id);
+  // Coaches can check people in on the day of the class or after, not before.
+  const future = !!session.date && session.date > todayKey();
+  const cap = rosterQuery.data?.session?.capacity ?? session.capacity ?? null;
+  const counts = {
+    checkedIn: live.filter((r) => r.status === "checked_in").length,
+    booked: live.filter((r) => r.status === "reserved" || r.status === "checked_in").length,
+    waitlist: live.filter((r) => r.status === "waitlisted").length,
+  };
 
   return (
     <>
@@ -117,10 +151,22 @@ export default function RosterSheet({ session, open, onOpenChange, onChanged }) 
             </p>
           ) : (
             <div className="mt-4 space-y-4">
+              {!rosterQuery.isLoading && !rosterQuery.isError && (
+                <p className="text-sm text-foreground" aria-live="polite">
+                  <span className="font-semibold">{counts.checkedIn} checked in</span>
+                  <span className="text-muted-foreground">
+                    {" · "}{counts.booked}{reservable && cap ? ` of ${cap}` : ""} {reservable ? "booked" : "here"}
+                    {counts.waitlist > 0 ? ` · ${counts.waitlist} on waitlist` : ""}
+                  </span>
+                </p>
+              )}
+              {future && <p className="text-xs text-muted-foreground">Check-in opens on the day of the class.</p>}
               <div className="flex flex-wrap gap-2">
-                <Button size="sm" variant={mode === "walkin" ? "default" : "outline"} className="gap-1.5" onClick={() => setMode(mode === "walkin" ? null : "walkin")}>
-                  <UserPlus className="w-4 h-4" /> Add walk-in
-                </Button>
+                {!future && (
+                  <Button size="sm" variant={mode === "walkin" ? "default" : "outline"} className="gap-1.5" onClick={() => setMode(mode === "walkin" ? null : "walkin")}>
+                    <UserPlus className="w-4 h-4" /> Add walk-in
+                  </Button>
+                )}
                 {reservable && (
                   <Button size="sm" variant={mode === "book" ? "default" : "outline"} className="gap-1.5" onClick={() => setMode(mode === "book" ? null : "book")}>
                     <CalendarPlus className="w-4 h-4" /> Book someone in
@@ -131,7 +177,7 @@ export default function RosterSheet({ session, open, onOpenChange, onChanged }) 
               {mode && (
                 <div className="rounded-lg border border-border bg-card p-3 space-y-2">
                   <p className="text-xs text-muted-foreground">
-                    {mode === "walkin" ? "Checks the person in now. Their membership is verified; the server will say if it doesn't cover this class." : "Reserves a spot as if they booked themselves."}
+                    {mode === "walkin" ? "Pick someone who isn't booked. They are checked in right away. We check their membership and tell you if it doesn't cover this class." : "Saves a spot for them, as if they booked it themselves."}
                   </p>
                   <ClientPicker exclude={existingIds} disabled={busyId === "pick"} onPick={(c) => handlePick(c, mode)} />
                 </div>
@@ -164,20 +210,24 @@ export default function RosterSheet({ session, open, onOpenChange, onChanged }) 
                         <div className="flex items-center gap-1.5 shrink-0">
                           {busy && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
                           {r.status === "reserved" && (<>
-                            <Button size="sm" disabled={busy} className="gap-1" onClick={() => run(r.id, (override) => checkInReservation(r, override), `${r.client_name} checked in`)}>
-                              <Check className="w-4 h-4" /> Check in
-                            </Button>
-                            <Button size="icon" variant="ghost" disabled={busy} title="No-show" aria-label="Mark no-show" onClick={() => run(r.id, () => markNoShow(r))}>
-                              <UserX className="w-4 h-4" />
-                            </Button>
+                            {!future && (
+                              <Button size="sm" disabled={busy} className="gap-1" onClick={() => doCheckIn(r)}>
+                                <Check className="w-4 h-4" /> Check in
+                              </Button>
+                            )}
+                            {!future && (
+                              <Button size="icon" variant="ghost" disabled={busy} title="No-show" aria-label="Mark no-show" onClick={() => run(r.id, () => markNoShow(r))}>
+                                <UserX className="w-4 h-4" />
+                              </Button>
+                            )}
                           </>)}
                           {r.status === "checked_in" && (
                             <Button size="sm" variant="outline" disabled={busy} className="gap-1" onClick={() => run(r.id, () => undoCheckIn(r))}>
                               <Undo2 className="w-4 h-4" /> Undo
                             </Button>
                           )}
-                          {r.status === "no_show" && (
-                            <Button size="sm" variant="outline" disabled={busy} className="gap-1" onClick={() => run(r.id, (override) => checkInReservation(r, override), `${r.client_name} checked in`)}>
+                          {(r.status === "no_show" || r.status === "waitlisted") && !future && (
+                            <Button size="sm" variant="outline" disabled={busy} className="gap-1" onClick={() => doCheckIn(r)}>
                               <Check className="w-4 h-4" /> Check in
                             </Button>
                           )}
