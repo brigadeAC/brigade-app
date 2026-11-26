@@ -39,6 +39,7 @@ import {
   Trophy
 } from "lucide-react";
 import { Dumbbell } from "lucide-react"; // Phase 3 editor
+import { Wallet, Tag } from "lucide-react"; // Phase 4: SALES
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
@@ -99,6 +100,13 @@ const navGroups = [
     ]
   },
   {
+    title: "Billing",
+    items: [
+      { name: "Billing", icon: Wallet, page: "BillingDashboard", perm: "billing.view" }, // Phase 4: SALES
+      { name: "Promo Codes", icon: Tag, page: "PromoCodes", perm: "billing.view" }, // Phase 4: SALES
+    ]
+  },
+  {
     title: "Admin Tools",
     items: [
       { name: "Team", icon: Users, page: "Team" },
@@ -155,6 +163,13 @@ const adminNavGroups = [
       { name: 'Habit Library', icon: ListChecks, page: 'HabitLibrary' },
       { name: 'Contracts', icon: FileText, page: 'Contracts' },
       { name: 'Community', icon: Users2, page: 'TrainerCommunity' },
+    ]
+  },
+  {
+    title: 'Billing',
+    items: [
+      { name: 'Billing', icon: Wallet, page: 'BillingDashboard', perm: 'billing.view' }, // Phase 4: SALES
+      { name: 'Promo Codes', icon: Tag, page: 'PromoCodes', perm: 'billing.view' }, // Phase 4: SALES
     ]
   },
   {
@@ -376,7 +391,9 @@ export default function Layout({ children, currentPageName }) {
   };
 
   // Public pages - no layout
-  const publicPages = ['Home', 'PublicHome', 'About', 'Contact', 'PrivacyPolicy', 'Terms', 'DataPolicy', 'WaitingList'];
+  const publicPages = ['Home', 'PublicHome', 'About', 'Contact', 'PrivacyPolicy', 'Terms', 'DataPolicy', 'WaitingList',
+    'JoinBrigade', // Phase 4: SALES
+  ];
   
   useEffect(() => {
     if (!isLoading && !user && !publicPages.includes(currentPageName)) {
@@ -528,6 +545,7 @@ export default function Layout({ children, currentPageName }) {
               if (item.page === "AdminBugs" && user?.role !== 'admin') return false;
               if (item.page === "Team" && user?.role !== 'admin') return false;
               if (item.page === "ReportBug" && user?.role === 'admin') return false;
+              if (item.perm && user?.role !== 'admin' && !(user?.permissions || []).includes(item.perm)) return false; // Phase 4: SALES
               return true;
             });
 

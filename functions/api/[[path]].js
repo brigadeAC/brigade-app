@@ -3379,7 +3379,394 @@ async function runLiftsFunction(name, payload, ctx) {
 }
 // ===== end Phase 3: lifts =====
 
-const PUBLIC_FUNCTIONS = new Set(['getAppLogo', 'submitContact']);
+// ===== Phase 4: SALES =====
+// Public join page (publicPlans, publicCheckout), promo codes, the billing
+// dashboard and the QuickBooks CSV export. Money is read with billing.view;
+// promo codes are changed with settings.manage. All Stripe calls go through
+// stripe(env, ...), so tests point them at a fake Stripe.
+TYPE_PERMISSION.PromoCode = 'settings.manage';
+const SALES_TRY_KINDS = new Set(['trial', 'intro', 'drop_in', 'punch', 'punch_card']);
+const SALES_DEFAULT_TAX_PCT = 2.98;
+const SALES_DEFAULT_BANK_PCT = 2.89;
+const SALES_DEFAULT_AGREEMENT = 'I agree to pay the membership price shown, plus tax, each billing period until I cancel. '
+  + 'If my plan has a commitment, I agree to stay through it or pay the buyout shown. Holds and cancellations follow the gym\'s posted policy.';
+const SALES_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const salesConnected = (env) => !!env.STRIPE_SECRET_KEY;
+const salesNum = (v, d) => { const n = Number(v); return Number.isFinite(n) ? n : d; };
+const salesIsActive = (p) => p.is_active !== false && p.is_active !== 0 && p.is_active !== 'false';
+const salesIsPublic = (p) => p.public === true || p.public === 1 || p.public === 'true';
+const salesGroup = (p) => (SALES_TRY_KINDS.has(p.kind) || salesNum(p.price_cents, 0) === 0 ? 'try' : 'membership');
+const salesNeedsAgreement = (p) => p.group === 'membership' && p.interval !== 'once';
+
+async function salesGymSettings(env) {
+  return parseRow(await env.DB.prepare(
+    `SELECT * FROM entities WHERE entity_type='GymSettings' ORDER BY created_date ASC LIMIT 1`
+  ).first()) || {};
+}
+
+// Per-IP counter in app_state, one bucket per 10 minutes.
+async function salesRateLimited(env, request, bucket, max) {
+  const ip = request?.headers?.get('cf-connecting-ip') || request?.headers?.get('x-forwarded-for') || 'local';
+  const windowId = Math.floor(Date.now() / 600000);
+  const row = await env.DB.prepare(
+    `INSERT INTO app_state (key, value, updated_date) VALUES (?1,'1',?2)
+     ON CONFLICT(key) DO UPDATE SET value = CAST(app_state.value AS INTEGER) + 1, updated_date = ?2 RETURNING value`
+  ).bind(`rl_sales_${bucket}_${ip}_${windowId}`, nowISO()).first();
+  if (Math.random() < 0.05) {
+    await env.DB.prepare(`DELETE FROM app_state WHERE key LIKE 'rl_sales_%' AND updated_date < ?`)
+      .bind(new Date(Date.now() - 3600000).toISOString()).run();
+  }
+  return Number(row?.value || 0) > max;
+}
+const SALES_RATE_LIMITED = { success: false, error: 'Too many tries. Please wait a few minutes and try again.', code: 'rate_limited' };
+
+function salesPublicPlan(p, gym) {
+  const price = Math.max(0, Math.round(salesNum(p.price_cents, 0)));
+  const bankPct = salesNum(p.bank_discount_pct, salesNum(gym.bank_discount_pct, SALES_DEFAULT_BANK_PCT));
+  const taxPct = salesNum(p.tax_rate_pct, salesNum(gym.tax_rate_pct, SALES_DEFAULT_TAX_PCT));
+  const group = salesGroup(p);
+  const interval = ['month', 'year', 'week', 'once'].includes(p.interval) ? p.interval : (group === 'membership' ? 'month' : 'once');
+  return {
+    id: p.id,
+    name: String(p.name || 'Plan'),
+    kind: p.kind || null,
+    group,
+    free: price === 0,
+    description: String(p.description || ''),
+    price_cents: price,
+    interval,
+    interval_count: Math.max(1, Math.round(salesNum(p.interval_count, 1))),
+    commitment_months: Math.max(0, Math.round(salesNum(p.commitment_months, 0))),
+    bank_discount_pct: price ? bankPct : 0,
+    bank_price_cents: price ? Math.round(price * (1 - bankPct / 100)) : 0,
+    tax_rate_pct: price ? taxPct : 0,
+    tax_note: price && taxPct ? `plus ${taxPct}% tax` : '',
+  };
+}
+
+async function salesFindOrCreateLead(env, { full_name, email, phone, plan }) {
+  const found = await selectEntities(env, 'Client', `lower(json_extract(data,'$.email')) = ?`, [email]);
+  if (found.length) return found[0];
+  return insertEntity(env, 'Client', {
+    full_name, email, phone, status: 'lead', lead_source: 'join_page', lead_plan_id: plan.id, lead_plan_name: plan.name || '',
+  }, 'join_page');
+}
+
+async function salesSignAgreement(env, { client, plan, signed_name, ip }) {
+  if (typeof createAgreement === 'function') { // RULES' helper
+    // eslint-disable-next-line no-undef
+    const rec = await createAgreement(env, { client_id: client.id, plan: await getEntityById(env, 'MembershipPlan', plan.id), signed_name, actor: client.email || 'join_page', ip });
+    return { agreement_id: rec?.agreement_id || rec?.id || null };
+  }
+  // stub: owned by RULES
+  const gym = await salesGymSettings(env);
+  const rec = await insertEntity(env, 'Agreement', {
+    client_id: client.id, membership_id: null, plan_id: plan.id, text_version: String(gym.agreement_version || '1'),
+    signed_name, signed_at: nowISO(), ip: ip || '',
+  }, 'join_page');
+  return { agreement_id: rec.id };
+}
+
+async function salesCheckout(env, args) {
+  // eslint-disable-next-line no-undef
+  if (typeof createCheckoutSession === 'function') return createCheckoutSession(env, args); // CORE's helper
+  // stub: owned by CORE
+  const { plan, client, method, promo_code, agreement_id, success_url, cancel_url } = args;
+  const recurring = plan.interval !== 'once';
+  const price = method === 'bank' ? plan.bank_price_cents : plan.price_cents;
+  const stored = method === 'bank' ? plan.stripe_price_bank_id : plan.stripe_price_id;
+  const data = {
+    mode: recurring ? 'subscription' : 'payment',
+    customer_email: client.email,
+    payment_method_types: [method === 'bank' ? 'us_bank_account' : 'card'],
+    line_items: [stored ? { price: stored, quantity: 1 } : {
+      quantity: 1,
+      price_data: { currency: 'usd', unit_amount: price, product_data: { name: plan.name }, ...(recurring ? { recurring: { interval: plan.interval, interval_count: plan.interval_count } } : {}) },
+    }],
+    success_url, cancel_url,
+    metadata: { client_id: client.id, plan_id: plan.id, agreement_id: agreement_id || '' },
+  };
+  if (promo_code) {
+    const found = await stripe(env, `promotion_codes?active=true&code=${encodeURIComponent(promo_code)}`, { method: 'GET' });
+    if (!found?.data?.length) return { error: 'That promo code isn\'t valid.' };
+    data.discounts = [{ promotion_code: found.data[0].id }];
+  } else data.allow_promotion_codes = true;
+  const session = await stripe(env, 'checkout/sessions', { data });
+  return { url: session.url };
+}
+
+// QuickBooks-friendly CSV cell: neutralize formulas, quote when needed.
+function salesCsvCell(v) {
+  let s = v === null || v === undefined ? '' : String(v);
+  if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
+  return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+const salesMoney = (c) => (Math.round(salesNum(c, 0)) / 100).toFixed(2);
+const salesUsDate = (key) => (key ? `${key.slice(5, 7)}/${key.slice(8, 10)}/${key.slice(0, 4)}` : '');
+const salesDay = (iso) => (iso && !Number.isNaN(Date.parse(iso)) ? programToday(Date.parse(iso)) : null);
+const SALES_MOVED = new Set(['paid', 'refunded', 'partially_refunded']);
+
+async function salesClientNames(env, ids) {
+  const list = [...new Set(ids.filter(Boolean))];
+  if (!list.length) return new Map();
+  const { results } = await env.DB.prepare(
+    `SELECT id, json_extract(data,'$.full_name') AS name FROM entities WHERE entity_type='Client' AND id IN (${inList(list)})`
+  ).bind(...list).all();
+  return new Map(results.map((r) => [r.id, r.name || 'Member']));
+}
+
+async function salesRenewals(env, memberships, names, plans, today) {
+  // eslint-disable-next-line no-undef
+  if (typeof upcomingRenewals === 'function') return upcomingRenewals(env); // RULES' report
+  try {
+    const saved = JSON.parse((await getState(env, 'billing_renewals'))?.value || 'null');
+    if (Array.isArray(saved)) return saved;
+    if (Array.isArray(saved?.renewals)) return saved.renewals;
+  } catch { /* fall through */ }
+  const until = pAddDays(today, 7);
+  return memberships
+    .filter((m) => m.billing_status === 'active' && isDateKey(m.next_payment_date) && m.next_payment_date >= today && m.next_payment_date <= until)
+    .map((m) => ({
+      membership_id: m.id, client_id: m.client_id, name: names.get(m.client_id) || 'Member',
+      plan: m.plan_name || plans.get(m.plan_id)?.name || 'Plan', date: m.next_payment_date,
+      amount_cents: salesNum(plans.get(m.plan_id)?.price_cents, null),
+    }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+async function runSalesFunction(name, payload, ctx) {
+  const { env, user, url, request } = ctx;
+  const p = payload || {};
+  switch (name) {
+    case 'publicPlans': {
+      if (await salesRateLimited(env, request, 'plans', 120)) return SALES_RATE_LIMITED;
+      const gym = await salesGymSettings(env);
+      const plans = (await selectEntities(env, 'MembershipPlan')).filter((x) => salesIsPublic(x) && salesIsActive(x))
+        .map((x) => salesPublicPlan(x, gym))
+        .sort((a, b) => (a.group === b.group ? a.price_cents - b.price_cents : a.group === 'try' ? -1 : 1));
+      return {
+        success: true, connected: salesConnected(env), plans,
+        agreement: { text: String(gym.agreement_text || SALES_DEFAULT_AGREEMENT), version: String(gym.agreement_version || '1') },
+      };
+    }
+
+    // One reply shape whether or not the email is already known.
+    case 'publicCheckout': {
+      const limit = Math.max(1, salesNum(env.SALES_RATE_LIMIT, 10));
+      if (await salesRateLimited(env, request, 'checkout', limit)) return SALES_RATE_LIMITED;
+      const full_name = String(p.full_name || '').trim().replace(/\s+/g, ' ');
+      const email = String(p.email || '').trim().toLowerCase();
+      const phone = String(p.phone || '').trim();
+      if (full_name.length < 2 || full_name.length > 100) return { success: false, error: 'Please enter your full name.' };
+      if (!SALES_EMAIL.test(email) || email.length > 200) return { success: false, error: 'That email address does not look right.' };
+      const digits = phone.replace(/\D/g, '');
+      if (digits.length < 7 || digits.length > 15 || phone.length > 30) return { success: false, error: 'Please enter a phone number we can reach you at.' };
+      const raw = await getEntityById(env, 'MembershipPlan', String(p.plan_id || ''));
+      if (!raw || !salesIsPublic(raw) || !salesIsActive(raw)) return { success: false, error: 'That option isn\'t available. Pick another.' };
+      const gym = await salesGymSettings(env);
+      const plan = { ...salesPublicPlan(raw, gym), stripe_price_id: raw.stripe_price_id || null, stripe_price_bank_id: raw.stripe_price_bank_id || null };
+      const ip = request?.headers?.get('cf-connecting-ip') || '';
+
+      if (plan.free) {
+        const client = await salesFindOrCreateLead(env, { full_name, email, phone, plan });
+        await insertEntity(env, 'ContactMessage', {
+          name: full_name, email, phone, subject: `Free trial: ${plan.name}`, status: 'new', source: 'join_page',
+          message: `${full_name} asked for a free trial (${plan.name}) from the Join page. Phone: ${phone}`,
+        }, null);
+        // Existing invite flow, only when this email has no account yet; the link is never returned here.
+        const hasAccount = await env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(email).first();
+        let emailed = false;
+        if (!hasAccount) {
+          const link = await createAccountLink(env, url, { kind: 'invite', email, user_type: 'client', client_id: client.id, full_name: client.full_name || full_name, hours: INVITE_HOURS, created_by: 'join_page' });
+          emailed = !!(await emailAccountLink(env, { kind: 'invite', to: email, name: full_name, link }))?.success;
+        }
+        await audit(env, { actor: email, action: 'trial_requested', target: 'MembershipPlan', targetId: plan.id, detail: emailed ? 'invite emailed' : 'invite recorded', request });
+        return { success: true, kind: 'trial', message: 'Thanks! We\'ll be in touch soon to set up your first class.' };
+      }
+
+      if (!salesConnected(env)) return { success: false, code: 'billing_not_connected', error: 'Online sign-up isn\'t open yet. Contact us to join.' };
+      const method = p.method === 'bank' ? 'bank' : p.method === 'card' ? 'card' : null;
+      if (!method) return { success: false, error: 'Pick card or bank account.' };
+      const promo = p.promo_code ? String(p.promo_code).trim().toUpperCase() : '';
+      if (promo && !/^[A-Z0-9_-]{2,40}$/.test(promo)) return { success: false, error: 'That promo code isn\'t valid.' };
+      const signed = String(p.signed_name || '').trim().replace(/\s+/g, ' ');
+      if (salesNeedsAgreement(plan) && signed.toLowerCase() !== full_name.toLowerCase()) {
+        return { success: false, code: 'agreement_required', error: 'Type your full name to sign the agreement.' };
+      }
+
+      const client = await salesFindOrCreateLead(env, { full_name, email, phone, plan });
+      let agreement_id = null;
+      if (salesNeedsAgreement(plan)) agreement_id = (await salesSignAgreement(env, { client, plan, signed_name: signed, ip }))?.agreement_id || null;
+      const origin = appOrigin(env, url);
+      let out;
+      try {
+        out = await salesCheckout(env, {
+          plan, plan_id: plan.id, client: { id: client.id, email, full_name }, client_id: client.id, method, promo_code: promo || null, agreement_id,
+          success_url: `${origin}/JoinBrigade?joined=1`, cancel_url: `${origin}/JoinBrigade?canceled=1`,
+        });
+      } catch (e) {
+        await recordError(env, { source: 'server', message: `publicCheckout: ${e?.message || e}`, page: 'JoinBrigade' });
+        return { success: false, error: 'We couldn\'t start checkout. Please try again or contact us.' };
+      }
+      if (!out?.url) return { success: false, error: out?.error || 'We couldn\'t start checkout. Please try again or contact us.' };
+      await audit(env, { actor: email, action: 'join_checkout_started', target: 'MembershipPlan', targetId: plan.id, detail: method, request });
+      return { success: true, kind: 'checkout', url: out.url };
+    }
+
+    case 'listPromoCodes': {
+      if (!can(user, 'billing.view')) return NO_PERMISSION;
+      const codes = (await selectEntities(env, 'PromoCode')).sort((a, b) => String(b.created_date).localeCompare(String(a.created_date)));
+      if (salesConnected(env) && codes.length) {
+        try {
+          const live = await stripe(env, 'promotion_codes?limit=100', { method: 'GET' });
+          const used = new Map((live?.data || []).map((x) => [x.id, x.times_redeemed || 0]));
+          for (const c of codes) if (used.has(c.promotion_code_id)) c.times_redeemed = used.get(c.promotion_code_id);
+        } catch { /* show what we have */ }
+      }
+      return { success: true, connected: salesConnected(env), can_edit: can(user, 'settings.manage'), codes };
+    }
+
+    case 'savePromoCode': {
+      if (!can(user, 'billing.view') || !can(user, 'settings.manage')) return NO_PERMISSION;
+      if (!salesConnected(env)) return { success: false, code: 'billing_not_connected', error: 'Connect billing first. Promo codes live in Stripe.' };
+      const code = String(p.code || '').trim().toUpperCase();
+      if (!/^[A-Z0-9_-]{3,30}$/.test(code)) return { success: false, error: 'Use 3 to 30 letters or numbers for the code.' };
+      const percent = p.percent_off === undefined || p.percent_off === null || p.percent_off === '' ? null : Number(p.percent_off);
+      const amount = p.amount_off_cents === undefined || p.amount_off_cents === null || p.amount_off_cents === '' ? null : Math.round(Number(p.amount_off_cents));
+      if ((percent === null) === (amount === null)) return { success: false, error: 'Pick a percent off or an amount off.' };
+      if (percent !== null && !(percent > 0 && percent <= 100)) return { success: false, error: 'Percent off must be between 1 and 100.' };
+      if (amount !== null && !(amount >= 1 && amount <= 1000000)) return { success: false, error: 'Enter a dollar amount off.' };
+      const duration = ['once', 'repeating', 'forever'].includes(p.duration) ? p.duration : null;
+      if (!duration) return { success: false, error: 'Pick how long the discount lasts.' };
+      const months = duration === 'repeating' ? Math.round(Number(p.duration_in_months)) : null;
+      if (duration === 'repeating' && !(months >= 1 && months <= 36)) return { success: false, error: 'Pick 1 to 36 months.' };
+      const expires = p.expires_on ? String(p.expires_on) : null;
+      if (expires && (!isDateKey(expires) || expires < programToday())) return { success: false, error: 'Pick an end date in the future.' };
+      const maxUses = p.max_redemptions === undefined || p.max_redemptions === null || p.max_redemptions === '' ? null : Math.round(Number(p.max_redemptions));
+      if (maxUses !== null && !(maxUses >= 1 && maxUses <= 100000)) return { success: false, error: 'Max uses must be 1 or more.' };
+      const dupe = await selectEntities(env, 'PromoCode', `json_extract(data,'$.code') = ? AND COALESCE(json_extract(data,'$.active'),1) = 1`, [code]);
+      if (dupe.length) return { success: false, error: 'That code already exists.' };
+      let coupon; let promo;
+      try {
+        coupon = await stripe(env, 'coupons', {
+          data: {
+            name: code, duration, duration_in_months: months ?? undefined,
+            ...(percent !== null ? { percent_off: percent } : { amount_off: amount, currency: 'usd' }),
+          },
+        });
+        promo = await stripe(env, 'promotion_codes', {
+          data: {
+            coupon: coupon.id, code,
+            expires_at: expires ? Math.floor(easternToUTC(expires, '23:59') / 1000) : undefined,
+            max_redemptions: maxUses ?? undefined,
+          },
+        });
+      } catch (e) {
+        return { success: false, error: `Stripe said: ${String(e?.message || e).slice(0, 160)}` };
+      }
+      const rec = await insertEntity(env, 'PromoCode', {
+        code, coupon_id: coupon.id, promotion_code_id: promo.id, percent_off: percent, amount_off_cents: amount,
+        duration, duration_in_months: months, expires_on: expires, max_redemptions: maxUses, active: true, times_redeemed: 0,
+      }, user.id);
+      await audit(env, { actor: user.email, action: 'promo_code_created', target: 'PromoCode', targetId: rec.id, detail: `${code} ${percent !== null ? `${percent}%` : `${amount}c`} ${duration}`, request });
+      return { success: true, promo_code: rec };
+    }
+
+    case 'archivePromoCode': {
+      if (!can(user, 'billing.view') || !can(user, 'settings.manage')) return NO_PERMISSION;
+      const rec = await getEntityById(env, 'PromoCode', String(p.id || ''));
+      if (!rec) return { success: false, error: 'Promo code not found.' };
+      if (rec.promotion_code_id && salesConnected(env)) {
+        try { await stripe(env, `promotion_codes/${encodeURIComponent(rec.promotion_code_id)}`, { data: { active: false } }); } catch (e) {
+          return { success: false, error: `Stripe said: ${String(e?.message || e).slice(0, 160)}` };
+        }
+      }
+      const saved = await patchEntity(env, rec, { active: false, archived_at: nowISO() });
+      await audit(env, { actor: user.email, action: 'promo_code_archived', target: 'PromoCode', targetId: rec.id, detail: rec.code, request });
+      return { success: true, promo_code: saved };
+    }
+
+    case 'billingDashboard': {
+      if (!can(user, 'billing.view')) return NO_PERMISSION;
+      const today = programToday();
+      const month = /^\d{4}-\d{2}$/.test(String(p.month || '')) ? p.month : today.slice(0, 7);
+      const [payments, memberships, planRows] = await Promise.all([
+        selectEntities(env, 'Payment'), selectEntities(env, 'Membership'), selectEntities(env, 'MembershipPlan'),
+      ]);
+      const plans = new Map(planRows.map((x) => [x.id, x]));
+      const names = await salesClientNames(env, [...payments.map((x) => x.client_id), ...memberships.map((x) => x.client_id)]);
+      const inMonth = (iso) => (salesDay(iso) || '').slice(0, 7) === month;
+      const revenue = { gross_cents: 0, refunded_cents: 0, net_cents: 0, tax_cents: 0, discount_cents: 0, payments: 0, failed: 0 };
+      for (const x of payments) {
+        if (SALES_MOVED.has(x.status) && inMonth(x.paid_at)) {
+          revenue.gross_cents += salesNum(x.amount_cents, 0);
+          revenue.tax_cents += salesNum(x.tax_cents, 0);
+          revenue.discount_cents += salesNum(x.discount_cents, 0);
+          revenue.payments += 1;
+        }
+        if (salesNum(x.refunded_cents, 0) > 0 && inMonth(x.refunded_at || x.paid_at)) revenue.refunded_cents += salesNum(x.refunded_cents, 0);
+        if (x.status === 'failed' && inMonth(x.paid_at || x.created_date)) revenue.failed += 1;
+      }
+      revenue.net_cents = revenue.gross_cents - revenue.refunded_cents;
+      const counts = { active: 0, past_due: 0, paused: 0, comped: 0 };
+      for (const m of memberships) {
+        const s = m.billing_status === 'unpaid' ? 'past_due' : m.billing_status;
+        if (s in counts) counts[s] += 1;
+      }
+      const failedFor = (m) => payments.filter((x) => x.membership_id === m.id && x.status === 'failed')
+        .map((x) => salesDay(x.paid_at || x.created_date)).filter(Boolean).sort();
+      const past_due = memberships.filter((m) => m.billing_status === 'past_due' || m.billing_status === 'unpaid').map((m) => {
+        const fails = failedFor(m);
+        return {
+          membership_id: m.id, client_id: m.client_id, name: names.get(m.client_id) || 'Member',
+          plan: m.plan_name || plans.get(m.plan_id)?.name || 'Plan', status: m.billing_status,
+          failed_payments: Math.max(salesNum(m.failed_payments, 0), fails.length),
+          since: m.past_due_since || fails[0] || null,
+        };
+      }).sort((a, b) => String(a.since || '9').localeCompare(String(b.since || '9')));
+      const renewals = await salesRenewals(env, memberships, names, plans, today);
+      const refunds = payments.filter((x) => salesNum(x.refunded_cents, 0) > 0)
+        .sort((a, b) => String(b.refunded_at || b.paid_at || '').localeCompare(String(a.refunded_at || a.paid_at || '')))
+        .slice(0, 10)
+        .map((x) => ({
+          payment_id: x.id, client_id: x.client_id, name: names.get(x.client_id) || 'Member', description: x.description || '',
+          refunded_cents: salesNum(x.refunded_cents, 0), amount_cents: salesNum(x.amount_cents, 0), date: salesDay(x.refunded_at || x.paid_at),
+        }));
+      return { success: true, connected: salesConnected(env), month, today, revenue, counts, past_due, renewals, refunds };
+    }
+
+    case 'exportPaymentsCsv': {
+      if (!can(user, 'billing.view')) return NO_PERMISSION;
+      const today = programToday();
+      const from = isDateKey(p.from) ? p.from : `${today.slice(0, 7)}-01`;
+      const to = isDateKey(p.to) ? p.to : today;
+      if (from > to) return { success: false, error: 'The start date is after the end date.' };
+      if (pDaysBetween(from, to) > 400) return { success: false, error: 'Pick a range of about a year or less.' };
+      const payments = (await selectEntities(env, 'Payment'))
+        .map((x) => ({ ...x, day: salesDay(x.paid_at) }))
+        .filter((x) => SALES_MOVED.has(x.status) && x.day && x.day >= from && x.day <= to)
+        .sort((a, b) => a.day.localeCompare(b.day) || String(a.paid_at).localeCompare(String(b.paid_at)));
+      const names = await salesClientNames(env, payments.map((x) => x.client_id));
+      const header = ['Date', 'Customer', 'Description', 'Amount', 'Tax', 'Discount', 'Refunded', 'Method', 'Stripe id'];
+      const rows = payments.map((x) => [
+        salesUsDate(x.day), names.get(x.client_id) || 'Member', x.description || 'Membership payment',
+        salesMoney(x.amount_cents), salesMoney(x.tax_cents), salesMoney(x.discount_cents), salesMoney(x.refunded_cents),
+        x.method || '', x.stripe_invoice_id || x.stripe_payment_intent_id || '',
+      ]);
+      const csv = [header, ...rows].map((r) => r.map(salesCsvCell).join(',')).join('\r\n') + '\r\n';
+      await audit(env, { actor: user.email, action: 'payments_exported', target: 'Payment', detail: `${from}..${to} (${rows.length})`, request });
+      return { success: true, from, to, count: rows.length, filename: `brigade-payments-${from}-to-${to}.csv`, csv };
+    }
+
+    default:
+      return { success: false, error: 'Unknown sales function.' };
+  }
+}
+// ===== end Phase 4: SALES =====
+
+const PUBLIC_FUNCTIONS = new Set(['getAppLogo', 'submitContact',
+  'publicPlans', 'publicCheckout', // Phase 4: SALES
+]);
 
 async function runFunction(name, payload, ctx) {
   const { env, user, url } = ctx;
@@ -4861,6 +5248,11 @@ async function runFunction(name, payload, ctx) {
     case 'upcomingRenewals': case 'memberBilling': case 'runBillingRules':
       return runRulesFunction(name, payload, ctx);
     // ===== end Phase 4: RULES (cases) =====
+    // ===== Phase 4: SALES (cases) =====
+    case 'publicPlans': case 'publicCheckout': case 'listPromoCodes': case 'savePromoCode': case 'archivePromoCode':
+    case 'billingDashboard': case 'exportPaymentsCsv':
+      return runSalesFunction(name, payload, ctx);
+    // ===== end Phase 4: SALES (cases) =====
 
     // Content browse helpers — empty until curated content sources are added.
     // Phase 3: MEMBER (scores, leaderboard, streak)
@@ -7057,7 +7449,7 @@ export async function onRequest(context) {
       // email or spend AI credits.
       if (!user && !PUBLIC_FUNCTIONS.has(name)) return err('Authentication required.', 401);
       const payload = method === 'POST' ? await request.json().catch(() => ({})) : {};
-      const result = await runFunction(name, payload, { env, user, url });
+      const result = await runFunction(name, payload, { env, user, url, request });
       if (result && result.__unimplemented) {
         return json({ error: `Function "${name}" is not available in the Cloudflare build.`, stubbed: true }, 200);
       }

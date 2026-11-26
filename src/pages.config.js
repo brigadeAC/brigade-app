@@ -63,6 +63,9 @@ const Leaderboard = lazy(() => import('./pages/Leaderboard'));
 const DailyWorkouts = lazy(() => import('./pages/DailyWorkouts'));
 const MovementLibrary = lazy(() => import('./pages/MovementLibrary'));
 const MemberBilling = lazy(() => import('./pages/MemberBilling')); // Phase 4: RULES
+const JoinBrigade = lazy(() => import('./pages/JoinBrigade')); // Phase 4: SALES
+const PromoCodes = lazy(() => import('./pages/PromoCodes')); // Phase 4: SALES
+const BillingDashboard = lazy(() => import('./pages/BillingDashboard')); // Phase 4: SALES
 
 
 export const PAGES = {
@@ -127,6 +130,9 @@ export const PAGES = {
     "DailyWorkouts": DailyWorkouts,
     "MovementLibrary": MovementLibrary,
     "MemberBilling": MemberBilling, // Phase 4: RULES
+    "JoinBrigade": JoinBrigade, // Phase 4: SALES
+    "PromoCodes": PromoCodes, // Phase 4: SALES
+    "BillingDashboard": BillingDashboard, // Phase 4: SALES
 }
 
 export const pagesConfig = {
