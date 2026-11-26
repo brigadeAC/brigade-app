@@ -45,6 +45,7 @@ const Classes = lazy(() => import('./pages/Classes'));
 const ClassSetup = lazy(() => import('./pages/ClassSetup'));
 const ClassReports = lazy(() => import('./pages/ClassReports'));
 const ClientClasses = lazy(() => import('./pages/ClientClasses'));
+const MyLifts = lazy(() => import('./pages/MyLifts'));
 const ProgramBuilder = lazy(() => import('./pages/ProgramBuilder'));
 const ClientProgram = lazy(() => import('./pages/ClientProgram'));
 const Schedule = lazy(() => import('./pages/Schedule'));
@@ -72,6 +73,7 @@ export const PAGES = {
     "ClassSetup": ClassSetup,
     "ClassReports": ClassReports,
     "ClientClasses": ClientClasses,
+    "MyLifts": MyLifts,
     "ProgramBuilder": ProgramBuilder,
     "ClientProgram": ClientProgram,
     "CRM": CRM,

@@ -24,7 +24,8 @@ import {
   Bug,
   Settings,
   Eye,
-  FileSignature
+  FileSignature,
+  Trophy
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -50,6 +51,7 @@ const clientNavGroups = [
     items: [
       { name: "Workouts", icon: Dumbbell, page: "ClientWorkouts" },
       { name: "Classes", icon: CalendarDays, page: "ClientClasses" },
+      { name: "My Lifts & PRs", icon: Trophy, page: "MyLifts" },
       { name: "Nutrition", icon: Utensils, page: "ClientMeals" },
       { name: "Progress", icon: LineChart, page: "ClientProgress" },
       { name: "Schedule", icon: CalendarDays, page: "ClientSchedule" },

@@ -400,7 +400,8 @@ export default function Layout({ children, currentPageName }) {
   // them back to their dashboard. The API scopes data either way — this keeps
   // trainer screens from rendering at all.
   if (isClient) {
-    const clientAllowed = [...clientPages, 'AskBrigade', 'Settings', 'Dashboard', 'IndependentDashboard', 'IndependentOnboarding'];
+    const clientAllowed = [...clientPages, 'AskBrigade', 'Settings', 'Dashboard', 'IndependentDashboard', 'IndependentOnboarding',
+      'MyLifts'];
     if (!clientAllowed.includes(currentPageName)) {
       return <Navigate to={createPageUrl('ClientDashboard')} replace />;
     }

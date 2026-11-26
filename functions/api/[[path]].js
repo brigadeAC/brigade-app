@@ -2772,6 +2772,299 @@ async function checkHeartbeat(env) {
   }
 }
 
+// ===== Phase 3: lifts =====
+// PRs, lift history and one-rep maxes. Two sources feed a member's lifts:
+// load scores in a class strength section (WorkoutScore, written by logScore;
+// the lift is the section's first movement) and lifts logged outside class
+// (LiftEntry). Members write LiftEntry only through saveLiftEntry and
+// deleteLiftEntry so the server always sets is_pr. Staff with classes.run may
+// add or fix a member's lift. Guardians act for a linked child.
+STAFF_WRITE_TYPES.add('LiftEntry');
+TYPE_PERMISSION.LiftEntry = 'classes.run';
+const LIFT_KG_PER_LB = 0.45359237;
+const LIFT_RM_REPS = [1, 2, 3, 5, 10];
+const liftToLb = (load, unit) => (unit === 'kg' ? Number(load) / LIFT_KG_PER_LB : Number(load));
+const liftFromLb = (lb, unit) => (unit === 'kg' ? lb * LIFT_KG_PER_LB : lb);
+const liftRound = (n) => Math.round(Number(n) * 10) / 10;
+// Epley: load x (1 + reps/30); a single is the 1RM itself.
+const liftEpley = (load, reps) => (reps <= 1 ? load : load * (1 + reps / 30));
+
+// Rep count of a class load score: value.reps if given, else read from the
+// section text ("3RM", "5x3" = sets of 3), else a single.
+function liftRepsOf(value, section) {
+  const r = Number(value?.reps);
+  if (Number.isInteger(r) && r > 0) return r;
+  const text = `${section?.title || ''} ${section?.description || ''}`;
+  const rm = /\b(\d{1,2})\s*-?\s*RM\b/i.exec(text);
+  if (rm && Number(rm[1]) > 0) return Number(rm[1]);
+  const sets = /\b\d{1,2}\s*[x×]\s*(\d{1,2})\b/i.exec(text);
+  if (sets && Number(sets[1]) > 0) return Number(sets[1]);
+  return 1;
+}
+
+// Every WorkoutScore of these clients with the workout section it belongs to.
+async function liftScoreRows(env, clientIds) {
+  if (!clientIds.length) return [];
+  const scores = await selectEntities(env, 'WorkoutScore', `json_extract(data,'$.client_id') IN (${inList(clientIds)})`, clientIds);
+  const ids = [...new Set(scores.map((s) => s.workout_id).filter(Boolean))];
+  const workouts = new Map();
+  for (let i = 0; i < ids.length; i += 90) {
+    const chunk = ids.slice(i, i + 90);
+    for (const w of await selectEntities(env, 'Workout', `id IN (${inList(chunk)})`, chunk)) workouts.set(w.id, w);
+  }
+  return scores.map((score) => {
+    const workout = workouts.get(score.workout_id);
+    const section = (workout?.sections || []).find((s) => s.id === score.section_id) || null;
+    return { score, workout, section };
+  }).filter((r) => r.section);
+}
+
+// Lift rows (class strength scores + LiftEntry), newest first.
+async function liftRows(env, clientIds, movementId = null) {
+  if (!clientIds.length) return [];
+  const where = `json_extract(data,'$.client_id') IN (${inList(clientIds)})${movementId ? " AND json_extract(data,'$.movement_id') = ?" : ''}`;
+  const entries = await selectEntities(env, 'LiftEntry', where, movementId ? [...clientIds, movementId] : clientIds);
+  const rows = entries.filter((e) => Number(e.load) > 0).map((e) => {
+    const unit = e.unit === 'kg' ? 'kg' : 'lb';
+    const reps = Math.max(1, Math.round(Number(e.reps) || 1));
+    return {
+      id: e.id, source: 'lift', client_id: e.client_id, movement_id: e.movement_id, date: e.date, created_date: e.created_date,
+      load: Number(e.load), unit, reps, load_lb: liftToLb(e.load, unit), note: e.note || '', is_pr: !!e.is_pr,
+    };
+  });
+  for (const { score, workout, section } of await liftScoreRows(env, clientIds)) {
+    const lift = section.kind === 'strength' ? (section.movement_ids || [])[0] : null;
+    const load = Number(score.value?.load);
+    if (!lift || !(load > 0) || (movementId && lift !== movementId)) continue;
+    const unit = (score.value?.unit || section.scoring?.unit) === 'kg' ? 'kg' : 'lb';
+    const reps = liftRepsOf(score.value, section);
+    rows.push({
+      id: score.id, source: 'class', client_id: score.client_id, movement_id: lift, date: score.date || workout.date, created_date: score.created_date,
+      load, unit, reps, load_lb: liftToLb(load, unit), note: score.comment || '', is_pr: !!score.is_pr,
+      workout_id: workout.id, section_id: section.id, workout_title: section.title || workout.title || 'Class',
+    });
+  }
+  return rows.sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(b.created_date).localeCompare(String(a.created_date)));
+}
+
+// Benchmark results (class scores on a section linked to a benchmark).
+async function liftBenchmarkRows(env, clientIds) {
+  return (await liftScoreRows(env, clientIds))
+    .filter(({ score, section }) => section.benchmark_id && Number.isFinite(Number(score.sort_value)))
+    .map(({ score, workout, section }) => ({
+      id: score.id, benchmark_id: section.benchmark_id, date: score.date || workout.date, sort_value: Number(score.sort_value),
+      value: score.value || {}, division: score.division || null, scoring: section.scoring || null, is_pr: !!score.is_pr,
+      lower_is_better: section.scoring?.lower_is_better ?? section.scoring?.type === 'time', title: section.title || workout.title || '',
+    }));
+}
+
+// Is this result a PR? Lifts: the load beats the member's best at the same
+// rep count (kg and lb compared), from class strength scores and logged lifts.
+// Benchmarks: sort_value beats their best on that benchmark. The record being
+// saved (exclude_id) is ignored. A first-ever result is not a PR (nothing to
+// beat yet); it becomes the baseline. -> { is_pr, previous } (previous in the
+// new result's unit for lifts, as a sort_value for benchmarks).
+async function checkPr(env, { client_id, movement_id, load, reps, scoring, sort_value, benchmark_id, workout_id, section_id, exclude_id, unit } = {}) {
+  const none = { is_pr: false, previous: null };
+  if (!client_id) return none;
+  let section = null;
+  if (workout_id && section_id) {
+    const w = await getEntityById(env, 'Workout', workout_id);
+    section = (w?.sections || []).find((s) => s.id === section_id) || null;
+  }
+  const sc = scoring || section?.scoring || null;
+  const lift = movement_id || (section?.kind === 'strength' ? (section.movement_ids || [])[0] : null);
+  const isLift = Number(load) > 0 && lift && (!section || section.kind === 'strength');
+  if (isLift) {
+    const u = (unit || sc?.unit) === 'kg' ? 'kg' : 'lb';
+    const r = Number(reps) > 0 ? Math.round(Number(reps)) : liftRepsOf(null, section);
+    const prev = (await liftRows(env, [client_id], lift)).filter((x) => x.id !== exclude_id && x.reps === r);
+    if (!prev.length) return none;
+    const best = Math.max(...prev.map((x) => x.load_lb));
+    return { is_pr: liftToLb(load, u) > best + 0.01, previous: liftRound(liftFromLb(best, u)) };
+  }
+  const bench = benchmark_id || section?.benchmark_id || null;
+  const sv = Number(sort_value);
+  if (!bench || sort_value == null || !Number.isFinite(sv)) return none;
+  let lower = sc?.lower_is_better;
+  if (lower == null) {
+    const b = await getEntityById(env, 'Benchmark', bench);
+    const bs = b?.scoring || sc;
+    lower = bs?.lower_is_better ?? bs?.type === 'time';
+  }
+  const prev = (await liftBenchmarkRows(env, [client_id])).filter((x) => x.benchmark_id === bench && x.id !== exclude_id);
+  if (!prev.length) return none;
+  const best = lower ? Math.min(...prev.map((x) => x.sort_value)) : Math.max(...prev.map((x) => x.sort_value));
+  return { is_pr: lower ? sv < best : sv > best, previous: best };
+}
+
+// Whose lifts: staff name client_id (writes need classes.run); members get
+// their own, or a linked child's (guardian rules in resolveClassClient).
+async function resolveLiftClient(env, user, clientId, { write = false } = {}) {
+  if (!user) return { error: 'Not logged in' };
+  if (isStaff(user)) {
+    if (write && !can(user, 'classes.run')) return { error: NO_PERMISSION.error, code: 'forbidden' };
+    if (!clientId) return { error: 'Pick a member first.' };
+    const client = await getEntityById(env, 'Client', clientId);
+    if (!client) return { error: 'Member not found.' };
+    return { client, clientIds: [client.id] };
+  }
+  const who = await resolveClassClient(env, user, clientId || null);
+  if (who.error) {
+    return clientId
+      ? { error: 'You can only see lifts for yourself or your children.', code: 'forbidden' }
+      : { error: who.error, code: 'no_client' };
+  }
+  return who;
+}
+
+async function liftNames(env, type, ids) {
+  const out = new Map();
+  const list = [...new Set(ids.filter(Boolean))];
+  for (let i = 0; i < list.length; i += 90) {
+    const chunk = list.slice(i, i + 90);
+    for (const e of await selectEntities(env, type, `id IN (${inList(chunk)})`, chunk)) out.set(e.id, e);
+  }
+  return out;
+}
+
+// One movement's lifts: the best at each rep count and the 1RM figures, in the unit most recently used.
+function liftSummary(rows) {
+  const unit = rows[0]?.unit || 'lb';
+  const show = (lb) => liftRound(liftFromLb(lb, unit));
+  const byReps = new Map();
+  for (const r of rows) {
+    const cur = byReps.get(r.reps);
+    if (!cur || r.load_lb > cur.load_lb + 0.01 || (Math.abs(r.load_lb - cur.load_lb) <= 0.01 && r.date < cur.date)) byReps.set(r.reps, r);
+  }
+  const bests = [...byReps.values()].sort((a, b) => a.reps - b.reps)
+    .map((r) => ({ reps: r.reps, load: show(r.load_lb), unit, date: r.date, id: r.id, standard: LIFT_RM_REPS.includes(r.reps) }));
+  const single = byReps.get(1);
+  let est = null;
+  for (const r of rows) {
+    const e = liftEpley(r.load_lb, r.reps);
+    if (!est || e > est.lb + 0.01) est = { lb: e, date: r.date, reps: r.reps };
+  }
+  return {
+    unit, bests,
+    one_rm: single ? { load: show(single.load_lb), date: single.date } : null,
+    est_1rm: est ? { load: show(est.lb), date: est.date, from_reps: est.reps } : null,
+  };
+}
+
+const LIFT_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const liftPublic = (e) => ({ id: e.id, client_id: e.client_id, movement_id: e.movement_id, date: e.date, load: e.load, unit: e.unit, reps: e.reps, note: e.note || '', is_pr: !!e.is_pr, created_date: e.created_date });
+
+async function runLiftsFunction(name, payload, ctx) {
+  const { env, user } = ctx;
+  if (!user) return { success: false, error: 'Not logged in' };
+  const p = payload || {};
+  switch (name) {
+    // Lift movements from the gym library, for the "Log a lift" picker.
+    case 'liftMovements': {
+      const all = await selectEntities(env, 'Movement');
+      const lifts = all.filter((m) => m.is_lift === true || (m.is_lift == null && m.category === 'weightlifting'))
+        .map((m) => ({ id: m.id, name: m.name || 'Lift', category: m.category || null }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+      return { success: true, movements: lifts };
+    }
+
+    // "Would this be a PR?" for the signed-in member (or a child / a member staff pick).
+    case 'checkPr': {
+      const who = await resolveLiftClient(env, user, p.client_id);
+      if (who.error) return { success: false, error: who.error, code: who.code };
+      const { client_id: _c, ...args } = p;
+      return { success: true, ...(await checkPr(env, { ...args, client_id: who.client.id })) };
+    }
+
+    case 'liftHistory': {
+      if (!p.movement_id) return { success: false, error: 'Pick a lift.' };
+      const who = await resolveLiftClient(env, user, p.client_id);
+      if (who.error) return { success: false, error: who.error, code: who.code };
+      const movement = await getEntityById(env, 'Movement', p.movement_id);
+      const rows = await liftRows(env, who.clientIds, p.movement_id);
+      return {
+        success: true,
+        movement: { id: p.movement_id, name: movement?.name || 'Lift' },
+        entries: rows.map(({ load_lb: _l, created_date: _c, ...r }) => r),
+        ...liftSummary(rows),
+      };
+    }
+
+    case 'prList': {
+      const who = await resolveLiftClient(env, user, p.client_id);
+      if (who.error) return { success: false, error: who.error, code: who.code };
+      const rows = await liftRows(env, who.clientIds);
+      const byMove = new Map();
+      for (const r of rows) {
+        if (!byMove.has(r.movement_id)) byMove.set(r.movement_id, []);
+        byMove.get(r.movement_id).push(r);
+      }
+      const moves = await liftNames(env, 'Movement', [...byMove.keys()]);
+      const lifts = [...byMove.entries()].map(([id, list]) => ({
+        movement_id: id, name: moves.get(id)?.name || 'Lift', count: list.length, last_date: list[0].date, ...liftSummary(list),
+      })).sort((a, b) => a.name.localeCompare(b.name));
+      const bench = await liftBenchmarkRows(env, who.clientIds);
+      const byBench = new Map();
+      for (const r of bench) {
+        const cur = byBench.get(r.benchmark_id);
+        const better = cur && (r.lower_is_better ? r.sort_value < cur.best.sort_value : r.sort_value > cur.best.sort_value);
+        if (!cur) byBench.set(r.benchmark_id, { best: r, count: 1 });
+        else { cur.count += 1; if (better) cur.best = r; }
+      }
+      const names = await liftNames(env, 'Benchmark', [...byBench.keys()]);
+      const benchmarks = [...byBench.entries()].map(([id, { best, count }]) => ({
+        benchmark_id: id, name: names.get(id)?.name || best.title || 'Benchmark', count,
+        best: { value: best.value, sort_value: best.sort_value, date: best.date, division: best.division },
+        scoring: names.get(id)?.scoring || best.scoring, lower_is_better: best.lower_is_better,
+      })).sort((a, b) => a.name.localeCompare(b.name));
+      return { success: true, lifts, benchmarks };
+    }
+
+    case 'saveLiftEntry': {
+      const existing = p.id ? await getEntityById(env, 'LiftEntry', p.id) : null;
+      if (p.id && !existing) return { success: false, error: 'That lift was not found.' };
+      const who = await resolveLiftClient(env, user, existing ? existing.client_id : p.client_id, { write: true });
+      if (who.error) return { success: false, error: who.error, code: who.code };
+      const movementId = p.movement_id || existing?.movement_id;
+      const movement = await getEntityById(env, 'Movement', movementId);
+      if (!movement) return { success: false, error: 'Pick a lift from the list.' };
+      const load = Number(p.load ?? existing?.load);
+      if (!(load > 0) || load > 2000) return { success: false, error: 'Enter the weight you lifted.' };
+      const unit = (p.unit ?? existing?.unit) === 'kg' ? 'kg' : 'lb';
+      const reps = Number(p.reps ?? existing?.reps ?? 1);
+      if (!Number.isInteger(reps) || reps < 1 || reps > 50) return { success: false, error: 'Reps must be a whole number from 1 to 50.' };
+      const date = p.date ?? existing?.date ?? programToday();
+      if (!LIFT_DATE.test(String(date)) || date > programToday()) return { success: false, error: 'Pick a date that is today or earlier.' };
+      const note = String(p.note ?? existing?.note ?? '').slice(0, 500);
+      const clientId = existing ? existing.client_id : who.client.id;
+      const pr = await checkPr(env, { client_id: clientId, movement_id: movement.id, load, reps, unit, exclude_id: existing?.id });
+      const fields = { movement_id: movement.id, date, load, unit, reps, note, is_pr: pr.is_pr };
+      let entry;
+      if (existing) entry = await patchEntity(env, existing, fields);
+      else {
+        const login = await clientLogin(env, who.client);
+        entry = await insertEntity(env, 'LiftEntry', { client_id: clientId, user_email: login?.email || who.client.email || null, ...fields }, user.email);
+      }
+      await audit(env, { actor: user.email, action: existing ? 'update' : 'create', target: 'LiftEntry', targetId: entry.id, detail: `${movement.name || 'lift'} ${load}${unit} x${reps}${pr.is_pr ? ' PR' : ''}`, request: null });
+      return { success: true, entry: liftPublic(entry), pr: pr.is_pr, previous: pr.previous };
+    }
+
+    case 'deleteLiftEntry': {
+      const existing = await getEntityById(env, 'LiftEntry', p.id);
+      if (!existing) return { success: false, error: 'That lift was not found.' };
+      const who = await resolveLiftClient(env, user, existing.client_id, { write: true });
+      if (who.error) return { success: false, error: who.error, code: who.code };
+      await env.DB.prepare("DELETE FROM entities WHERE id = ? AND entity_type = 'LiftEntry'").bind(existing.id).run();
+      await audit(env, { actor: user.email, action: 'delete', target: 'LiftEntry', targetId: existing.id, detail: `${existing.load}${existing.unit} x${existing.reps}`, request: null });
+      return { success: true };
+    }
+    default:
+      return { success: false, error: 'Unknown lifts function.' };
+  }
+}
+// ===== end Phase 3: lifts =====
+
 const PUBLIC_FUNCTIONS = new Set(['getAppLogo', 'submitContact']);
 
 async function runFunction(name, payload, ctx) {
@@ -4233,6 +4526,11 @@ async function runFunction(name, payload, ctx) {
       if (!isStaff(user)) return { success: false, error: 'Only coaches can run this.' };
       return runClassTick(env);
     }
+
+    // ===== Phase 3: lifts (cases) =====
+    case 'liftMovements': case 'liftHistory': case 'prList': case 'saveLiftEntry': case 'deleteLiftEntry': case 'checkPr':
+      return runLiftsFunction(name, payload, ctx);
+    // ===== end Phase 3: lifts (cases) =====
 
     // Content browse helpers — empty until curated content sources are added.
     case 'getCuratedRecipes':
