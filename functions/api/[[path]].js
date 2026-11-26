@@ -423,6 +423,7 @@ const NO_PERMISSION = { success: false, error: 'Your role doesn\'t allow this. A
 const TYPE_PERMISSION = {
   Membership: 'members.manage', MembershipPlan: 'members.manage',
   GymSettings: 'settings.manage', ClassType: 'schedule.manage', ClassSlot: 'schedule.manage', ClassDayChange: 'schedule.manage',
+  WorkoutScore: 'classes.run', // Phase 3 MEMBER
 };
 const isMemberUser = (user) => !!user && user.role !== 'admin' && (user.user_type === 'client' || user.user_type === 'independent');
 const staffWriteDenied = (type, user) => ((STAFF_LIBRARY_TYPES.has(type) || STAFF_WRITE_TYPES.has(type)) && !isStaff(user))
@@ -501,6 +502,7 @@ async function memberWriteViolation(env, user, type, fields, existing = null) {
     }
   }
 
+  if (type === 'WorkoutScore') return "Log scores from Today's Workout."; // Phase 3 MEMBER
   if (STAFF_WRITE_TYPES.has(type)) return 'Only coaches can change program enrollments.';
   if (MEMBER_PROGRAM_RECORD_TYPES.has(type) && 'enrollment_id' in fields && fields.enrollment_id
       && fields.enrollment_id !== existing?.enrollment_id) {
@@ -4235,6 +4237,15 @@ async function runFunction(name, payload, ctx) {
     }
 
     // Content browse helpers — empty until curated content sources are added.
+    // Phase 3: MEMBER (scores, leaderboard, streak)
+    case 'logScore':
+    case 'deleteScore':
+    case 'leaderboard':
+    case 'myScores':
+    case 'weeklyStreak':
+    case 'todayWorkout': // stub: owned by EDITOR (drop this line at merge)
+      return runMemberScoreFunction(name, payload, ctx);
+
     case 'getCuratedRecipes':
     case 'searchResourceSources':
       return { results: [], items: [], recipes: [] };
@@ -4243,6 +4254,321 @@ async function runFunction(name, payload, ctx) {
       return { __unimplemented: true };
   }
 }
+
+// ===== Phase 3: MEMBER =====
+// Scores members log against the day's workout, the leaderboard and the weekly
+// streak. WorkoutScore rows are written only through logScore/deleteScore, so
+// every score is checked against its section's scoring type and gets a
+// comparable sort_value (contract: lower is better only for 'time').
+const SCORE_DIVISIONS = ['rx_plus', 'rx', 'scaled'];
+const SCORE_DIVISION_LABEL = { rx_plus: 'Rx+', rx: 'Rx', scaled: 'Scaled' };
+const SCORE_CAP_PENALTY = 1e7; // capped time scores rank below every finisher, more reps first
+const SCORE_COMMENT_MAX = 280;
+const SCORED_TYPES = new Set(['time', 'rounds_reps', 'load', 'reps', 'distance', 'calories', 'check']);
+const LOAD_TO_LB = { lb: 1, kg: 2.20462 };
+const DIST_TO_M = { m: 1, km: 1000, mi: 1609.344 };
+
+// Members see a workout once it is published and its publish time has passed.
+const scoreWorkoutVisible = (w, nowMs = Date.now()) => !!w && w.status === 'published'
+  && (!w.publish_at || Date.parse(w.publish_at) <= nowMs);
+const scoreSection = (w, sectionId) => (Array.isArray(w?.sections) ? w.sections : []).find((s) => s && s.id === sectionId) || null;
+const sectionIsScored = (s) => !!s && SCORED_TYPES.has(s.scoring?.type);
+const fmtClock = (sec) => {
+  const t = Math.round(Number(sec) || 0);
+  const h = Math.floor(t / 3600); const m = Math.floor((t % 3600) / 60); const s = t % 60;
+  return h ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${m}:${String(s).padStart(2, '0')}`;
+};
+const roundNum = (n) => Math.round(Number(n) * 100) / 100;
+
+// Check a logged value against the section's scoring. -> { value, sort_value } | { error }
+function normalizeScoreValue(scoring, raw) {
+  const v = raw && typeof raw === 'object' ? raw : {};
+  const num = (x) => (x === '' || x === null || x === undefined ? NaN : Number(x));
+  const whole = (x) => Number.isInteger(num(x)) && num(x) >= 0;
+  switch (scoring?.type) {
+    case 'time': {
+      const cap = Number(scoring.time_cap_sec) > 0 ? Number(scoring.time_cap_sec) : null;
+      if (v.capped) {
+        if (!whole(v.reps)) return { error: 'Enter how many reps you finished before the cap.' };
+        const reps = num(v.reps);
+        return { value: { capped: true, reps, ...(cap ? { seconds: cap } : {}) }, sort_value: SCORE_CAP_PENALTY - Math.min(reps, SCORE_CAP_PENALTY - 1) };
+      }
+      const sec = num(v.seconds);
+      if (!Number.isFinite(sec) || sec <= 0) return { error: 'Enter your time as minutes and seconds.' };
+      if (cap && sec > cap) return { error: `That's over the ${fmtClock(cap)} time cap. Tick "Hit the cap" and enter your reps.` };
+      return { value: { seconds: Math.round(sec), capped: false }, sort_value: Math.round(sec) };
+    }
+    case 'rounds_reps': {
+      const rounds = v.rounds === '' || v.rounds === undefined || v.rounds === null ? 0 : num(v.rounds);
+      const reps = v.reps === '' || v.reps === undefined || v.reps === null ? 0 : num(v.reps);
+      if (!whole(rounds) || !whole(reps)) return { error: 'Rounds and reps must be whole numbers.' };
+      if (rounds === 0 && reps === 0) return { error: 'Enter your rounds and reps.' };
+      const per = Number(scoring.reps_per_round) > 0 ? Number(scoring.reps_per_round) : null;
+      if (per && reps >= per) return { error: `A round is ${per} reps, so extra reps must be fewer than ${per}.` };
+      if (reps >= 1000) return { error: 'That many extra reps looks off. Check the number.' };
+      return { value: { rounds, reps }, sort_value: rounds * 1000 + reps };
+    }
+    case 'load': {
+      const load = num(v.load);
+      if (!Number.isFinite(load) || load <= 0 || load > 5000) return { error: 'Enter the weight you lifted.' };
+      const unit = LOAD_TO_LB[v.unit] ? v.unit : (LOAD_TO_LB[scoring.unit] ? scoring.unit : 'lb');
+      const base = LOAD_TO_LB[scoring.unit] ? scoring.unit : 'lb';
+      // Compared in the section's unit so lb and kg entries rank together.
+      return { value: { load: roundNum(load), unit }, sort_value: roundNum(unit === base ? load : (load * LOAD_TO_LB[unit]) / LOAD_TO_LB[base]) };
+    }
+    case 'reps': {
+      if (!whole(v.reps) || num(v.reps) === 0) return { error: 'Enter your reps as a whole number.' };
+      return { value: { reps: num(v.reps) }, sort_value: num(v.reps) };
+    }
+    case 'distance': {
+      const d = num(v.distance);
+      if (!Number.isFinite(d) || d <= 0) return { error: 'Enter the distance.' };
+      const unit = DIST_TO_M[v.unit] ? v.unit : (DIST_TO_M[scoring.unit] ? scoring.unit : 'm');
+      const base = DIST_TO_M[scoring.unit] ? scoring.unit : 'm';
+      return { value: { distance: roundNum(d), unit }, sort_value: roundNum(unit === base ? d : (d * DIST_TO_M[unit]) / DIST_TO_M[base]) };
+    }
+    case 'calories': {
+      const c = num(v.calories);
+      if (!Number.isFinite(c) || c <= 0 || !Number.isInteger(c)) return { error: 'Enter your calories as a whole number.' };
+      return { value: { calories: c, unit: 'cal' }, sort_value: c };
+    }
+    case 'check':
+      if (v.done === false) return { error: 'Tick done to log this part.' };
+      return { value: { done: true }, sort_value: 1 };
+    default:
+      return { error: 'This part of the workout is not scored.' };
+  }
+}
+
+// How a score reads on screen: "12:34", "Capped, 145 reps", "5 rounds + 12", "225 lb".
+function scoreDisplay(scoring, value) {
+  const v = value || {};
+  switch (scoring?.type) {
+    case 'time': return v.capped ? `Capped, ${v.reps ?? 0} reps` : fmtClock(v.seconds);
+    case 'rounds_reps': return `${v.rounds ?? 0} round${v.rounds === 1 ? '' : 's'}${v.reps ? ` + ${v.reps}` : ''}`;
+    case 'load': return `${v.load} ${v.unit || scoring.unit || 'lb'}`;
+    case 'reps': return `${v.reps} reps`;
+    case 'distance': return `${v.distance} ${v.unit || scoring.unit || 'm'}`;
+    case 'calories': return `${v.calories} cal`;
+    case 'check': return 'Done';
+    default: return '';
+  }
+}
+
+// Who a score is for. Members: themselves or a linked child. Staff need classes.run and name client_id.
+async function scoreTarget(env, user, clientId) {
+  if (isStaff(user)) {
+    if (!can(user, 'classes.run')) return { denied: NO_PERMISSION };
+    if (!clientId) return { denied: { success: false, error: 'Pick the member this score is for.' } };
+  }
+  const who = await resolveClassClient(env, user, clientId || null);
+  if (who.error) {
+    return { denied: { success: false, error: clientId && !isStaff(user) ? 'You can only log scores for yourself or your children.' : who.error, code: 'forbidden' } };
+  }
+  return { who };
+}
+
+// Can this user change or remove this score?
+async function canEditScore(env, user, score) {
+  if (isStaff(user)) return can(user, 'classes.run');
+  return (await actableClientIds(env, user)).includes(score.client_id);
+}
+
+const scoreOut = (score, section) => ({ ...score, display: scoreDisplay(section?.scoring, score.value), division_label: SCORE_DIVISION_LABEL[score.division] || '' });
+
+async function logScore(env, user, payload) {
+  const workout = await getEntityById(env, 'Workout', payload?.workout_id);
+  if (!workout || (!scoreWorkoutVisible(workout))) return { success: false, error: 'This workout is not posted yet.', code: 'not_published' };
+  const section = scoreSection(workout, payload?.section_id);
+  if (!section) return { success: false, error: 'That part of the workout was not found.' };
+  if (!sectionIsScored(section)) return { success: false, error: 'This part of the workout is not scored.' };
+  if (workout.date > programToday()) return { success: false, error: 'You can log this score on the day of the workout.', code: 'too_early' };
+  const t = await scoreTarget(env, user, payload?.client_id);
+  if (t.denied) return t.denied;
+  const { who } = t;
+  const division = SCORE_DIVISIONS.includes(payload?.division) ? payload.division : null;
+  if (!division) return { success: false, error: 'Pick Rx, Rx+ or Scaled.' };
+  const norm = normalizeScoreValue(section.scoring, payload?.value);
+  if (norm.error) return { success: false, error: norm.error, code: 'bad_value' };
+  const comment = String(payload?.comment ?? '').trim().slice(0, SCORE_COMMENT_MAX);
+
+  const ids = who.clientIds;
+  const existing = (await selectEntities(env, 'WorkoutScore',
+    `json_extract(data,'$.workout_id') = ? AND json_extract(data,'$.section_id') = ? AND json_extract(data,'$.client_id') IN (${inList(ids)})`,
+    [workout.id, section.id, ...ids])).sort((a, b) => String(a.created_date).localeCompare(String(b.created_date)))[0] || null;
+  const clientId = existing?.client_id || who.client.id;
+  const fields = {
+    workout_id: workout.id, section_id: section.id, date: workout.date,
+    client_id: clientId, user_email: who.client.email || existing?.user_email || null,
+    division, value: norm.value, sort_value: norm.sort_value, comment, is_pr: false,
+  };
+  let pr = null;
+  if (typeof checkPr === 'function') {
+    try {
+      // checkPr is defined by the LIFTS block once merged.
+      pr = await checkPr(env, {
+        client_id: clientId, movement_id: section.kind === 'strength' ? (section.movement_ids || [])[0] || null : null,
+        load: norm.value.load ?? null, reps: norm.value.reps ?? null, scoring: section.scoring, sort_value: norm.sort_value,
+        benchmark_id: section.benchmark_id || null, workout_id: workout.id, section_id: section.id, exclude_id: existing?.id || null,
+      });
+      fields.is_pr = !!pr?.is_pr;
+    } catch (e) {
+      console.error('checkPr failed', e?.message);
+    }
+  }
+  let score;
+  if (existing) {
+    score = await patchEntity(env, existing, { ...fields, updated_by: user.email });
+  } else {
+    // One score per member per section: insert only if none slipped in meanwhile.
+    const id = uid();
+    const now = nowISO();
+    const r = await env.DB.prepare(
+      `INSERT INTO entities (id, entity_type, data, created_by, created_date, updated_date)
+       SELECT ?, 'WorkoutScore', ?, ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM entities WHERE entity_type='WorkoutScore'
+         AND json_extract(data,'$.workout_id') = ? AND json_extract(data,'$.section_id') = ? AND json_extract(data,'$.client_id') = ?)`
+    ).bind(id, JSON.stringify(fields), user.email, now, now, workout.id, section.id, clientId).run();
+    if (!r?.meta?.changes) return { success: false, error: 'A score was just saved for this. Refresh and try again.', code: 'conflict' };
+    score = await getEntityById(env, 'WorkoutScore', id);
+  }
+  if (isStaff(user) || who.guardianId) {
+    await audit(env, { actor: user.email, action: existing ? 'score_updated' : 'score_logged', target: 'WorkoutScore', targetId: score.id, detail: `for ${who.client.full_name || clientId}`, request: null });
+  }
+  return { success: true, score: scoreOut(score, section), pr: !!fields.is_pr, previous: pr?.previous ?? null, updated: !!existing };
+}
+
+async function deleteScore(env, user, payload) {
+  const score = await getEntityById(env, 'WorkoutScore', payload?.score_id);
+  if (!score) return { success: false, error: 'Score not found.' };
+  if (!(await canEditScore(env, user, score))) return isStaff(user) ? NO_PERMISSION : { success: false, error: 'You can only remove your own scores.', code: 'forbidden' };
+  await env.DB.prepare(`DELETE FROM entities WHERE id = ? AND entity_type = 'WorkoutScore'`).bind(score.id).run();
+  if (isStaff(user)) await audit(env, { actor: user.email, action: 'score_deleted', target: 'WorkoutScore', targetId: score.id, detail: '', request: null });
+  return { success: true };
+}
+
+const scoredSectionsOf = (w) => (Array.isArray(w?.sections) ? w.sections : []).filter(sectionIsScored)
+  .map((s) => ({ id: s.id, kind: s.kind, title: s.title || '', scoring: s.scoring }));
+
+async function leaderboard(env, user, payload) {
+  const workout = await getEntityById(env, 'Workout', payload?.workout_id);
+  const staffView = isStaff(user);
+  if (!workout || (!staffView && !scoreWorkoutVisible(workout))) return { success: false, error: 'This workout is not posted yet.', code: 'not_published' };
+  const sections = scoredSectionsOf(workout);
+  const section = scoreSection(workout, payload?.section_id) || (() => {
+    const id = (sections.find((s) => s.kind === 'metcon') || sections[0])?.id;
+    return id ? scoreSection(workout, id) : null;
+  })();
+  const head = { workout: { id: workout.id, date: workout.date, title: workout.title || '' }, sections };
+  if (!section || !sectionIsScored(section)) return { success: true, ...head, section: null, rows: [] };
+  const scores = await selectEntities(env, 'WorkoutScore', `json_extract(data,'$.workout_id') = ? AND json_extract(data,'$.section_id') = ?`, [workout.id, section.id]);
+  const clientIds = [...new Set(scores.map((s) => s.client_id))];
+  const clients = clientIds.length ? await selectEntities(env, 'Client', `id IN (${inList(clientIds)})`, clientIds) : [];
+  const byId = Object.fromEntries(clients.map((c) => [c.id, c]));
+  const mine = new Set(staffView ? [] : await actableClientIds(env, user));
+  const division = SCORE_DIVISIONS.includes(payload?.division) ? payload.division : null;
+  const gender = payload?.gender ? String(payload.gender).toLowerCase() : null;
+  const lower = section.scoring?.lower_is_better === true || (section.scoring?.lower_is_better === undefined && section.scoring?.type === 'time');
+  const tier = (d) => { const i = SCORE_DIVISIONS.indexOf(d); return i < 0 ? 9 : i; };
+  const list = scores
+    .filter((s) => !division || s.division === division)
+    .filter((s) => !gender || String(byId[s.client_id]?.gender || '').toLowerCase() === gender)
+    // Rx+ above Rx above Scaled, then by score; ties go to whoever logged first.
+    .sort((a, b) => tier(a.division) - tier(b.division)
+      || (lower ? a.sort_value - b.sort_value : b.sort_value - a.sort_value)
+      || String(a.created_date).localeCompare(String(b.created_date)));
+  let rank = 0;
+  const rows = list.map((s, i) => {
+    const prev = list[i - 1];
+    if (!prev || prev.division !== s.division || prev.sort_value !== s.sort_value) rank = i + 1;
+    return {
+      rank, score_id: s.id, name: shortName(byId[s.client_id]?.full_name),
+      division: s.division, division_label: SCORE_DIVISION_LABEL[s.division] || '', display: scoreDisplay(section.scoring, s.value),
+      comment: s.comment || '', is_pr: !!s.is_pr, mine: mine.has(s.client_id),
+    };
+  });
+  return {
+    success: true, ...head,
+    section: { id: section.id, kind: section.kind, title: section.title || '', description: section.description || '', scoring: section.scoring },
+    rows,
+  };
+}
+
+async function myScores(env, user, payload) {
+  const t = isStaff(user)
+    ? (payload?.client_id ? await scoreTarget(env, user, payload.client_id) : { denied: { success: false, error: 'Pick a member.' } })
+    : await scoreTarget(env, user, payload?.client_id || null);
+  if (t.denied) return t.denied;
+  const today = programToday();
+  const from = isDateKey(payload?.from) ? payload.from : pAddDays(today, -90);
+  const to = isDateKey(payload?.to) ? payload.to : pAddDays(today, 1);
+  const ids = t.who.clientIds;
+  const scores = await selectEntities(env, 'WorkoutScore',
+    `json_extract(data,'$.client_id') IN (${inList(ids)}) AND json_extract(data,'$.date') >= ? AND json_extract(data,'$.date') <= ?`, [...ids, from, to]);
+  const wIds = [...new Set(scores.map((s) => s.workout_id))];
+  const workouts = wIds.length ? await selectEntities(env, 'Workout', `id IN (${inList(wIds)})`, wIds) : [];
+  const wById = Object.fromEntries(workouts.map((w) => [w.id, w]));
+  return {
+    success: true,
+    scores: scores.map((s) => {
+      const w = wById[s.workout_id];
+      const sec = scoreSection(w, s.section_id);
+      return { ...scoreOut(s, sec), workout_title: w?.title || '', section_title: sec?.title || '', section_kind: sec?.kind || '' };
+    }).sort((a, b) => b.date.localeCompare(a.date) || String(b.created_date).localeCompare(String(a.created_date))),
+  };
+}
+
+// Consecutive Monday-start weeks (gym time) with a logged score or a class check-in.
+// This week counts once it has one; until then the streak runs to last week.
+async function weeklyStreak(env, user, payload) {
+  const t = isStaff(user)
+    ? (payload?.client_id ? await scoreTarget(env, user, payload.client_id) : { denied: { success: false, error: 'Pick a member.' } })
+    : await scoreTarget(env, user, payload?.client_id || null);
+  if (t.denied) return t.denied;
+  const ids = t.who.clientIds;
+  const today = programToday();
+  const since = pAddDays(today, -7 * 160);
+  const { results } = await env.DB.prepare(
+    `SELECT DISTINCT json_extract(data,'$.date') AS d FROM entities WHERE entity_type = 'WorkoutScore'
+       AND json_extract(data,'$.client_id') IN (${inList(ids)}) AND json_extract(data,'$.date') >= ? AND json_extract(data,'$.date') <= ?
+     UNION SELECT DISTINCT json_extract(data,'$.date') AS d FROM entities WHERE entity_type = 'Reservation'
+       AND json_extract(data,'$.status') = 'checked_in' AND json_extract(data,'$.client_id') IN (${inList(ids)})
+       AND json_extract(data,'$.date') >= ? AND json_extract(data,'$.date') <= ?`
+  ).bind(...ids, since, today, ...ids, since, today).all();
+  const days = results.map((r) => r.d).filter(isDateKey);
+  const weeks = new Set(days.map(classWeekStart));
+  const thisWeek = classWeekStart(today);
+  const thisWeekCount = days.filter((d) => classWeekStart(d) === thisWeek).length;
+  let w = weeks.has(thisWeek) ? thisWeek : pAddDays(thisWeek, -7);
+  let streak = 0;
+  while (weeks.has(w)) { streak += 1; w = pAddDays(w, -7); }
+  return { success: true, weeks: streak, this_week_count: thisWeekCount, this_week_active: weeks.has(thisWeek), week_start: thisWeek };
+}
+
+// stub: owned by EDITOR — remove at merge in favour of EDITOR's todayWorkout.
+async function memberTodayWorkoutStub(env, user, payload) {
+  const date = isDateKey(payload?.date) ? payload.date : programToday();
+  const staffView = can(user, 'programs.manage');
+  const all = await selectEntities(env, 'Workout', `json_extract(data,'$.date') = ?`, [date]);
+  const workouts = all
+    .filter((w) => staffView || scoreWorkoutVisible(w))
+    .filter((w) => !payload?.class_type_id || !w.class_type_id || w.class_type_id === payload.class_type_id)
+    .map((w) => { if (staffView) return w; const { coach_notes: _n, ...rest } = w; return rest; });
+  return { success: true, date, workouts };
+}
+
+async function runMemberScoreFunction(name, payload, { env, user }) {
+  if (!user) return { success: false, error: 'Not logged in' };
+  switch (name) {
+    case 'logScore': return logScore(env, user, payload);
+    case 'deleteScore': return deleteScore(env, user, payload);
+    case 'leaderboard': return leaderboard(env, user, payload);
+    case 'myScores': return myScores(env, user, payload);
+    case 'weeklyStreak': return weeklyStreak(env, user, payload);
+    case 'todayWorkout': return memberTodayWorkoutStub(env, user, payload); // stub: owned by EDITOR
+    default: return { __unimplemented: true };
+  }
+}
+// ===== end Phase 3: MEMBER =====
 
 /* -------------------------------- LLM ----------------------------------- */
 
