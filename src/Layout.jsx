@@ -35,7 +35,8 @@ import {
   CalendarCheck,
   SlidersHorizontal,
   BarChart3,
-  Sparkles
+  Sparkles,
+  Trophy
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -72,6 +73,7 @@ const navGroups = [
       { name: "Classes", icon: CalendarCheck, page: "Classes" },
       { name: "Class Setup", icon: SlidersHorizontal, page: "ClassSetup" },
       { name: "Class Reports", icon: BarChart3, page: "ClassReports" },
+      { name: "Leaderboard", icon: Trophy, page: "Leaderboard" },
       { name: "Ask Brigade", icon: Sparkles, page: "AskBrigade" }
     ]
   },
@@ -135,6 +137,7 @@ const adminNavGroups = [
       { name: 'Classes', icon: CalendarCheck, page: 'Classes' },
       { name: 'Class Setup', icon: SlidersHorizontal, page: 'ClassSetup' },
       { name: 'Class Reports', icon: BarChart3, page: 'ClassReports' },
+      { name: 'Leaderboard', icon: Trophy, page: 'Leaderboard' },
       { name: 'Ask Brigade', icon: Sparkles, page: 'AskBrigade' },
     ]
   },
@@ -392,6 +395,11 @@ export default function Layout({ children, currentPageName }) {
     return children;
   }
 
+  // Leaderboard big-screen mode (?tv=1): the board alone, no app menu.
+  if (currentPageName === 'Leaderboard' && new URLSearchParams(location.search).get('tv') === '1') {
+    return children;
+  }
+
   // Client pages - use client layout
   const clientPages = ['ClientDashboard', 'ClientWorkouts', 'ClientMeals', 'ClientProgress', 'ClientSchedule', 'ClientHabits', 'ClientOnboarding', 'Messages', 'ClientResources', 'ClientCommunity', 'ClientInfo', 'ReportBug', 'ClientJournal', 'OnboardingWalkthrough', 'ClientRecovery', 'ClientDocuments', 'ClientProgram', 'ClientClasses'];
 
@@ -401,7 +409,7 @@ export default function Layout({ children, currentPageName }) {
   // trainer screens from rendering at all.
   if (isClient) {
     const clientAllowed = [...clientPages, 'AskBrigade', 'Settings', 'Dashboard', 'IndependentDashboard', 'IndependentOnboarding',
-      'MyLifts'];
+      'MyLifts', 'TodaysWorkout', 'Leaderboard'];
     if (!clientAllowed.includes(currentPageName)) {
       return <Navigate to={createPageUrl('ClientDashboard')} replace />;
     }
