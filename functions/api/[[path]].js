@@ -5622,9 +5622,8 @@ const SAMPLE_AGREEMENT_TEXT = `SAMPLE MEMBERSHIP AGREEMENT. Replace this text wi
 
 9. Changes. The gym may change prices or these terms with 30 days' notice. Changes apply from your next billing period.`;
 
-const billingConnected = (env) => !!env.STRIPE_SECRET_KEY;
 const canChangeBilling = (user) => isStaff(user) && can(user, 'members.manage') && can(user, 'billing.view');
-const centsOf = (v) => { const n = Number(v); return Number.isInteger(n) && n > 0 ? n : null; };
+const rulesCentsOf = (v) => { const n = Number(v); return Number.isInteger(n) && n > 0 ? n : null; };
 const rulesDateFromUnix = (secs) => (Number.isFinite(Number(secs)) && Number(secs) > 0 ? programToday(Number(secs) * 1000) : null);
 const rulesUnixOf = (key) => Math.floor(easternToUTC(key, '00:00') / 1000);
 const fmtUsd = (cents) => `$${(Number(cents || 0) / 100).toFixed(2)}`;
@@ -5826,7 +5825,7 @@ async function runRulesFunction(name, payload, ctx) {
     const already = Math.round(numOr(p.refunded_cents, 0));
     const left = paid - already;
     if (p.status === 'failed' || left <= 0) return { success: false, error: 'Nothing left to refund on this payment.' };
-    const amount = payload?.amount_cents === undefined || payload?.amount_cents === null ? left : centsOf(payload.amount_cents);
+    const amount = payload?.amount_cents === undefined || payload?.amount_cents === null ? left : rulesCentsOf(payload.amount_cents);
     if (!amount) return { success: false, error: 'Enter an amount in cents above zero.' };
     if (amount > left) return { success: false, error: `You can refund up to ${fmtUsd(left)}.` };
     const reason = String(payload?.reason || '').trim().slice(0, 200);
