@@ -4,12 +4,13 @@ import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ChevronLeft, ChevronRight, Loader2, Plus, RefreshCw, Settings2, Users } from "lucide-react";
+import { CalendarOff, ChevronLeft, ChevronRight, Loader2, Plus, RefreshCw, Settings2, Users } from "lucide-react";
 import { toast } from "sonner";
 import { todayKey, addDays, fromKey } from "@/lib/programs";
 import RosterSheet from "@/components/classes/coach/RosterSheet";
 import OneOffClassDialog from "@/components/classes/coach/OneOffClassDialog";
-import { fetchSchedule, runClassTick, errorMessage, fmtTime } from "@/components/classes/coach/api";
+import DayChangeDialog from "@/components/classes/coach/DayChangeDialog";
+import { fetchScheduleWithChanges, runClassTick, changeDay, errorMessage, fmtTime } from "@/components/classes/coach/api";
 
 export default function Classes() {
   const queryClient = useQueryClient();
@@ -18,6 +19,8 @@ export default function Classes() {
   const [openId, setOpenId] = useState(null);
   const [generating, setGenerating] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [changingDay, setChangingDay] = useState(false);
+  const [undoing, setUndoing] = useState(false);
 
   // Day strip: the week (Mon-Sun) containing the selected date.
   const strip = useMemo(() => {
@@ -26,11 +29,13 @@ export default function Classes() {
     return Array.from({ length: 7 }, (_, i) => addDays(monday, i));
   }, [date]);
 
-  const { data: sessions = [], isLoading, isError, error } = useQuery({
+  const { data, isLoading, isError, error } = useQuery({
     queryKey: ["classSchedule", date],
-    queryFn: () => fetchSchedule(date, date),
+    queryFn: () => fetchScheduleWithChanges(date, date),
     refetchInterval: 30000,
   });
+  const sessions = useMemo(() => data?.sessions || [], [data]);
+  const dayChange = (data?.dayChanges || []).find((c) => c.date === date) || null;
   const list = useMemo(
     () => [...sessions].filter((s) => s.date === date || !s.date).sort((a, b) => (a.start_time || "").localeCompare(b.start_time || "")),
     [sessions, date]
@@ -47,6 +52,20 @@ export default function Classes() {
       toast.error(errorMessage(e));
     } finally {
       setGenerating(false);
+    }
+  };
+
+  const undoDayChange = async () => {
+    if (!window.confirm("Put this day back to the normal schedule? Classes that were cancelled come back empty. Members who were told about the change are not told again.")) return;
+    setUndoing(true);
+    try {
+      await changeDay({ date, mode: "normal" });
+      toast.success("Back to the normal schedule");
+      queryClient.invalidateQueries({ queryKey: ["classSchedule"] });
+    } catch (e) {
+      toast.error(errorMessage(e));
+    } finally {
+      setUndoing(false);
     }
   };
 
@@ -94,11 +113,28 @@ export default function Classes() {
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-base font-semibold text-foreground">{heading}</h2>
           <div className="flex items-center gap-2">
+            {date >= today && !dayChange && (
+              <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setChangingDay(true)}>
+                <CalendarOff className="w-4 h-4" /> Change this day
+              </Button>
+            )}
             {date !== today && <Button variant="ghost" size="sm" onClick={() => setDate(today)}>Today</Button>}
             <Input type="date" value={date} onChange={(e) => e.target.value && setDate(e.target.value)} className="w-auto h-9" aria-label="Pick a date" />
           </div>
         </div>
       </div>
+
+      {dayChange && (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-foreground">{dayChange.label}{dayChange.reason ? `: ${dayChange.reason}` : ""}</p>
+            <p className="text-xs text-muted-foreground">Holiday change for this day only. The weekly schedule is the same.</p>
+          </div>
+          {date >= today && (
+            <Button variant="outline" size="sm" onClick={undoDayChange} disabled={undoing}>{undoing ? "Undoing" : "Undo"}</Button>
+          )}
+        </div>
+      )}
 
       {isLoading ? (
         <div className="flex justify-center py-12"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
@@ -106,8 +142,8 @@ export default function Classes() {
         <p className="text-sm text-red-600">{errorMessage(error, "Couldn't load classes.")}</p>
       ) : list.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border p-8 text-center">
-          <p className="text-sm font-medium text-foreground">No classes on this day.</p>
-          <p className="text-sm text-muted-foreground mt-1">If the weekly schedule is set up, use Generate schedule now to create upcoming sessions. For a one-time class, use Add class.</p>
+          <p className="text-sm font-medium text-foreground">{dayChange?.mode === "closed" ? "The gym is closed this day." : "No classes on this day."}</p>
+          {dayChange?.mode !== "closed" && <p className="text-sm text-muted-foreground mt-1">If the weekly schedule is set up, use Generate schedule now to create upcoming sessions. For a one-time class, use Add class.</p>}
         </div>
       ) : (
         <ul className="space-y-2">
@@ -146,6 +182,8 @@ export default function Classes() {
         </ul>
       )}
 
+      <DayChangeDialog open={changingDay} onOpenChange={setChangingDay} date={date} sessions={list}
+        onSaved={() => queryClient.invalidateQueries({ queryKey: ["classSchedule"] })} />
       <OneOffClassDialog open={adding} onOpenChange={setAdding} defaultDate={date} onCreated={setDate} />
       <RosterSheet session={openSession} open={!!openSession} onOpenChange={(v) => !v && setOpenId(null)} />
     </div>

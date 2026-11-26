@@ -32,10 +32,14 @@ export function useMyClasses(options = {}) {
   return { ...q, upcoming, recent: d.recent || d.recent_attendance || [], memberships, waiverSigned, reservationBySession };
 }
 
+// -> data: { sessions, dayChanges } (dayChanges: holiday closures and swapped days)
 export function useSchedule(from, to, enabled = true) {
   return useQuery({
     queryKey: [...SCHEDULE_KEY, from, to],
-    queryFn: async () => asSessions(await classSchedule({ from, to })),
+    queryFn: async () => {
+      const d = await classSchedule({ from, to });
+      return { sessions: asSessions(d), dayChanges: Array.isArray(d?.day_changes) ? d.day_changes : [] };
+    },
     enabled,
     staleTime: 30000,
   });

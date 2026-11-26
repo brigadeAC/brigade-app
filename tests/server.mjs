@@ -4,12 +4,21 @@ import { spawn } from 'node:child_process';
 import { mkdtempSync, writeFileSync, symlinkSync, readFileSync, rmSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import net from 'node:net';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 export const CRON_SECRET = 'test-cron-secret';
 export const ADMIN = { email: 'admin@example.test', password: 'admin-pass-1' };
 
-export async function startServer(port = 8799) {
+// A free local port, so several test runs can go at once.
+const freePort = () => new Promise((resolve, reject) => {
+  const srv = net.createServer();
+  srv.once('error', reject);
+  srv.listen(0, '127.0.0.1', () => { const { port } = srv.address(); srv.close(() => resolve(port)); });
+});
+
+export async function startServer(port) {
+  port = port || Number(process.env.TEST_PORT) || await freePort();
   const dir = mkdtempSync(path.join(tmpdir(), 'brigade-test-'));
   mkdirSync(path.join(dir, 'dist'));
   writeFileSync(path.join(dir, 'dist', 'index.html'), '<!doctype html>');
