@@ -106,3 +106,8 @@ export const planSummary = (p) => {
   const lim = p.limit_count ? `${p.limit_count}${p.limit_period === "week" ? "/week" : p.limit_period === "month" ? "/month" : " total"}` : "";
   return [PLAN_KINDS[p.kind] || p.kind, lim, p.duration_days ? `${p.duration_days} days` : ""].filter(Boolean).join(" · ");
 };
+
+// Guardians: a parent's account can book for a linked child.
+export const fetchFamily = (clientId) => invoke("clientFamily", { client_id: clientId });
+export const linkGuardian = (clientId, guardianClientId) => invoke("linkGuardian", { client_id: clientId, guardian_client_id: guardianClientId });
+export const unlinkGuardian = (clientId, guardianClientId) => invoke("unlinkGuardian", { client_id: clientId, guardian_client_id: guardianClientId });

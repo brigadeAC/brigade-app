@@ -8,13 +8,21 @@ import DayStrip from "@/components/classes/member/DayStrip";
 import SessionRow from "@/components/classes/member/SessionRow";
 import CancelDialog from "@/components/classes/member/CancelDialog";
 import MyClassesList, { MembershipLines } from "@/components/classes/member/MyClassesList";
-import { useGymSettings, useMyClasses, useSchedule } from "@/components/classes/member/useClassesData";
+import PersonSwitcher from "@/components/classes/member/PersonSwitcher";
+import { useGymSettings, useMyClasses, useMyFamily, useSchedule } from "@/components/classes/member/useClassesData";
 import { useClassActions } from "@/components/classes/member/useClassActions";
+
+const firstName = (full) => String(full || "").trim().split(/\s+/)[0] || "Child";
 
 export default function ClientClasses() {
   const settings = useGymSettings();
-  const my = useMyClasses();
-  const actions = useClassActions();
+  // Guardians can switch to a linked child; null means "me".
+  const children = useMyFamily();
+  const [personId, setPersonId] = useState(null);
+  const forId = personId && children.some((c) => c.id === personId) ? personId : null;
+  const person = children.find((c) => c.id === forId) || null;
+  const my = useMyClasses({}, forId);
+  const actions = useClassActions(forId);
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 30000);
@@ -22,7 +30,7 @@ export default function ClientClasses() {
   }, []);
 
   const today = easternTodayKey(now);
-  const schedule = useSchedule(today, addDays(today, 61));
+  const schedule = useSchedule(today, addDays(today, 61), true, forId);
   const sessions = useMemo(() => schedule.data || [], [schedule.data]);
   // Two weeks, or further when a class beyond that is already open for booking
   // (or they're already booked into one).
@@ -71,6 +79,7 @@ export default function ClientClasses() {
           <ArrowLeft className="w-4 h-4" /> Dashboard
         </Link>
         <h1 className="text-2xl font-bold text-foreground">Classes</h1>
+        {children.length > 0 && <PersonSwitcher people={children} value={forId} onChange={setPersonId} />}
         {my.memberships && <div className="mt-1"><MembershipLines memberships={my.memberships} /></div>}
       </div>
 
@@ -109,7 +118,7 @@ export default function ClientClasses() {
       </div>
 
       <div className="space-y-2">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground px-1">My classes</h2>
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground px-1">{person ? `${firstName(person.full_name)}'s classes` : "My classes"}</h2>
         <div className="glass-card p-4">
           {my.isLoading ? <Loader2 className="w-5 h-5 animate-spin text-muted-foreground mx-auto" /> : (
             <MyClassesList upcoming={my.upcoming} onOpen={(r) => { if (r.date && days.includes(r.date)) setSelected(r.date); }} />

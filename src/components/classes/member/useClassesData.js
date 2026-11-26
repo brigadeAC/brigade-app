@@ -1,19 +1,31 @@
 import { useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { myClasses, classSchedule, asSessions, fetchGymSettings, withSettingsDefaults } from "@/lib/classes";
+import { myClasses, myFamily, classSchedule, asSessions, fetchGymSettings, withSettingsDefaults } from "@/lib/classes";
 
 export const MY_CLASSES_KEY = ["myClasses"];
 export const SCHEDULE_KEY = ["classSchedule"];
 export const SETTINGS_KEY = ["gymSettings"];
+export const FAMILY_KEY = ["myFamily"];
 
 export function useGymSettings() {
   const { data } = useQuery({ queryKey: SETTINGS_KEY, queryFn: fetchGymSettings, staleTime: 300000 });
   return data || withSettingsDefaults(null);
 }
 
+// Children the signed-in member can book for (guardian accounts). [] for most people.
+export function useMyFamily() {
+  const { data } = useQuery({ queryKey: FAMILY_KEY, queryFn: myFamily, retry: false, staleTime: 300000 });
+  return Array.isArray(data?.children) ? data.children : [];
+}
+
 // myClasses -> { upcoming, recent, memberships, waiverSigned, reservationBySession }
-export function useMyClasses(options = {}) {
-  const q = useQuery({ queryKey: MY_CLASSES_KEY, queryFn: myClasses, retry: false, staleTime: 30000, ...options });
+// clientId: a linked child's classes (guardian); omit for your own.
+export function useMyClasses(options = {}, clientId = null) {
+  const q = useQuery({
+    queryKey: [...MY_CLASSES_KEY, clientId || "me"],
+    queryFn: () => myClasses({ client_id: clientId }),
+    retry: false, staleTime: 30000, ...options,
+  });
   const d = q.data || {};
   const upcoming = useMemo(
     () => (Array.isArray(d.upcoming) ? d.upcoming : Array.isArray(d.upcoming_reservations) ? d.upcoming_reservations : [])
@@ -32,10 +44,10 @@ export function useMyClasses(options = {}) {
   return { ...q, upcoming, recent: d.recent || d.recent_attendance || [], memberships, waiverSigned, reservationBySession };
 }
 
-export function useSchedule(from, to, enabled = true) {
+export function useSchedule(from, to, enabled = true, clientId = null) {
   return useQuery({
-    queryKey: [...SCHEDULE_KEY, from, to],
-    queryFn: async () => asSessions(await classSchedule({ from, to })),
+    queryKey: [...SCHEDULE_KEY, from, to, clientId || "me"],
+    queryFn: async () => asSessions(await classSchedule({ from, to, client_id: clientId })),
     enabled,
     staleTime: 30000,
   });

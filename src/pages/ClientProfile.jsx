@@ -46,6 +46,7 @@ import ProgressPhotos from "@/components/clients/ProgressPhotos";
 import TrophyHabitTracker from "@/components/habits/TrophyHabitTracker";
 import ProgramTab from "@/components/programs/client/ProgramTab";
 import MembershipTab from "@/components/classes/coach/MembershipTab";
+import FamilyCard from "@/components/classes/coach/FamilyCard";
 import WorkoutRoutineCard from "@/components/workouts/WorkoutRoutineCard";
 import ItemCompletionTracker from "@/components/ItemCompletionTracker";
 import ProgressChartForm from "@/components/forms/ProgressChartForm";
@@ -1131,6 +1132,7 @@ export default function ClientProfile() {
         {/* Membership Tab (group classes) */}
         <TabsContent value="membership" className="space-y-4">
           <MembershipTab clientId={clientId} client={client} />
+          <div className="pt-4 border-t border-border"><FamilyCard clientId={clientId} /></div>
         </TabsContent>
 
         {/* Onboarding Tab */}
