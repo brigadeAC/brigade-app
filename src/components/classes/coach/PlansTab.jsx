@@ -9,6 +9,7 @@ import { Plus, Pencil, EyeOff, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { errorMessage, PLAN_KINDS, planSummary } from "./api";
 import { Field, NativeSelect, numOrNull } from "./ui";
+import PlanBillingFields from "@/components/billing/PlanBillingFields"; // Phase 4 CORE
 
 const SEEDS = [
   { name: "Unlimited", kind: "unlimited" },
@@ -153,6 +154,7 @@ export default function PlansTab() {
                 </div>
               </Field>
               <Field label="Description"><Textarea rows={2} value={editing.description || ""} onChange={(e) => set("description", e.target.value)} /></Field>
+              <PlanBillingFields plan={editing} set={set} />
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setEditing(null)}>Cancel</Button>
                 <Button type="submit" disabled={saving}>{saving ? "Saving" : "Save"}</Button>

@@ -16,11 +16,14 @@ import {
   Download,
   Loader2,
   Sun,
-  Moon } from
+  Moon,
+  CreditCard } from
 "lucide-react";
 import { Button } from "@/components/ui/button";
 import InstallGuide from "@/components/InstallGuide";
 import NotificationSettings from "@/components/NotificationSettings";
+import MemberBillingCard from "@/components/billing/MemberBillingCard"; // Phase 4 CORE
+import GymBillingAdmin from "@/components/billing/GymBillingAdmin"; // Phase 4 CORE
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -262,6 +265,7 @@ export default function Settings() {
     }
   };
 
+  const canGymBilling = !isClient && (user?.role === "admin" || ["billing.view", "settings.manage"].some((p) => (user?.permissions || []).includes(p))); // Phase 4 CORE
   if (!user) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -300,6 +304,7 @@ export default function Settings() {
                 <Shield className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Compliance
               </TabsTrigger>
             )}
+            {canGymBilling && <TabsTrigger value="billing" className="flex-1 sm:flex-none text-xs sm:text-sm gap-1.5 sm:gap-2 whitespace-nowrap"><CreditCard className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Billing</TabsTrigger>}
             <TabsTrigger value="account" className="flex-1 sm:flex-none text-xs sm:text-sm gap-1.5 sm:gap-2 whitespace-nowrap">
               <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Account
             </TabsTrigger>
@@ -307,6 +312,7 @@ export default function Settings() {
         </div>
 
         <TabsContent value="profile" className="space-y-6">
+          {isClient && <MemberBillingCard />}
           {/* Profile Photo */}
           <div className="glass-card rounded-2xl p-6">
             <h3 className="text-lg font-semibold text-foreground mb-4">Profile Photo</h3>
@@ -681,6 +687,8 @@ export default function Settings() {
             <MembershipAgreementSettings />
           </TabsContent>
         )}
+
+        {canGymBilling && <TabsContent value="billing" className="space-y-6"><GymBillingAdmin /></TabsContent>}
 
         <TabsContent value="account" className="space-y-6">
           <Passkeys />
