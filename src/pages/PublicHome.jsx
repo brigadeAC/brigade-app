@@ -36,12 +36,15 @@ export default function PublicHome() {
           <div className="flex items-center gap-2.5">
             <BrandWordmarkImage className="h-8" />
           </div>
-          <button
-            onClick={goToLogin}
-            className="h-10 px-5 rounded-[6px] bg-primary text-primary-foreground text-sm font-bold uppercase tracking-[0.08em] hover:bg-primary/90 transition"
-          >
-            Sign in
-          </button>
+          <div className="flex items-center gap-2">
+            <Link to={createPageUrl("JoinBrigade")} className="h-10 px-4 inline-flex items-center rounded-[6px] border border-border text-sm font-bold uppercase tracking-[0.08em] hover:bg-secondary transition">Join</Link>
+            <button
+              onClick={goToLogin}
+              className="h-10 px-5 rounded-[6px] bg-primary text-primary-foreground text-sm font-bold uppercase tracking-[0.08em] hover:bg-primary/90 transition"
+            >
+              Sign in
+            </button>
+          </div>
         </Column>
       </header>
 
@@ -116,11 +119,17 @@ export default function PublicHome() {
               Most people here started while managing something. The first step is a conversation with a
               coach about where you are and what you want to change.
             </p>
+            <Link
+              to={createPageUrl("JoinBrigade")}
+              className="mt-10 mr-3 inline-flex h-12 px-8 items-center gap-2 rounded-[6px] bg-primary text-primary-foreground text-sm font-bold uppercase tracking-[0.08em] hover:bg-primary/90 transition"
+            >
+              Join Brigade <ArrowRight className="w-4 h-4" />
+            </Link>
             <a
               href="https://brigadeathleticclub.com"
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-10 inline-flex h-12 px-8 items-center gap-2 rounded-[6px] bg-primary text-primary-foreground text-sm font-bold uppercase tracking-[0.08em] hover:bg-primary/90 transition"
+              className="mt-10 inline-flex h-12 px-8 items-center gap-2 rounded-[6px] border border-white/30 text-sm font-bold uppercase tracking-[0.08em] hover:bg-white/10 transition"
             >
               Talk to a coach <ArrowRight className="w-4 h-4" />
             </a>
