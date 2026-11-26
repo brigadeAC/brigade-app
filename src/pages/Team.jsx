@@ -45,12 +45,20 @@ export default function Team() {
     } catch (e) { toast.error(e.message); }
   };
 
+  const setRole = async (m, role) => {
+    try {
+      await accountCall("setStaffRole", { user_id: m.id, role });
+      toast.success(`${m.full_name || m.email} is now a ${role}`);
+      refresh();
+    } catch (e) { toast.error(e.message); }
+  };
+
   return (
     <div className="space-y-5 pb-8 max-w-2xl">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Team</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Coaches who can sign in. Coaches see every client.</p>
+          <p className="text-sm text-muted-foreground mt-0.5">Staff who can sign in. Managers also handle memberships, holds, family links, the class schedule, booking rules and reports.</p>
         </div>
         <Button onClick={() => { setFormError(""); setInviting(true); }} className="gap-2"><UserPlus className="w-4 h-4" /> Invite coach</Button>
       </div>
@@ -62,11 +70,18 @@ export default function Team() {
               {data.team.map((m) => (
                 <li key={m.id} className={`rounded-xl border border-border bg-card p-4 flex flex-wrap items-center gap-3 ${m.disabled ? "opacity-60" : ""}`}>
                   <div className="min-w-0 flex-1 basis-48">
-                    <p className="text-sm font-semibold text-foreground">{m.full_name || m.email}{m.is_admin ? " · Admin" : ""}{m.is_me ? " (you)" : ""}{m.disabled ? " · Access off" : ""}</p>
+                    <p className="text-sm font-semibold text-foreground">{m.full_name || m.email}{m.is_admin ? " · Admin" : m.staff_role === "manager" ? " · Manager" : " · Coach"}{m.is_me ? " (you)" : ""}{m.disabled ? " · Access off" : ""}</p>
                     <p className="text-xs text-muted-foreground break-all">{m.email}</p>
                   </div>
                   {!m.is_me && (
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
+                      {!m.is_admin && (
+                        <select aria-label={`Role for ${m.full_name || m.email}`} value={m.staff_role || "coach"} onChange={(e) => setRole(m, e.target.value)}
+                          className="h-9 rounded-md border border-input bg-background px-2 text-sm text-foreground">
+                          <option value="coach">Coach</option>
+                          <option value="manager">Manager</option>
+                        </select>
+                      )}
                       {!m.disabled && <Button size="sm" variant="outline" onClick={() => reset(m)}>Reset password</Button>}
                       {!m.is_admin && <Button size="sm" variant="outline" onClick={() => access(m)}>{m.disabled ? "Turn on" : "Turn off"}</Button>}
                     </div>

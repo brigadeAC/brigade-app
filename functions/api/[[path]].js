@@ -301,8 +301,40 @@ const CLASS_HOOK_TYPES = new Set(['ClassSlot', 'ClassType', 'ClassSession', 'Res
 const MEMBER_PROGRAM_RECORD_TYPES = new Set(['LessonCompletion', 'CheckinResponse']);
 const STAFF_PRIVATE_TYPES = new Set(['Message', 'Notification', 'CoachBriefing', 'AgentConversation']);
 const isStaff = (user) => !!user && (user.role === 'admin' || user.user_type === 'trainer');
+
+/* ---- Roles and permissions ----
+ * Admin comes only from ADMIN_EMAILS. Staff accounts (user_type 'trainer') are
+ * a coach unless an admin made them a manager (users.data.staff_role). Clients
+ * are members; a member with linked children is also a parent (client_guardians).
+ * Every staff-only action names the permission it needs; change a role's powers
+ * here and only here. */
+const STAFF_ROLES = ['coach', 'manager'];
+const PERMISSIONS = {
+  manager: new Set(['classes.run', 'classes.edit', 'schedule.manage', 'members.invite', 'members.manage', 'guardians.manage', 'reports.view', 'programs.manage', 'settings.manage']),
+  coach: new Set(['classes.run', 'classes.edit', 'members.invite', 'programs.manage']),
+};
+const ALL_PERMISSIONS = [...new Set([...PERMISSIONS.manager, ...PERMISSIONS.coach, 'staff.manage', 'settings.manage'])].sort();
+function staffRole(user) {
+  if (!user) return null;
+  if (user.role === 'admin') return 'admin';
+  if (user.user_type !== 'trainer') return null;
+  return user.staff_role === 'manager' ? 'manager' : 'coach';
+}
+function can(user, perm) {
+  const r = staffRole(user);
+  if (r === 'admin') return true;
+  return !!r && PERMISSIONS[r].has(perm);
+}
+const permissionsOf = (user) => (staffRole(user) === 'admin' ? ALL_PERMISSIONS : [...(PERMISSIONS[staffRole(user)] || [])].sort());
+const NO_PERMISSION = { success: false, error: 'Your role doesn\'t allow this. Ask an admin.', code: 'forbidden' };
+// Entity types whose writes need more than plain staff access.
+const TYPE_PERMISSION = {
+  Membership: 'members.manage', MembershipPlan: 'members.manage',
+  GymSettings: 'settings.manage', ClassType: 'schedule.manage', ClassSlot: 'schedule.manage', ClassDayChange: 'schedule.manage',
+};
 const isMemberUser = (user) => !!user && user.role !== 'admin' && (user.user_type === 'client' || user.user_type === 'independent');
-const staffWriteDenied = (type, user) => (STAFF_LIBRARY_TYPES.has(type) || STAFF_WRITE_TYPES.has(type)) && !isStaff(user);
+const staffWriteDenied = (type, user) => ((STAFF_LIBRARY_TYPES.has(type) || STAFF_WRITE_TYPES.has(type)) && !isStaff(user))
+  || (TYPE_PERMISSION[type] && isStaff(user) && !can(user, TYPE_PERMISSION[type]));
 
 // Ownership scoping: admins see everything; everyone else only rows they own —
 // rows they created, rows assigned to them as trainer, or rows about them as
@@ -2747,7 +2779,11 @@ async function runFunction(name, payload, ctx) {
       ).bind(nowISO()).all();
       return {
         success: true, email_enabled: emailReady(env),
-        team: results.map(userRow).map((u) => ({ id: u.id, email: u.email, full_name: u.full_name, disabled: !!u.disabled, is_admin: resolveRole(env, u.email, u.role) === 'admin', is_me: u.id === user.id })),
+        team: results.map(userRow).map((u) => {
+          const isAdmin = resolveRole(env, u.email, u.role) === 'admin';
+          return { id: u.id, email: u.email, full_name: u.full_name, disabled: !!u.disabled, is_admin: isAdmin, staff_role: isAdmin ? 'admin' : staffRole(u), is_me: u.id === user.id };
+        }),
+        roles: STAFF_ROLES,
         pending: pending.results,
       };
     }
@@ -2762,6 +2798,23 @@ async function runFunction(name, payload, ctx) {
       await env.DB.prepare('UPDATE users SET data = ?, updated_date = ? WHERE id = ?').bind(JSON.stringify(data), nowISO(), row.id).run();
       await audit(env, { actor: user.email, action: data.disabled ? 'access_off' : 'access_on', target: 'Account', targetId: row.id, request: null });
       return { success: true, disabled: data.disabled };
+    }
+
+    // Admin only: make a staff account a coach or a manager.
+    case 'setStaffRole': {
+      if (!can(user, 'staff.manage')) return { success: false, error: 'Only an admin can change roles.' };
+      const role = String(payload?.role || '');
+      if (!STAFF_ROLES.includes(role)) return { success: false, error: 'Pick coach or manager.' };
+      const row = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(payload?.user_id || '').first();
+      if (!row || row.user_type !== 'trainer') return { success: false, error: 'Staff account not found.' };
+      if (resolveRole(env, row.email, row.role) === 'admin') return { success: false, error: 'Admins already have every permission.' };
+      const data = JSON.parse(row.data || '{}');
+      const before = data.staff_role === 'manager' ? 'manager' : 'coach';
+      if (before === role) return { success: true, role };
+      data.staff_role = role;
+      await env.DB.prepare('UPDATE users SET data = ?, updated_date = ? WHERE id = ?').bind(JSON.stringify(data), nowISO(), row.id).run();
+      await audit(env, { actor: user.email, action: 'role_changed', target: 'Account', targetId: row.id, detail: `${before} -> ${role}`, request: null });
+      return { success: true, role };
     }
 
     /* ---- Email ---- */
@@ -3573,6 +3626,7 @@ async function runFunction(name, payload, ctx) {
     case 'cancelMembershipHold':
     case 'setMembershipEndDate': {
       if (!isStaff(user)) return { success: false, error: 'Only coaches can change memberships.' };
+      if (!can(user, 'members.manage')) return NO_PERMISSION;
       const today = programToday();
       let m = await getEntityById(env, 'Membership', payload?.membership_id);
       if (!m) return { success: false, error: 'Membership not found.' };
@@ -3701,6 +3755,7 @@ async function runFunction(name, payload, ctx) {
     case 'linkGuardian':
     case 'unlinkGuardian': {
       if (!isStaff(user)) return { success: false, error: 'Only coaches can change guardians.' };
+      if (!can(user, 'guardians.manage')) return NO_PERMISSION;
       const child = await getEntityById(env, 'Client', payload?.client_id);
       const guardian = await getEntityById(env, 'Client', payload?.guardian_client_id);
       if (!child || !guardian) return { success: false, error: 'Client not found.' };
@@ -3734,6 +3789,7 @@ async function runFunction(name, payload, ctx) {
 
     case 'classReports': {
       if (!isStaff(user)) return { success: false, error: 'Only coaches can see reports.' };
+      if (!can(user, 'reports.view')) return NO_PERMISSION;
       return classReports(env, payload || {});
     }
 
@@ -3991,6 +4047,7 @@ async function runFunction(name, payload, ctx) {
 
     case 'classDayChange': {
       if (!isStaff(user)) return { success: false, error: 'Only coaches can change the schedule.' };
+      if (!can(user, 'schedule.manage')) return NO_PERMISSION;
       return classDayChange(env, user, payload);
     }
 
@@ -4845,7 +4902,7 @@ export async function onRequest(context) {
               ).bind(uid(), 'Client', JSON.stringify(profile), user.email, now, now).run();
             }
           }
-          return json(user);
+          return json({ ...user, staff_role: staffRole(user), permissions: permissionsOf(user) });
         }
         if (method === 'PUT') {
           const body = await request.json();
@@ -4856,7 +4913,7 @@ export async function onRequest(context) {
           // account itself. Admin status comes solely from the ADMIN_EMAILS
           // allowlist; account type is fixed at registration (gated by beta key
           // / invite), so self-service changes would bypass those gates.
-          const PROTECTED = ['id', 'email', 'role', 'user_type', 'password_hash', 'beta_key_used', 'beta_key_verified', 'beta_key', 'billing', 'disabled', 'sessions_valid_from', 'created_date', 'updated_date'];
+          const PROTECTED = ['id', 'email', 'role', 'user_type', 'password_hash', 'beta_key_used', 'beta_key_verified', 'beta_key', 'billing', 'disabled', 'staff_role', 'sessions_valid_from', 'created_date', 'updated_date'];
           for (const [k, v] of Object.entries(body)) {
             if (PROTECTED.includes(k)) continue;
             if (k in cols) cols[k] = v;
@@ -5007,7 +5064,7 @@ export async function onRequest(context) {
           const prepared = [];
           for (const item of list) {
             const { id: _i, created_date: _c, updated_date: _u, created_by: _b, ...fields } = item || {};
-            if (staffWriteDenied(type, user)) return err('Only coaches can change this.', 403);
+            if (staffWriteDenied(type, user)) return err(isStaff(user) ? 'Your role doesn\'t allow this. Ask an admin.' : 'Only coaches can change this.', 403);
             const violation = await memberWriteViolation(env, user, type, fields);
             if (violation) return err(violation, 403);
             // One Client record per email per coach. A duplicate splits the
@@ -5058,7 +5115,7 @@ export async function onRequest(context) {
           const body = await request.json();
           const data = JSON.parse(row.data || '{}');
           const { id: _i, created_date: _c, updated_date: _u, created_by: _b, ...fields } = body || {};
-          if (staffWriteDenied(type, user)) return err('Only coaches can change this.', 403);
+          if (staffWriteDenied(type, user)) return err(isStaff(user) ? 'Your role doesn\'t allow this. Ask an admin.' : 'Only coaches can change this.', 403);
           const violation = await memberWriteViolation(env, user, type, fields, data);
           if (violation) return err(violation, 403);
           if (sharedWriteDenied(type, row, user, fields)) return err('Only the author can edit this.', 403);
@@ -5079,7 +5136,7 @@ export async function onRequest(context) {
           const row = await getScopedEntity(env, type, id, user);
           if (!row) return err('Not found.', 404);
           if (sharedWriteDenied(type, row, user)) return err('Only the author can delete this.', 403);
-          if (staffWriteDenied(type, user)) return err('Only coaches can change this.', 403);
+          if (staffWriteDenied(type, user)) return err(isStaff(user) ? 'Your role doesn\'t allow this. Ask an admin.' : 'Only coaches can change this.', 403);
           // Clients and their data are kept until an admin deletes the client.
           if (type === 'Client') {
             if (user.role !== 'admin') return err('Only an admin can delete a client.', 403);

@@ -15,6 +15,8 @@ before(async () => {
   const first = await api.call('POST', 'auth/register', { email: ADMIN.email, password: ADMIN.password, full_name: 'Ada Admin' });
   const inv = await api.fn('createInvite', { email: 'coach@example.test', full_name: 'Cody Coach' }, first.data.token);
   coach = (await api.call('POST', 'auth/register', { token: tokenOf(inv.link), full_name: 'Cody Coach', password: 'coach-pass-1' })).data;
+  // The setup account manages memberships and class setup, so make it a manager.
+  assert.equal((await api.fn('setStaffRole', { user_id: coach.user.id, role: 'manager' }, first.data.token)).success, true);
   const t = coach.token;
   await api.create('GymSettings', { waiver_required: false }, t);
   const crossfit = await api.create('ClassType', { name: 'CrossFit', reservable: true, default_capacity: 20, default_duration_min: 60, is_active: true }, t);
