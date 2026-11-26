@@ -27,9 +27,10 @@ export function useMyClasses(options = {}) {
     return m;
   }, [upcoming]);
   const memberships = Array.isArray(d.memberships) ? d.memberships : null;
+  const pastMemberships = Array.isArray(d.past_memberships) ? d.past_memberships : [];
   const w = d.waiver ?? d.waiver_status;
   const waiverSigned = typeof w === "boolean" ? w : w?.signed ?? (typeof d.waiver_signed === "boolean" ? d.waiver_signed : null);
-  return { ...q, upcoming, recent: d.recent || d.recent_attendance || [], memberships, waiverSigned, reservationBySession };
+  return { ...q, upcoming, recent: d.recent || d.recent_attendance || [], memberships, pastMemberships, waiverSigned, reservationBySession };
 }
 
 export function useSchedule(from, to, enabled = true) {

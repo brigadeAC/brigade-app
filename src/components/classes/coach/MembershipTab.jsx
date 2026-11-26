@@ -4,10 +4,11 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Plus, Pause, Play, Ban, Loader2 } from "lucide-react";
+import { Plus, Pause, Play, Ban, Loader2, CalendarX } from "lucide-react";
 import { toast } from "sonner";
 import { todayKey, addDays, fromKey } from "@/lib/programs";
-import { errorMessage, fetchMemberStatus, planSummary, fmtTime, RES_STATUS } from "./api";
+import { holdOn } from "@/lib/classes";
+import { invoke, errorMessage, fetchMemberStatus, planSummary, fmtTime, RES_STATUS } from "./api";
 import { Field, NativeSelect } from "./ui";
 
 const fmtDate = (k) => (k ? fromKey(k).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "");
@@ -24,7 +25,11 @@ export default function MembershipTab({ clientId, client }) {
   const [holdFor, setHoldFor] = useState(null);
   const [holdFrom, setHoldFrom] = useState(todayKey());
   const [holdTo, setHoldTo] = useState("");
+  const [holdReason, setHoldReason] = useState("");
+  const [holdExtend, setHoldExtend] = useState(true);
   const [endFor, setEndFor] = useState(null);
+  const [endDate, setEndDate] = useState(todayKey());
+  const [endReason, setEndReason] = useState("");
   const [busy, setBusy] = useState(false);
 
   const { data: memberships = [], isLoading } = useQuery({
@@ -106,8 +111,25 @@ export default function MembershipTab({ clientId, client }) {
     } catch (err) { toast.error(errorMessage(err)); } finally { setBusy(false); }
   };
 
-  const current = memberships.filter((m) => m.status !== "ended");
-  const past = memberships.filter((m) => m.status === "ended");
+  // Holds and end dates go through the server so bookings, end dates and the
+  // audit log stay in step.
+  const act = async (name, payload, msg) => {
+    setBusy(true);
+    try {
+      const r = await invoke(name, payload);
+      const n = r?.cancelled_bookings || 0;
+      toast.success(n ? `${msg}. ${n} booked class${n === 1 ? " was" : "es were"} cancelled.` : msg);
+      setHoldFor(null); setEndFor(null);
+      refresh();
+    } catch (err) { toast.error(errorMessage(err)); } finally { setBusy(false); }
+  };
+  const openHold = (m) => { setHoldFor(m); setHoldFrom(todayKey()); setHoldTo(""); setHoldReason(""); setHoldExtend(true); };
+  const openEnd = (m) => { setEndFor(m); setEndDate(m.end_date && m.end_date >= todayKey() ? m.end_date : todayKey()); setEndReason(m.end_reason || ""); };
+
+  const today = todayKey();
+  const isPast = (m) => m.status === "ended" || (m.end_date && m.end_date < today);
+  const current = memberships.filter((m) => !isPast(m));
+  const past = memberships.filter(isPast);
   const sortDesc = (a, b) => (b.start_date || "").localeCompare(a.start_date || "");
 
   const usageLine = (m) => {
@@ -129,8 +151,10 @@ export default function MembershipTab({ clientId, client }) {
   };
 
   const Card = ({ m }) => {
-    const isHold = m.status === "on_hold";
-    const ended = m.status === "ended";
+    const legacyHold = m.status === "on_hold" && !(m.holds || []).length;
+    const ended = isPast(m);
+    const isHold = !ended && (legacyHold || !!holdOn(m, today));
+    const holds = (m.holds || []).slice().sort((a, b) => (b.from || "").localeCompare(a.from || ""));
     return (
       <li className="rounded-xl border border-border bg-card p-4 space-y-2">
         <div className="flex items-start justify-between gap-3">
@@ -145,16 +169,44 @@ export default function MembershipTab({ clientId, client }) {
           </span>
         </div>
         {!ended && usageLine(m) && <p className="text-sm text-foreground">{usageLine(m)}</p>}
-        {isHold && <p className="text-xs text-muted-foreground">Hold {fmtDate(m.hold_from)}{m.hold_to ? ` to ${fmtDate(m.hold_to)}` : ""}</p>}
+        {legacyHold && <p className="text-xs text-muted-foreground">Hold {fmtDate(m.hold_from)}{m.hold_to ? ` to ${fmtDate(m.hold_to)}` : ""}</p>}
+        {m.end_date && !ended && m.end_reason && <p className="text-xs text-muted-foreground">Ends {fmtDate(m.end_date)}: {m.end_reason}</p>}
+        {holds.length > 0 && (
+          <ul className="space-y-1.5">
+            {holds.map((h) => {
+              const cancelled = h.status === "cancelled";
+              const over = !cancelled && h.to < today;
+              const now = !cancelled && h.from <= today && today <= h.to;
+              const label = cancelled ? "Cancelled" : over ? (h.planned_to && h.planned_to !== h.to ? "Ended early" : "Done") : now ? "On hold now" : "Coming up";
+              return (
+                <li key={h.id} className={`rounded-lg border border-border px-3 py-2 text-xs ${cancelled || over ? "text-muted-foreground" : "text-foreground"}`}>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className={cancelled ? "line-through" : ""}>Hold {fmtDate(h.from)} to {fmtDate(h.to)}{h.reason ? ` · ${h.reason}` : ""}</span>
+                    <span className="shrink-0 font-semibold">{label}</span>
+                  </div>
+                  {!ended && !cancelled && !over && (
+                    <div className="flex gap-2 pt-1.5">
+                      {now && h.from < today && <Button size="sm" variant="outline" className="h-7 px-2 text-xs" disabled={busy} onClick={() => act("endMembershipHold", { membership_id: m.id, hold_id: h.id }, "Hold ended. They can book from today")}>End hold today</Button>}
+                      <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" disabled={busy} onClick={() => act("cancelMembershipHold", { membership_id: m.id, hold_id: h.id }, "Hold cancelled")}>Cancel hold</Button>
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
         {m.notes && <p className="text-xs text-muted-foreground">{m.notes}</p>}
+        {ended && m.end_date && (
+          <Button size="sm" variant="ghost" className="gap-1.5 h-7 px-2 text-xs" disabled={busy} onClick={() => act("setMembershipEndDate", { membership_id: m.id, end_date: null }, "End date removed")}><CalendarX className="w-3.5 h-3.5" /> Remove end date</Button>
+        )}
         {!ended && (
           <div className="flex flex-wrap gap-2 pt-1">
-            {isHold ? (
+            {legacyHold ? (
               <Button size="sm" variant="outline" className="gap-1.5" disabled={busy} onClick={() => update(m, { status: "active", hold_from: null, hold_to: null }, "Membership resumed")}><Play className="w-3.5 h-3.5" /> Resume</Button>
             ) : (
-              <Button size="sm" variant="outline" className="gap-1.5" onClick={() => { setHoldFor(m); setHoldFrom(todayKey()); setHoldTo(""); }}><Pause className="w-3.5 h-3.5" /> Put on hold</Button>
+              <Button size="sm" variant="outline" className="gap-1.5" onClick={() => openHold(m)}><Pause className="w-3.5 h-3.5" /> Put on hold</Button>
             )}
-            <Button size="sm" variant="outline" className="gap-1.5 text-red-600 hover:text-red-600" onClick={() => setEndFor(m)}><Ban className="w-3.5 h-3.5" /> End membership</Button>
+            <Button size="sm" variant="outline" className="gap-1.5 text-red-600 hover:text-red-600" onClick={() => openEnd(m)}><Ban className="w-3.5 h-3.5" /> {m.end_date ? "Change end date" : "Set end date"}</Button>
           </div>
         )}
       </li>
@@ -244,15 +296,24 @@ export default function MembershipTab({ clientId, client }) {
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>Put {holdFor?.plan_name} on hold</DialogTitle>
-            <DialogDescription>The client can't book classes while the membership is on hold.</DialogDescription>
+            <DialogDescription>The client can't book classes on these days. Classes they already booked then are cancelled. You can end the hold early.</DialogDescription>
           </DialogHeader>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="From"><Input type="date" value={holdFrom} onChange={(e) => setHoldFrom(e.target.value)} /></Field>
-            <Field label="Until" hint="Blank = until resumed"><Input type="date" value={holdTo} onChange={(e) => setHoldTo(e.target.value)} /></Field>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="From"><Input type="date" value={holdFrom} onChange={(e) => setHoldFrom(e.target.value)} /></Field>
+              <Field label="Until"><Input type="date" value={holdTo} min={holdFrom} onChange={(e) => setHoldTo(e.target.value)} /></Field>
+            </div>
+            <Field label="Reason" hint="The client can see this"><Input value={holdReason} maxLength={200} placeholder="Injury, travel" onChange={(e) => setHoldReason(e.target.value)} /></Field>
+            {holdFor?.end_date && (
+              <label className="flex items-start gap-2 text-sm text-foreground">
+                <input type="checkbox" className="mt-1" checked={holdExtend} onChange={(e) => setHoldExtend(e.target.checked)} />
+                <span>Move the end date ({fmtDate(holdFor.end_date)}) back by the length of the hold</span>
+              </label>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setHoldFor(null)}>Cancel</Button>
-            <Button disabled={busy || !holdFrom || (holdTo && holdTo < holdFrom)} onClick={() => update(holdFor, { status: "on_hold", hold_from: holdFrom, hold_to: holdTo || null }, "Membership on hold")}>Put on hold</Button>
+            <Button disabled={busy || !holdFrom || !holdTo || holdTo < holdFrom || !holdReason.trim()} onClick={() => act("holdMembership", { membership_id: holdFor.id, from: holdFrom, to: holdTo, reason: holdReason.trim(), extend_end_date: holdExtend }, "Membership on hold")}>Put on hold</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -260,12 +321,17 @@ export default function MembershipTab({ clientId, client }) {
       <Dialog open={!!endFor} onOpenChange={(v) => !v && setEndFor(null)}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>End {endFor?.plan_name}?</DialogTitle>
-            <DialogDescription>The membership ends today. Existing reservations are not cancelled. Attendance history is kept.</DialogDescription>
+            <DialogTitle>End date for {endFor?.plan_name}</DialogTitle>
+            <DialogDescription>The client can book classes up to and including this day. Classes booked after it are cancelled. Their history and records are kept.</DialogDescription>
           </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEndFor(null)}>Keep membership</Button>
-            <Button disabled={busy} onClick={() => update(endFor, { status: "ended", end_date: todayKey() < (endFor.start_date || "") ? endFor.start_date : (endFor.end_date && endFor.end_date < todayKey() ? endFor.end_date : todayKey()) }, "Membership ended")}>End membership</Button>
+          <div className="space-y-3">
+            <Field label="Last day"><Input type="date" value={endDate} min={endFor?.start_date || undefined} onChange={(e) => setEndDate(e.target.value)} /></Field>
+            <Field label="Reason" hint="Optional"><Input value={endReason} maxLength={200} onChange={(e) => setEndReason(e.target.value)} /></Field>
+          </div>
+          <DialogFooter className="gap-2">
+            {endFor?.end_date && <Button variant="ghost" disabled={busy} onClick={() => act("setMembershipEndDate", { membership_id: endFor.id, end_date: null }, "End date removed")}>Remove end date</Button>}
+            <Button variant="outline" onClick={() => setEndFor(null)}>Cancel</Button>
+            <Button disabled={busy || !endDate || (endFor?.start_date && endDate < endFor.start_date)} onClick={() => act("setMembershipEndDate", { membership_id: endFor.id, end_date: endDate, reason: endReason.trim() }, "End date saved")}>Save end date</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

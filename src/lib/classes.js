@@ -197,12 +197,54 @@ export function allowanceLine(m) {
   return `${name}: ${a.remaining} of ${a.limit} classes left ${noun}`.replace("left remaining", "left");
 }
 
-const membershipCovers = (m, session) => {
-  if (m?.status && m.status !== "active") return false;
+// ---------- holds and end dates (mirror of the backend) ----------
+const isKey = (k) => typeof k === "string" && /^\d{4}-\d{2}-\d{2}$/.test(k);
+// The hold covering a date key, or null. Holds: m.holds [{ id, from, to, status }];
+// also the older single hold (hold_from / hold_to).
+export function holdOn(m, date) {
+  const h = (Array.isArray(m?.holds) ? m.holds : []).find((x) => x && x.status !== "cancelled" && isKey(x.from) && isKey(x.to) && x.from <= date && date <= x.to);
+  if (h) return h;
+  if (isKey(m?.hold_from) && m.hold_from <= date && (!isKey(m.hold_to) || date <= m.hold_to) && (m.status === "on_hold" || m.status === "active")) {
+    return { from: m.hold_from, to: isKey(m.hold_to) ? m.hold_to : null };
+  }
+  return null;
+}
+// "Dec 10" from a date key (year added when it isn't this year's).
+export function shortDay(key, today) {
+  const [y, mo, d] = String(key).split("-").map(Number);
+  const sameYear = !today || String(today).slice(0, 4) === String(key).slice(0, 4);
+  return new Date(Date.UTC(y, mo - 1, d)).toLocaleDateString("en-US", { timeZone: "UTC", month: "short", day: "numeric", ...(sameYear ? {} : { year: "numeric" }) });
+}
+// Plain-words lines about holds and end dates for the member.
+// memberships: current ones from myClasses; past: past_memberships.
+export function membershipNotices(memberships, past, today) {
+  const list = Array.isArray(memberships) ? memberships : [];
+  const out = [];
+  const who = (m) => (list.length > 1 && m.plan_name ? `Your ${m.plan_name} membership` : "Your membership");
+  list.forEach((m) => {
+    const now = m.hold_now || holdOn(m, today);
+    if (now) out.push({ key: `${m.id}-hold`, tone: "warn", text: `${who(m)} is on hold${now.to ? ` until ${shortDay(now.to, today)}` : ""}. You can book classes again after that.` });
+    const next = m.next_hold || (Array.isArray(m.holds) ? m.holds : []).filter((h) => h.status !== "cancelled" && isKey(h.from) && h.from > today).sort((a, b) => a.from.localeCompare(b.from))[0];
+    if (next) out.push({ key: `${m.id}-next`, tone: "info", text: `${who(m)} goes on hold ${shortDay(next.from, today)} to ${shortDay(next.to, today)}.` });
+    if (isKey(m.end_date) && m.end_date >= today) out.push({ key: `${m.id}-end`, tone: "info", text: `${who(m)} ends ${shortDay(m.end_date, today)}.` });
+  });
+  if (!list.length && Array.isArray(past) && past.length && isKey(past[0].end_date)) {
+    out.push({ key: "ended", tone: "warn", text: `Your membership ended ${shortDay(past[0].end_date, today)}. Ask the front desk to start a new one.` });
+  }
+  return out;
+}
+
+const coversTypeAndDates = (m, session) => {
+  if (m?.status === "ended") return false;
   if (session.date && m.start_date && session.date < m.start_date) return false;
   if (session.date && m.end_date && session.date > m.end_date) return false;
   const ids = m.class_type_ids;
   return !Array.isArray(ids) || ids.length === 0 || ids.includes(session.class_type_id);
+};
+const membershipCovers = (m, session) => {
+  if (m?.status && m.status !== "active" && m.status !== "on_hold") return false;
+  if (!coversTypeAndDates(m, session)) return false;
+  return !session.date || !holdOn(m, session.date);
 };
 
 // Monday (yyyy-MM-dd) of the week containing a date key.
@@ -274,7 +316,13 @@ function coverageProblem(session, memberships, waiverSigned, settings, _checkIn,
   }
   if (!Array.isArray(memberships)) return null;
   const covering = memberships.filter((m) => membershipCovers(m, session));
-  if (covering.length === 0) return { reason: "No membership covers this class", tone: "warn" };
+  if (covering.length === 0) {
+    const held = memberships.filter((m) => coversTypeAndDates(m, session)).map((m) => holdOn(m, session.date)).find(Boolean);
+    if (held) return { reason: held.to ? `On hold until ${shortDay(held.to)}` : "Membership on hold", tone: "warn" };
+    const ends = memberships.filter((m) => m.end_date && session.date > m.end_date).map((m) => m.end_date).sort().pop();
+    if (ends) return { reason: `Membership ends ${shortDay(ends)}`, tone: "warn" };
+    return { reason: "No membership covers this class", tone: "warn" };
+  }
   // "remaining" from myClasses is for the current week/month: only trust it for sessions in that period.
   const today = easternTodayKey(now);
   const hasAllowance = covering.some((m) => {

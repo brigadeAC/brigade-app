@@ -25,6 +25,7 @@ import { isLogDone } from "@/lib/habitLibrary";
 import { isScheduledOn, todayKey, gymToday } from "@/lib/programs";
 import ClientTodayCard from "@/components/programs/client/ClientTodayCard";
 import NextClassCard from "@/components/classes/member/NextClassCard";
+import MembershipNoticeCard from "@/components/classes/member/MembershipNoticeCard";
 
 const todayStr = todayKey;
 
@@ -359,6 +360,9 @@ export default function ClientDashboard() {
           <p className="text-sm font-medium text-muted-foreground">Nutrition</p>
         </Link>
       </div>
+
+      {/* ---- Membership hold / end date ---- */}
+      <MembershipNoticeCard />
 
       {/* ---- Next booked class ---- */}
       <NextClassCard />

@@ -71,7 +71,7 @@ export default function ClientClasses() {
           <ArrowLeft className="w-4 h-4" /> Dashboard
         </Link>
         <h1 className="text-2xl font-bold text-foreground">Classes</h1>
-        {my.memberships && <div className="mt-1"><MembershipLines memberships={my.memberships} /></div>}
+        {my.memberships && <div className="mt-1"><MembershipLines memberships={my.memberships} past={my.pastMemberships} today={today} /></div>}
       </div>
 
       <div className="glass-card p-4 space-y-3">

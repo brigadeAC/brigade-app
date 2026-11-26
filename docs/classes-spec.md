@@ -75,6 +75,13 @@ Coach/Scholarship (comp, unlimited).
 class_type_ids, start_date, end_date (null = ongoing; punch/intro default start+duration_days-1),
 sessions_total (punch/drop-in), sessions_used, status: active|on_hold|ended, hold_from, hold_to,
 notes`
+Holds: `holds: [{ id, from, to, planned_to, reason, status: active|cancelled, extend_days,
+created_by, created_at, ended_early_at?, cancelled_at? }]`, set only through the staff functions
+`holdMembership`, `endMembershipHold`, `cancelMembershipHold`; `setMembershipEndDate` sets or
+clears `end_date` (+ `end_reason`). A hold blocks booking on its days (checked inside the
+booking insert), cancels bookings already made then, and pushes a set end date back by its
+length (given back if ended early or cancelled). Bookings after a new end date are cancelled.
+Nothing is deleted: cancelled holds and ended memberships stay as history.
 Plan fields are copied onto the membership at assignment (template edits don't change
 existing memberships, same idea as habits).
 

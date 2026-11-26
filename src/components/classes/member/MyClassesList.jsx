@@ -1,13 +1,30 @@
 import React from "react";
 import { fromKey } from "@/lib/programs";
-import { formatTime, reservationStatusInfo, allowanceLine } from "@/lib/classes";
+import { formatTime, reservationStatusInfo, allowanceLine, membershipNotices } from "@/lib/classes";
 
-export function MembershipLines({ memberships }) {
+// Holds and end dates in plain words ("Your membership is on hold until Dec 10.").
+export function MembershipNotices({ memberships, past, today, className = "" }) {
+  const notes = membershipNotices(memberships, past, today);
+  if (!notes.length) return null;
+  return (
+    <div className={`space-y-1.5 ${className}`}>
+      {notes.map((n) => (
+        <p key={n.key} className={`text-sm rounded-lg px-3 py-2 ${n.tone === "warn" ? "bg-amber-500/10 text-amber-700 dark:text-amber-400" : "bg-secondary/60 text-foreground"}`}>{n.text}</p>
+      ))}
+    </div>
+  );
+}
+
+export function MembershipLines({ memberships, past, today }) {
   if (!memberships) return null;
-  if (memberships.length === 0) return <p className="text-sm text-muted-foreground">No active membership. Ask the front desk to set one up.</p>;
+  const notices = <MembershipNotices memberships={memberships} past={past} today={today} className="mt-2" />;
+  if (memberships.length === 0) {
+    return (past && past.length) ? notices : <p className="text-sm text-muted-foreground">No active membership. Ask the front desk to set one up.</p>;
+  }
   return (
     <div className="space-y-1">
       {memberships.map((m) => <p key={m.id || m.plan_id} className="text-sm text-foreground">{allowanceLine(m)}</p>)}
+      {notices}
     </div>
   );
 }

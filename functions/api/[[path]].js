@@ -1404,10 +1404,30 @@ async function waiverStatus(env, who) {
   return { signed: !!row, contract_id: row?.id || null };
 }
 
+// Holds live on the membership: m.holds = [{ id, from, to, planned_to, reason,
+// status: 'active'|'cancelled', extend_days, created_by, created_at, ... }].
+// Ending a hold early shortens `to` (planned_to keeps the first plan).
+// Cancelled holds stay in the list as history. The older single hold
+// (status 'on_hold' + hold_from/hold_to) is still honoured below.
+const liveHolds = (m) => (Array.isArray(m?.holds) ? m.holds : [])
+  .filter((h) => h && h.status !== 'cancelled' && isDateKey(h.from) && isDateKey(h.to));
+function holdOn(m, date) {
+  const h = liveHolds(m).find((x) => x.from <= date && date <= x.to);
+  if (h) return h;
+  const legacy = isDateKey(m?.hold_from) && m.hold_from <= date && (!isDateKey(m.hold_to) || date <= m.hold_to);
+  if (legacy && (m.status === 'on_hold' || m.status === 'active')) return { from: m.hold_from, to: isDateKey(m.hold_to) ? m.hold_to : null, legacy: true };
+  return null;
+}
+// "Dec 10" (adds the year when it isn't this year).
+const shortDay = (k, today = programToday()) => new Date(keyToUTC(k)).toLocaleDateString('en-US', {
+  timeZone: 'UTC', month: 'short', day: 'numeric', ...(String(k).slice(0, 4) !== today.slice(0, 4) ? { year: 'numeric' } : {}),
+});
+
 function membershipCoversDate(m, date) {
   if (!m || m.status === 'ended') return false;
   if (!isDateKey(m.start_date) || m.start_date > date) return false;
   if (isDateKey(m.end_date) && m.end_date < date) return false;
+  if (liveHolds(m).some((h) => h.from <= date && date <= h.to)) return false;
   const inHold = isDateKey(m.hold_from) && m.hold_from <= date && (!isDateKey(m.hold_to) || date <= m.hold_to);
   if (m.status === 'on_hold') return isDateKey(m.hold_from) && !inHold;
   if (m.status !== 'active') return false;
@@ -1434,7 +1454,20 @@ function countedStatuses(s, forTotal = false) {
 // SQL condition "this membership still has room for one more class on `date`".
 // Week: Mon-Sun Eastern week; month: billing month; total: sessions_used (bumped
 // at check-in) + reservations not yet checked in.
+// SQL condition "this membership is still live on `date`": not ended, not past
+// its end date, not on hold. Checked inside the insert so a hold or end date
+// saved while someone is booking still wins.
+const MEMBERSHIP_LIVE_SQL = `EXISTS (SELECT 1 FROM entities mm WHERE mm.id = ? AND mm.entity_type = 'Membership'
+  AND COALESCE(json_extract(mm.data,'$.status'),'active') != 'ended'
+  AND (json_extract(mm.data,'$.end_date') IS NULL OR json_extract(mm.data,'$.end_date') = '' OR json_extract(mm.data,'$.end_date') >= ?)
+  AND NOT EXISTS (SELECT 1 FROM json_each(COALESCE(json_extract(mm.data,'$.holds'),'[]')) h
+    WHERE COALESCE(json_extract(h.value,'$.status'),'active') != 'cancelled'
+      AND json_extract(h.value,'$.from') <= ? AND json_extract(h.value,'$.to') >= ?))`;
 function allowanceGuard(m, date, s) {
+  const g = allowanceLimitGuard(m, date, s);
+  return { ...g, sql: `${MEMBERSHIP_LIVE_SQL} AND ${g.sql}`, binds: [m.id, date, date, date, ...g.binds] };
+}
+function allowanceLimitGuard(m, date, s) {
   const lim = membershipLimit(m);
   if (!lim) return { sql: '1=1', binds: [], lim: null };
   if (lim.period === 'total') {
@@ -1481,7 +1514,7 @@ async function findClassMembership(env, who, session, s) {
   const all = await clientMemberships(env, who);
   const covering = all.filter((m) => membershipCoversDate(m, session.date) && membershipCoversType(m, session.class_type_id))
     .sort((a, b) => membershipRank(a) - membershipRank(b));
-  if (!covering.length) return { reason: 'No active membership covers this class.', code: 'no_membership' };
+  if (!covering.length) return whyNotCovered(all, session);
   for (const m of covering) {
     const guard = allowanceGuard(m, session.date, s);
     if (!guard.lim) return { membership: m, guard };
@@ -1493,6 +1526,72 @@ async function findClassMembership(env, who, session, s) {
     : lim?.period === 'month' ? `You have used all ${lim.count} classes on your plan for that month.`
       : 'No classes left on your plan.';
   return { reason, code: 'limit_reached' };
+}
+
+// Plain-words reason when no membership covers a class date: on hold, ended,
+// or none at all. staffReason is the same sentence about "this client".
+function whyNotCovered(all, session) {
+  const date = session.date;
+  const today = programToday();
+  const typed = all.filter((m) => membershipCoversType(m, session.class_type_id) && isDateKey(m.start_date) && m.start_date <= date);
+  for (const m of typed) {
+    if (m.status === 'ended' || (isDateKey(m.end_date) && m.end_date < date)) continue;
+    const h = holdOn(m, date);
+    if (!h) continue;
+    const until = isDateKey(h.to) ? ` until ${shortDay(h.to, today)}` : '';
+    return { reason: `Your membership is on hold${until}.`, staffReason: `This client's membership is on hold${until}.`, code: 'on_hold' };
+  }
+  const ended = typed.filter((m) => isDateKey(m.end_date) && m.end_date < date)
+    .sort((a, b) => b.end_date.localeCompare(a.end_date))[0];
+  if (ended) {
+    const d = shortDay(ended.end_date, today);
+    return ended.end_date >= today
+      ? { reason: `Your membership ends ${d}, so you can't book classes after that.`, staffReason: `This client's membership ends ${d}.`, code: 'membership_ended' }
+      : { reason: `Your membership ended ${d}.`, staffReason: `This client's membership ended ${d}.`, code: 'membership_ended' };
+  }
+  return { reason: 'No active membership covers this class.', code: 'no_membership' };
+}
+
+// Save a membership only if nobody changed it since we read it.
+async function patchMembershipIf(env, m, patch) {
+  const { id, created_by: _c, created_date: _d, updated_date, ...data } = m;
+  const now = nowISO();
+  const res = await env.DB.prepare(
+    `UPDATE entities SET data = ?, updated_date = ? WHERE id = ? AND entity_type = 'Membership' AND updated_date = ?`
+  ).bind(JSON.stringify({ ...data, ...patch }), now, id, updated_date).run();
+  return !!res?.meta?.changes;
+}
+
+// Cancel a membership's bookings (reserved / waitlisted, not started yet) on
+// dates from..to, for a hold or an end date. Frees spots for the waitlist.
+// Attendance and past records are never touched.
+async function releaseMembershipBookings(env, m, from, to, reason, actor) {
+  const rows = await selectEntities(env, 'Reservation',
+    `json_extract(data,'$.membership_id') = ? AND json_extract(data,'$.status') IN ('reserved','waitlisted') AND json_extract(data,'$.date') >= ? AND json_extract(data,'$.date') <= ?`,
+    [m.id, from, to || '9999-12-31']);
+  const now = Date.now();
+  const touched = new Set(); const freed = new Set();
+  let n = 0;
+  for (const r of rows) {
+    if (Date.parse(r.start_at) <= now) continue;
+    const ts = nowISO();
+    const res = await env.DB.prepare(
+      `UPDATE entities SET data = json_set(data, '$.status', 'cancelled', '$.cancelled_at', ?, '$.waitlist_position', NULL, '$.cancelled_by', ?, '$.cancel_reason', ?), updated_date = ?
+       WHERE id = ? AND entity_type = 'Reservation' AND json_extract(data,'$.status') = ?`
+    ).bind(ts, actor.id, reason, ts, r.id, r.status).run();
+    if (!res?.meta?.changes) continue;
+    n++;
+    touched.add(r.session_id);
+    if (r.status === 'reserved') freed.add(r.session_id);
+  }
+  if (touched.size) {
+    const s = await getGymSettings(env);
+    for (const sid of touched) {
+      await recountSession(env, sid);
+      if (freed.has(sid)) await promoteWaitlist(env, await getEntityById(env, 'ClassSession', sid), s, actor);
+    }
+  }
+  return n;
 }
 
 // Conditional insert of a reservation. mode: 'spot' (needs a free spot),
@@ -1510,7 +1609,7 @@ function reservationInsert(env, { data, createdBy, session, clientIds, guard, mo
   const cap = capOf(session);
   if (mode === 'spot' && cap !== null) { conds.push(`${RES_SPOT_COUNT} < ?`); condBinds.push(session.id, cap); }
   if (mode === 'waitlist') { conds.push(`${RES_SPOT_COUNT} >= ?`); condBinds.push(session.id, cap ?? 0); }
-  if (guard && guard.lim) { conds.push(guard.sql); condBinds.push(...guard.binds); }
+  if (guard) { conds.push(guard.sql); condBinds.push(...guard.binds); }
   const dataExpr = mode === 'waitlist'
     ? `json_set(?, '$.waitlist_position', (SELECT COALESCE(MAX(CAST(json_extract(data,'$.waitlist_position') AS INTEGER)),0)+1 FROM entities WHERE entity_type='Reservation' AND json_extract(data,'$.session_id') = ? AND json_extract(data,'$.status') = 'waitlisted'))`
     : '?';
@@ -1924,8 +2023,12 @@ async function classMemberSummary(env, who, s, { includeAll = false } = {}) {
   for (const x of current) {
     const allowance = await membershipAllowance(env, x, s, today);
     const bp = billingPeriod(x.start_date, today);
+    const holdNow = holdOn(x, today);
+    const nextHold = liveHolds(x).filter((h) => h.from > today).sort((a, b) => a.from.localeCompare(b.from))[0] || null;
     withAllowance.push({
       ...x, allowance, remaining: allowance.remaining,
+      hold_now: holdNow ? { from: holdNow.from, to: holdNow.to || null } : null,
+      next_hold: nextHold ? { from: nextHold.from, to: nextHold.to } : null,
       used_this_week: await weekCount(x, classWeekStart(today), pAddDays(classWeekStart(today), 6)),
       used_this_month: await weekCount(x, bp.start, bp.end),
     });
@@ -1939,6 +2042,10 @@ async function classMemberSummary(env, who, s, { includeAll = false } = {}) {
     recent,
     recent_attendance: recent,
     memberships: withAllowance,
+    // Ended memberships, newest first: members keep seeing their history.
+    past_memberships: memberships.filter((x) => !current.includes(x))
+      .map((x) => ({ id: x.id, plan_name: x.plan_name || '', start_date: x.start_date || null, end_date: x.end_date || null, status: x.status }))
+      .sort((a, b) => String(b.end_date || '').localeCompare(String(a.end_date || ''))),
     waiver: { required: !!s.waiver_required, signed: waiver.signed, contract_id: waiver.contract_id },
     stats: {
       visits_30d: last30.filter((r) => r.status === 'checked_in').length,
@@ -2932,6 +3039,98 @@ async function runFunction(name, payload, ctx) {
       };
     }
 
+    // Membership holds and end dates (staff only). Holds block booking on
+    // those days, cancel bookings already made then, and push a set end date
+    // back by the hold length so the member doesn't lose paid days.
+    case 'holdMembership':
+    case 'endMembershipHold':
+    case 'cancelMembershipHold':
+    case 'setMembershipEndDate': {
+      if (!isStaff(user)) return { success: false, error: 'Only coaches can change memberships.' };
+      const today = programToday();
+      let m = await getEntityById(env, 'Membership', payload?.membership_id);
+      if (!m) return { success: false, error: 'Membership not found.' };
+      const holds = Array.isArray(m.holds) ? m.holds.map((h) => ({ ...h })) : [];
+      const patch = {};
+      let detail = '';
+      let release = null; // [from, to, reason]
+
+      if (name === 'holdMembership') {
+        const from = payload?.from; const to = payload?.to;
+        const reason = String(payload?.reason || '').trim().slice(0, 200);
+        if (!isDateKey(from) || !isDateKey(to)) return { success: false, error: 'Pick a start and end date for the hold.' };
+        if (to < from) return { success: false, error: 'The hold ends before it starts.' };
+        if (pDaysBetween(from, to) >= 366) return { success: false, error: 'A hold can be one year at most.' };
+        if (to < today) return { success: false, error: 'That hold is already over. Pick dates from today on.' };
+        if (!reason) return { success: false, error: 'Add a reason for the hold.' };
+        if (m.status === 'ended') return { success: false, error: 'This membership has ended.' };
+        if (isDateKey(m.start_date) && from < m.start_date) return { success: false, error: 'The hold starts before the membership does.' };
+        if (isDateKey(m.end_date) && from > m.end_date) return { success: false, error: `The membership ends ${shortDay(m.end_date, today)}, before this hold starts.` };
+        // Older single hold: fold it into the list first.
+        if (m.status === 'on_hold' || isDateKey(m.hold_from)) {
+          if (!isDateKey(m.hold_to)) return { success: false, error: 'Resume the current hold first.' };
+          holds.push({ id: uid(), from: m.hold_from, to: m.hold_to, planned_to: m.hold_to, reason: '', status: 'active', extend_days: 0, legacy: true });
+          Object.assign(patch, { status: 'active', hold_from: null, hold_to: null });
+        }
+        const clash = holds.find((h) => h.status !== 'cancelled' && isDateKey(h.from) && isDateKey(h.to) && h.from <= to && from <= h.to);
+        if (clash) return { success: false, error: `This overlaps another hold (${shortDay(clash.from, today)} to ${shortDay(clash.to, today)}).` };
+        const days = pDaysBetween(from, to) + 1;
+        const extend = payload?.extend_end_date !== false && isDateKey(m.end_date);
+        if (extend) patch.end_date = pAddDays(m.end_date, days);
+        holds.push({
+          id: uid(), from, to, planned_to: to, reason, status: 'active', extend_days: extend ? days : 0,
+          created_by: user.email, created_at: nowISO(),
+        });
+        detail = `hold ${from} to ${to}: ${reason}`;
+        release = [from, to, 'Membership on hold'];
+      } else if (name === 'endMembershipHold' || name === 'cancelMembershipHold') {
+        const h = holds.find((x) => x.id === payload?.hold_id);
+        if (!h || h.status === 'cancelled') return { success: false, error: 'Hold not found.' };
+        const cancel = name === 'cancelMembershipHold' || h.from >= today;
+        let giveBack = 0;
+        if (cancel) {
+          giveBack = numOr(h.extend_days, 0);
+          Object.assign(h, { status: 'cancelled', cancelled_at: nowISO(), cancelled_by: user.email, extend_days: 0 });
+          detail = `hold ${h.from} to ${h.to} cancelled`;
+        } else {
+          if (h.to < today) return { success: false, error: 'This hold is already over.' };
+          const newTo = pAddDays(today, -1);
+          giveBack = Math.min(numOr(h.extend_days, 0), pDaysBetween(newTo, h.to));
+          Object.assign(h, { to: newTo, ended_early_at: nowISO(), ended_by: user.email, extend_days: numOr(h.extend_days, 0) - giveBack });
+          detail = `hold ${h.from} to ${h.planned_to || h.to} ended early, last day ${newTo}`;
+        }
+        if (giveBack > 0 && isDateKey(m.end_date)) patch.end_date = pAddDays(m.end_date, -giveBack);
+      } else {
+        const end = payload?.end_date === null || payload?.end_date === '' ? null : payload?.end_date;
+        if (end !== null && !isDateKey(end)) return { success: false, error: 'Pick an end date.' };
+        if (end && isDateKey(m.start_date) && end < m.start_date) return { success: false, error: 'The end date is before the membership starts.' };
+        patch.end_date = end;
+        patch.end_reason = String(payload?.reason || '').trim().slice(0, 200) || null;
+        patch.end_set_by = user.email;
+        patch.end_set_at = nowISO();
+        if (m.status === 'ended' && (end === null || end >= today)) patch.status = 'active';
+        detail = end ? `end date ${end}${patch.end_reason ? `: ${patch.end_reason}` : ''}` : 'end date removed';
+        if (end) release = [pAddDays(end, 1), null, 'Membership ended'];
+      }
+
+      if (!(await patchMembershipIf(env, m, { ...patch, holds }))) {
+        return { success: false, error: 'This membership just changed. Refresh and try again.', code: 'retry' };
+      }
+      m = await getEntityById(env, 'Membership', m.id);
+      const cancelled = release ? await releaseMembershipBookings(env, m, release[0], release[1], release[2], user) : 0;
+      if (cancelled) {
+        await notifyClassMember(env, {
+          loginId: m.client_user_id, createdBy: user.email,
+          title: name === 'holdMembership' ? 'Membership on hold' : 'Membership end date',
+          message: name === 'holdMembership'
+            ? `Your membership is on hold ${shortDay(release[0], today)} to ${shortDay(release[1], today)}. We cancelled ${cancelled} class${cancelled === 1 ? '' : 'es'} you had booked then.`
+            : `Your membership ends ${shortDay(m.end_date, today)}. We cancelled ${cancelled} class${cancelled === 1 ? '' : 'es'} you had booked after that.`,
+        });
+      }
+      await audit(env, { actor: user.email, action: name, target: 'Membership', targetId: m.id, detail: `${detail}${cancelled ? `; ${cancelled} bookings cancelled` : ''}`, request: null });
+      return { success: true, membership: m, cancelled_bookings: cancelled };
+    }
+
     case 'myClasses': {
       if (!user) return { success: false, error: 'Not logged in' };
       const s = await getGymSettings(env);
@@ -2986,7 +3185,7 @@ async function runFunction(name, payload, ctx) {
       for (let attempt = 0; attempt < 3 && !reservation; attempt++) {
         const pick = await findClassMembership(env, who, session, s);
         if (!pick.membership && !override) {
-          return { success: false, error: staff ? pick.reason.replace(/^You have/, 'This client has') : pick.reason, code: pick.code, ...(staff ? { can_override: true } : {}) };
+          return { success: false, error: staff ? (pick.staffReason || pick.reason.replace(/^You have/, 'This client has')) : pick.reason, code: pick.code, ...(staff ? { can_override: true } : {}) };
         }
         if (!pick.membership) warnings.push('Booked without a covering membership (staff override).');
         const data = {
@@ -3122,7 +3321,7 @@ async function runFunction(name, payload, ctx) {
         // No reservation: book-and-check-in (reservable), open gym, or staff walk-in.
         const pick = await findClassMembership(env, who, session, s);
         if (!pick.membership && !override) {
-          return { success: false, error: staff ? pick.reason.replace(/^You have/, 'This client has') : pick.reason, code: pick.code, ...(staff ? { can_override: true } : {}) };
+          return { success: false, error: staff ? (pick.staffReason || pick.reason.replace(/^You have/, 'This client has')) : pick.reason, code: pick.code, ...(staff ? { can_override: true } : {}) };
         }
         if (!pick.membership) warnings.push('Checked in without a covering membership (staff override).');
         const punch = !!(pick.membership && membershipLimit(pick.membership)?.period === 'total');
