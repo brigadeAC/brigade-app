@@ -40,6 +40,7 @@ import {
 } from "lucide-react";
 import { Dumbbell } from "lucide-react"; // Phase 3 editor
 import { Wallet, Tag } from "lucide-react"; // Phase 4: SALES
+import { CalendarRange, CalendarOff } from "lucide-react"; // Scheduling: BOARD
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
@@ -79,6 +80,13 @@ const navGroups = [
       { name: "Movement Library", icon: Library, page: "MovementLibrary" },
       { name: "Leaderboard", icon: Trophy, page: "Leaderboard" },
       { name: "Ask Brigade", icon: Sparkles, page: "AskBrigade" }
+    ]
+  },
+  {
+    title: "Schedule",
+    items: [
+      { name: "Schedule board", icon: CalendarRange, page: "ScheduleBoard", perm: "coach_schedule.manage" }, // Scheduling: BOARD
+      { name: "Time off requests", icon: CalendarOff, page: "TimeOffInbox", perm: "coach_schedule.manage" }, // Scheduling: BOARD
     ]
   },
   {
@@ -152,6 +160,13 @@ const adminNavGroups = [
       { name: 'Movement Library', icon: Library, page: 'MovementLibrary' },
       { name: 'Leaderboard', icon: Trophy, page: 'Leaderboard' },
       { name: 'Ask Brigade', icon: Sparkles, page: 'AskBrigade' },
+    ]
+  },
+  {
+    title: 'Schedule',
+    items: [
+      { name: 'Schedule board', icon: CalendarRange, page: 'ScheduleBoard', perm: 'coach_schedule.manage' }, // Scheduling: BOARD
+      { name: 'Time off requests', icon: CalendarOff, page: 'TimeOffInbox', perm: 'coach_schedule.manage' }, // Scheduling: BOARD
     ]
   },
   {

@@ -314,6 +314,7 @@ const RIGHTS = [
   { key: 'classes.run', label: 'Run classes', hint: 'Rosters, check-in, book people in' },
   { key: 'classes.edit', label: 'Change a single class', hint: 'Time, coach, capacity, or cancel it' },
   { key: 'schedule.manage', label: 'Set up the class schedule', hint: 'Class types, weekly times, holiday closures' },
+  { key: 'coach_schedule.manage', label: 'Manage coach schedules', hint: 'Build and publish the coaching schedule, approve time off' },
   { key: 'members.invite', label: 'Invite members', hint: 'Send join links to members' },
   { key: 'members.manage', label: 'Manage memberships', hint: 'Plans, holds and end dates' },
   { key: 'guardians.manage', label: 'Link parents and children', hint: 'Who can book for a child' },
@@ -327,7 +328,7 @@ const RIGHT_KEYS = new Set(RIGHTS.map((r) => r.key));
 const ADMIN_ONLY_RIGHTS = ['staff.manage']; // invite staff, change roles: never grantable
 const DEFAULT_ROLES = {
   coach: { name: 'Coach', builtin: true, rights: ['classes.run', 'classes.edit', 'members.invite', 'programs.manage'] },
-  manager: { name: 'Manager', builtin: true, rights: ['classes.run', 'classes.edit', 'schedule.manage', 'members.invite', 'members.manage', 'guardians.manage', 'members.coaching_all', 'programs.manage', 'reports.view', 'settings.manage', 'billing.view'] },
+  manager: { name: 'Manager', builtin: true, rights: ['classes.run', 'classes.edit', 'schedule.manage', 'coach_schedule.manage', 'members.invite', 'members.manage', 'guardians.manage', 'members.coaching_all', 'programs.manage', 'reports.view', 'settings.manage', 'billing.view'] },
 };
 const ALL_PERMISSIONS = [...RIGHT_KEYS, ...ADMIN_ONLY_RIGHTS].sort();
 async function loadRoles(env) {
@@ -3728,6 +3729,274 @@ async function runSalesFunction(name, payload, ctx) {
 }
 // ===== end Phase 4: SALES =====
 
+// ===== Scheduling: BOARD =====
+// Manager side of coach scheduling: the weekly board, shifts, publish, and the
+// time off inbox. Everything here needs the right coach_schedule.manage.
+const BOARD_PERM = 'coach_schedule.manage';
+// Same blocks as CORE's AVAILABILITY_BLOCKS (early 5–11, midday 11–16, evening 16–21).
+const BOARD_BLOCKS = { early: ['05:00', '11:00'], midday: ['11:00', '16:00'], evening: ['16:00', '21:00'] };
+const BOARD_HM = /^([01]\d|2[0-3]):[0-5]\d$/;
+const boardOverlap = (aS, aE, bS, bE) => hmToMin(aS) < hmToMin(bE) && hmToMin(bS) < hmToMin(aE);
+const boardWeek = (k) => classWeekStart(isDateKey(k) ? k : programToday());
+const boardWeekLabel = (k) => new Date(keyToUTC(k)).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric' });
+const boardEnd = (start, minutes) => minToHm(Math.min(hmToMin(start) + (Number(minutes) || 60), 1439));
+
+async function boardStaff(env) {
+  const { results } = await env.DB.prepare('SELECT * FROM users ORDER BY full_name').all();
+  return results.map(userRow).map((u) => ({ ...u, role: resolveRole(env, u.email, u.role) }))
+    .filter(isStaff).map((u) => ({ id: u.id, name: u.full_name || u.email }));
+}
+
+// Time off that touches `date` (and the time window, for part-day requests).
+const boardOffCovers = (t, date, start = null, end = null) => t.start_date <= date && t.end_date >= date
+  && (!t.part_day || !start || boardOverlap(t.part_day.start, t.part_day.end, start, end));
+
+// Is [start,end] inside the coach's available blocks that day? null = no row on file.
+function boardAvailable(avail, start, end) {
+  if (!avail) return null;
+  let t = hmToMin(start);
+  const stop = hmToMin(end);
+  const spans = Object.entries(BOARD_BLOCKS).filter(([k]) => avail.blocks?.[k]).map(([, s]) => s.map(hmToMin)).sort((a, b) => a[0] - b[0]);
+  for (const [s, e] of spans) if (s <= t && e > t) t = e;
+  return t >= stop;
+}
+
+async function boardRange(env, from, to) {
+  const inRange = `json_extract(data,'$.date') BETWEEN ? AND ?`;
+  const [shifts, sessions, pt, avail, off] = await Promise.all([
+    selectEntities(env, 'StaffShift', inRange, [from, to]),
+    selectEntities(env, 'ClassSession', `${inRange} AND json_extract(data,'$.status') = 'scheduled' AND COALESCE(json_extract(data,'$.auto_cancelled'),0) = 0`, [from, to]),
+    selectEntities(env, 'Session', `${inRange} AND json_extract(data,'$.trainer_id') IS NOT NULL AND COALESCE(json_extract(data,'$.status'),'') NOT IN ('cancelled','canceled')`, [from, to]),
+    selectEntities(env, 'Availability', inRange, [from, to]),
+    selectEntities(env, 'TimeOffRequest', `json_extract(data,'$.status') IN ('pending','approved') AND json_extract(data,'$.start_date') <= ? AND json_extract(data,'$.end_date') >= ?`, [to, from]),
+  ]);
+  const classes = sessions.map((s) => ({
+    id: s.id, date: s.date, start: s.start_time, end: boardEnd(s.start_time, s.duration_min),
+    title: s.class_type_name || 'Class', color: s.color || null,
+    coach_user_id: s.coach_user_id || null, coach_name: s.coach_name || '', reserved_count: s.reserved_count || 0,
+    needs_coach: !s.coach_user_id,
+  })).sort((a, b) => (a.date + a.start).localeCompare(b.date + b.start));
+  const ptOut = pt.filter((p) => BOARD_HM.test(String(p.start_time || ''))).map((p) => ({
+    id: p.id, date: p.date, start: p.start_time, end: boardEnd(p.start_time, p.duration || p.duration_min),
+    trainer_id: p.trainer_id, title: String(p.type || 'PT session').replace(/_/g, ' '), status: p.status || 'scheduled',
+  }));
+  const availability = {};
+  for (const a of avail) (availability[a.user_id] ||= {})[a.date] = { blocks: a.blocks || {}, note: a.note || '' };
+  const shiftOut = shifts.map((s) => ({ id: s.id, user_id: s.user_id, user_name: s.user_name, date: s.date, start: s.start, end: s.end, role_label: s.role_label || '', note: s.note || '', status: s.status || 'draft' }))
+    .sort((a, b) => (a.date + a.start).localeCompare(b.date + b.start));
+  const timeOff = off.map((t) => ({ id: t.id, user_id: t.user_id, user_name: t.user_name, start_date: t.start_date, end_date: t.end_date, part_day: t.part_day || null, reason: t.reason || '', status: t.status }));
+  return { shifts: shiftOut, classes, pt: ptOut, availability, time_off: timeOff };
+}
+
+// Is this person already busy (shift, class or PT) at that time?
+const boardBusy = (r, userId, date, start, end, skipId = null) =>
+  r.shifts.some((s) => s.user_id === userId && s.date === date && s.id !== skipId && boardOverlap(s.start, s.end, start, end))
+  || r.classes.some((c) => c.coach_user_id === userId && c.date === date && c.id !== skipId && boardOverlap(c.start, c.end, start, end))
+  || r.pt.some((p) => p.trainer_id === userId && p.date === date && boardOverlap(p.start, p.end, start, end));
+
+// stub: owned by REMIND — notifyScheduleChange(env, userIds, { title, message }) replaces this fallback.
+async function boardNotify(env, userIds, { title, message }, createdBy) {
+  const ids = [...new Set(userIds.filter(Boolean))];
+  if (!ids.length) return 0;
+  if (typeof notifyScheduleChange === 'function') {
+    await notifyScheduleChange(env, ids, { title, message }); // eslint-disable-line no-undef
+    return ids.length;
+  }
+  for (const id of ids) {
+    await insertEntity(env, 'Notification', { user_id: id, type: 'schedule', title, message, link: '/MySchedule', read: false }, createdBy);
+    const p = sendPushToUser(env, id, { title, body: String(message).slice(0, 140), url: '/MySchedule', tag: 'schedule' });
+    if (env.__waitUntil) env.__waitUntil(p); else await p;
+  }
+  return ids.length;
+}
+
+async function boardWeekState(env, weekStart) {
+  return (await selectEntities(env, 'ScheduleWeek', `json_extract(data,'$.week_start') = ?`, [weekStart]))[0] || null;
+}
+
+async function boardShiftWarnings(env, r, f, skipId) {
+  const warnings = [];
+  const off = r.time_off.find((t) => t.user_id === f.user_id && t.status === 'approved' && boardOffCovers(t, f.date, f.start, f.end));
+  if (off) warnings.push(`${f.user_name} has approved time off then.`);
+  const ok = boardAvailable(r.availability[f.user_id]?.[f.date], f.start, f.end);
+  if (ok === false) warnings.push(`This is outside ${f.user_name}'s availability.`);
+  if (boardBusy(r, f.user_id, f.date, f.start, f.end, skipId)) warnings.push(`${f.user_name} is already working then.`);
+  return warnings;
+}
+
+async function runScheduleBoardFunction(name, payload, ctx) {
+  const { env, user } = ctx;
+  if (!user) return { success: false, error: 'Not logged in' };
+  if (!isStaff(user) || !can(user, BOARD_PERM)) return NO_PERMISSION;
+  const p = payload || {};
+  switch (name) {
+    case 'scheduleBoard': {
+      const week = boardWeek(p.week_start);
+      const days = Array.from({ length: 7 }, (_, i) => pAddDays(week, i));
+      const [r, coaches, state, pending] = await Promise.all([
+        boardRange(env, days[0], days[6]), boardStaff(env), boardWeekState(env, week),
+        selectEntities(env, 'TimeOffRequest', `json_extract(data,'$.status') = 'pending'`),
+      ]);
+      return {
+        success: true, week_start: week, days, coaches,
+        status: state?.status || 'draft', published_at: state?.published_at || null,
+        ...r,
+        counts: {
+          needs_coach: r.classes.filter((c) => c.needs_coach).length,
+          pending_time_off: pending.length,
+          drafts: r.shifts.filter((s) => s.status !== 'published').length,
+        },
+      };
+    }
+
+    case 'saveShift': {
+      const existing = p.id ? await getEntityById(env, 'StaffShift', p.id) : null;
+      if (p.id && !existing) return { success: false, error: 'Shift not found.' };
+      const who = await staffLogin(env, p.user_id || existing?.user_id);
+      if (!who) return { success: false, error: 'Pick someone from the team.' };
+      const date = p.date ?? existing?.date;
+      const start = p.start ?? existing?.start;
+      const end = p.end ?? existing?.end;
+      if (!isDateKey(date)) return { success: false, error: 'Pick a date.' };
+      if (!BOARD_HM.test(String(start)) || !BOARD_HM.test(String(end))) return { success: false, error: 'Pick a start and end time.' };
+      if (hmToMin(end) <= hmToMin(start)) return { success: false, error: 'The shift has to end after it starts.' };
+      const fields = {
+        user_id: who.id, user_name: who.full_name || who.email, date, start, end,
+        role_label: String(p.role_label ?? existing?.role_label ?? 'Coach').trim().slice(0, 40) || 'Coach',
+        note: String(p.note ?? existing?.note ?? '').trim().slice(0, 300),
+        status: 'draft', // stays a draft until the week is published (again)
+      };
+      const r = await boardRange(env, date, date);
+      const warnings = await boardShiftWarnings(env, r, fields, existing?.id);
+      const shift = existing
+        ? await patchEntity(env, existing, { ...fields, updated_by: user.id })
+        : await insertEntity(env, 'StaffShift', { ...fields, created_by_id: user.id }, user.email);
+      await audit(env, { actor: user.email, action: existing ? 'update' : 'create', target: 'StaffShift', targetId: shift.id, detail: `${fields.user_name} ${date} ${start}-${end} ${fields.role_label}`, request: null });
+      return { success: true, shift, warnings };
+    }
+
+    case 'deleteShift': {
+      const shift = await getEntityById(env, 'StaffShift', p.id);
+      if (!shift) return { success: false, error: 'Shift not found.' };
+      await env.DB.prepare('DELETE FROM entities WHERE id = ? AND entity_type = ?').bind(shift.id, 'StaffShift').run();
+      await audit(env, { actor: user.email, action: 'delete', target: 'StaffShift', targetId: shift.id, detail: `${shift.user_name} ${shift.date} ${shift.start}-${shift.end}`, request: null });
+      // A coach could already see a published shift: tell them it's gone.
+      if (shift.status === 'published' && shift.date >= programToday()) {
+        await boardNotify(env, [shift.user_id], { title: 'Shift removed', message: `Your shift on ${boardWeekLabel(shift.date)} (${shift.start}–${shift.end}) was removed.` }, user.email);
+      }
+      return { success: true };
+    }
+
+    case 'assignClassCoach': {
+      // The one coach-change path: editClassSession patches, audits and notifies.
+      return editClassSession(env, user, { session_id: p.session_id, coach_user_id: p.coach_user_id || null });
+    }
+
+    case 'copyScheduleWeek': {
+      const fromWeek = boardWeek(p.from_week);
+      const toWeek = isDateKey(p.to_week) ? boardWeek(p.to_week) : pAddDays(fromWeek, 7);
+      if (fromWeek === toWeek) return { success: false, error: 'Pick a different week to copy to.' };
+      const offset = pDaysBetween(fromWeek, toWeek);
+      const src = await boardRange(env, fromWeek, pAddDays(fromWeek, 6));
+      const dst = await boardRange(env, toWeek, pAddDays(toWeek, 6));
+      const created = []; const skipped = [];
+      for (const s of src.shifts) {
+        const date = pAddDays(s.date, offset);
+        if (dst.time_off.some((t) => t.user_id === s.user_id && t.status === 'approved' && boardOffCovers(t, date, s.start, s.end))) {
+          skipped.push({ user_name: s.user_name, date, reason: 'time off' }); continue;
+        }
+        if (dst.shifts.some((d) => d.user_id === s.user_id && d.date === date && d.start === s.start && d.end === s.end)) {
+          skipped.push({ user_name: s.user_name, date, reason: 'already there' }); continue;
+        }
+        created.push(await insertEntity(env, 'StaffShift', {
+          user_id: s.user_id, user_name: s.user_name, date, start: s.start, end: s.end,
+          role_label: s.role_label, note: s.note, status: 'draft', created_by_id: user.id,
+        }, user.email));
+      }
+      await audit(env, { actor: user.email, action: 'create', target: 'StaffShift', targetId: toWeek, detail: `copied week ${fromWeek} to ${toWeek}: ${created.length} shifts, ${skipped.length} skipped`, request: null });
+      return { success: true, week_start: toWeek, created: created.length, skipped };
+    }
+
+    case 'publishSchedule': {
+      const week = boardWeek(p.week_start);
+      const shifts = await selectEntities(env, 'StaffShift', `json_extract(data,'$.date') BETWEEN ? AND ?`, [week, pAddDays(week, 6)]);
+      const drafts = shifts.filter((s) => s.status !== 'published');
+      for (const s of drafts) await patchEntity(env, s, { status: 'published' });
+      const state = await boardWeekState(env, week);
+      const was = state?.status === 'published';
+      const fields = { week_start: week, status: 'published', published_at: nowISO(), published_by: user.id };
+      if (state) await patchEntity(env, state, fields); else await insertEntity(env, 'ScheduleWeek', fields, user.email);
+      const label = boardWeekLabel(week);
+      const notified = await boardNotify(env, shifts.map((s) => s.user_id), was
+        ? { title: 'Schedule updated', message: `Your schedule for the week of ${label} changed. Take a look.` }
+        : { title: 'Your schedule is out', message: `Your schedule for the week of ${label} is out.` }, user.email);
+      await audit(env, { actor: user.email, action: 'update', target: 'ScheduleWeek', targetId: week, detail: `published week ${week}: ${drafts.length} changes, ${notified} notified`, request: null });
+      return { success: true, week_start: week, published: drafts.length, notified };
+    }
+
+    case 'timeOffInbox': {
+      const all = await selectEntities(env, 'TimeOffRequest');
+      const want = p.status === 'history' ? (t) => t.status !== 'pending' : p.status ? (t) => t.status === p.status : () => true;
+      const list = all.filter(want).sort((a, b) => (a.status === 'pending' ? 0 : 1) - (b.status === 'pending' ? 0 : 1)
+        || (a.status === 'pending' ? a.start_date.localeCompare(b.start_date) : String(b.decided_at || b.created_date).localeCompare(String(a.decided_at || a.created_date))))
+        .slice(0, 200);
+      const staff = await boardStaff(env);
+      const requests = [];
+      for (const t of list) {
+        const live = t.status === 'pending' || t.status === 'approved';
+        let affected = Array.isArray(t.affected) ? t.affected : [];
+        let r = null;
+        if (live && t.start_date && t.end_date && pDaysBetween(t.start_date, t.end_date) <= 62) {
+          r = await boardRange(env, t.start_date, t.end_date);
+          const hit = (date, start, end) => boardOffCovers(t, date, start, end);
+          affected = [
+            ...r.classes.filter((c) => c.coach_user_id === t.user_id && hit(c.date, c.start, c.end)).map((c) => ({ kind: 'class', id: c.id, date: c.date, label: c.title, time: c.start, end: c.end })),
+            ...r.shifts.filter((s) => s.user_id === t.user_id && hit(s.date, s.start, s.end)).map((s) => ({ kind: 'shift', id: s.id, date: s.date, label: s.role_label || 'Shift', time: s.start, end: s.end })),
+            ...r.pt.filter((x) => x.trainer_id === t.user_id && hit(x.date, x.start, x.end)).map((x) => ({ kind: 'pt', id: x.id, date: x.date, label: x.title, time: x.start, end: x.end })),
+          ].sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+        }
+        const out = { ...t, affected };
+        if (r) {
+          out.affected = affected.map((a) => {
+            if (a.kind === 'pt' || !a.end) return a;
+            const cover = staff.filter((s) => s.id !== t.user_id
+              && boardAvailable(r.availability[s.id]?.[a.date], a.time, a.end) === true
+              && !r.time_off.some((o) => o.user_id === s.id && boardOffCovers(o, a.date, a.time, a.end))
+              && !boardBusy(r, s.id, a.date, a.time, a.end));
+            return { ...a, cover_suggestions: cover };
+          });
+        }
+        requests.push(out);
+      }
+      return { success: true, requests };
+    }
+
+    case 'decideTimeOff': {
+      const t = await getEntityById(env, 'TimeOffRequest', p.id);
+      if (!t) return { success: false, error: 'Request not found.' };
+      if (t.status !== 'pending') return { success: false, error: `This request is already ${t.status}.` };
+      const approve = p.approve === true;
+      const note = String(p.note || '').trim().slice(0, 300);
+      const res = await env.DB.prepare(
+        `UPDATE entities SET data = json_set(data, '$.status', ?, '$.decided_by', ?, '$.decided_at', ?, '$.decision_note', ?), updated_date = ?
+         WHERE id = ? AND entity_type = 'TimeOffRequest' AND json_extract(data,'$.status') = 'pending'`
+      ).bind(approve ? 'approved' : 'declined', user.id, nowISO(), note, nowISO(), t.id).run();
+      if (!res?.meta?.changes) return { success: false, error: 'This request just changed. Refresh and try again.' };
+      const when = t.start_date === t.end_date ? boardWeekLabel(t.start_date) : `${boardWeekLabel(t.start_date)}–${boardWeekLabel(t.end_date)}`;
+      await boardNotify(env, [t.user_id], {
+        title: approve ? 'Time off approved' : 'Time off declined',
+        message: `Your time off for ${when} was ${approve ? 'approved' : 'declined'}.${note ? ` Note: ${note}` : ''}`,
+      }, user.email);
+      await audit(env, { actor: user.email, action: 'update', target: 'TimeOffRequest', targetId: t.id, detail: `${approve ? 'approved' : 'declined'} time off for ${t.user_name || t.user_id} ${t.start_date}..${t.end_date}`, request: null });
+      return { success: true, request: await getEntityById(env, 'TimeOffRequest', t.id) };
+    }
+
+    default:
+      return { success: false, error: 'Unknown function.' };
+  }
+}
+// ===== end Scheduling: BOARD =====
+
 const PUBLIC_FUNCTIONS = new Set(['getAppLogo', 'submitContact',
   'publicPlans', 'publicCheckout', // Phase 4: SALES
 ]);
@@ -5218,6 +5487,11 @@ async function runFunction(name, payload, ctx) {
     case 'billingDashboard': case 'exportPaymentsCsv':
       return runSalesFunction(name, payload, ctx);
     // ===== end Phase 4: SALES (cases) =====
+    // ===== Scheduling: BOARD (cases) =====
+    case 'scheduleBoard': case 'saveShift': case 'deleteShift': case 'assignClassCoach': case 'copyScheduleWeek':
+    case 'publishSchedule': case 'timeOffInbox': case 'decideTimeOff':
+      return runScheduleBoardFunction(name, payload, ctx);
+    // ===== end Scheduling: BOARD (cases) =====
 
     // Content browse helpers — empty until curated content sources are added.
     // Phase 3: MEMBER (scores, leaderboard, streak)
