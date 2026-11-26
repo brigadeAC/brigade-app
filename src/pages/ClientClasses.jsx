@@ -83,7 +83,7 @@ export default function ClientClasses() {
         </Link>
         <h1 className="text-2xl font-bold text-foreground">Classes</h1>
         {children.length > 0 && <PersonSwitcher people={children} value={forId} onChange={setPersonId} />}
-        {my.memberships && <div className="mt-1"><MembershipLines memberships={my.memberships} /></div>}
+        {my.memberships && <div className="mt-1"><MembershipLines memberships={my.memberships} past={my.pastMemberships} today={today} /></div>}
       </div>
 
       <div className="glass-card p-4 space-y-3">

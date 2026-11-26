@@ -290,6 +290,104 @@ test('waiver: required when on, accepted once signed', async () => {
   await api.update('GymSettings', gs.id, { waiver_required: false }, coach.token);
 });
 
+/* ---------------- holds and end dates ---------------- */
+const membershipOf = async (m) => (await api.list('Membership', coach.token)).find((x) => x.client_id === m.client.id);
+const hold = (mem, from, to, extra = {}) => api.fn('holdMembership', { membership_id: mem.id, from, to, reason: 'Knee injury', ...extra }, coach.token);
+test('hold: blocks booking on those days, cancels bookings then, members cannot set one', async () => {
+  const m = await addMember('holder');
+  const today = eastern().date;
+  const inHold = await makeClass(30);
+  const booked = await book(m, inHold);
+  assert.equal(booked.success, true);
+  const mem = await membershipOf(m);
+  // Members can't hold or end their own membership.
+  for (const n of ['holdMembership', 'setMembershipEndDate']) {
+    assert.equal((await api.fn(n, { membership_id: mem.id, from: today, to: addDays(today, 3), reason: 'x', end_date: today }, m.token)).success, false);
+  }
+  assert.equal((await hold(mem, today, addDays(today, 3), { reason: '' })).success, false, 'reason needed');
+  assert.equal((await hold(mem, addDays(today, 3), today)).success, false, 'backwards dates');
+  const h = await hold(mem, today, addDays(today, 3));
+  assert.equal(h.success, true, h.error);
+  assert.equal(h.cancelled_bookings, 1);
+  assert.equal((await hold(mem, addDays(today, 2), addDays(today, 5))).success, false, 'overlap');
+  assert.equal((await roster(inHold)).session.reserved_count, 0);
+  const r = await book(m, await makeClass(26));
+  assert.equal(r.code, 'on_hold');
+  assert.match(r.error, /^Your membership is on hold until [A-Z][a-z]{2} \d{1,2}\.$/);
+  const staff = await api.fn('bookClass', { session_id: inHold.id, client_id: m.client.id }, coach.token);
+  assert.match(staff.error, /^This client's membership is on hold until/);
+  assert.equal((await book(m, await makeClass(24 * 5))).success, true, 'after the hold');
+  const mine = await api.fn('myClasses', {}, m.token);
+  assert.deepEqual(mine.memberships[0].hold_now, { from: today, to: addDays(today, 3) });
+  const log = (await api.call('GET', 'audit?limit=50', undefined, admin.token)).data;
+  assert.ok(log.some((x) => x.action === 'holdMembership' && x.target_id === mem.id && /Knee injury/.test(x.detail)));
+});
+test('hold: ending early lets them book again, cancelling removes it, end date moves with it', async () => {
+  const today = eastern().date;
+  const m = await addMember('traveler', { membership: { end_date: addDays(today, 60) } });
+  let mem = await membershipOf(m);
+  // Started two days ago (recorded late), runs to day 9.
+  assert.equal((await hold(mem, addDays(today, -2), addDays(today, 9), { reason: 'Travel' })).success, true);
+  mem = await membershipOf(m);
+  assert.equal(mem.end_date, addDays(today, 72), 'pushed back 12 days');
+  assert.equal((await book(m, await makeClass(30))).code, 'on_hold');
+  const e = await api.fn('endMembershipHold', { membership_id: mem.id, hold_id: mem.holds[0].id }, coach.token);
+  assert.equal(e.success, true, e.error);
+  assert.equal(e.membership.holds[0].to, addDays(today, -1));
+  assert.equal(e.membership.end_date, addDays(today, 62), 'unused hold days given back');
+  assert.equal((await book(m, await makeClass(30))).success, true);
+  // A future hold, then cancelled: kept as history, no longer blocks.
+  mem = await membershipOf(m);
+  assert.equal((await hold(mem, addDays(today, 20), addDays(today, 24))).success, true);
+  mem = await membershipOf(m);
+  assert.equal(mem.end_date, addDays(today, 67));
+  const fut = mem.holds.find((x) => x.status === 'active' && x.from > today);
+  const c = await api.fn('cancelMembershipHold', { membership_id: mem.id, hold_id: fut.id }, coach.token);
+  assert.equal(c.success, true, c.error);
+  assert.equal(c.membership.end_date, addDays(today, 62));
+  assert.equal(c.membership.holds.length, 2, 'history kept');
+  assert.equal(c.membership.holds.find((x) => x.id === fut.id).status, 'cancelled');
+});
+test('hold days do not count against a weekly limit', async () => {
+  const plan = await api.create('MembershipPlan', { name: 'One a week (hold)', kind: 'limited', limit_count: 1, limit_period: 'week', class_type_ids: [], is_active: true }, coach.token);
+  const m = await addMember('weekly', { plan });
+  const s = await makeClass(30);
+  assert.equal((await book(m, s)).success, true);
+  const mem = await membershipOf(m);
+  const h = await hold(mem, s.date, s.date);
+  assert.equal(h.success, true, h.error);
+  await api.fn('cancelMembershipHold', { membership_id: mem.id, hold_id: h.membership.holds[0].id }, coach.token);
+  // The booking the hold cancelled no longer uses up the week.
+  assert.equal((await book(m, await makeClass(30))).success, true);
+});
+test('end date: no booking after it, history stays', async () => {
+  const m = await addMember('leaver');
+  const today = eastern().date;
+  const before = await makeClass(3);
+  assert.equal((await book(m, before)).success, true);
+  const later = await makeClass(24 * 4);
+  assert.equal((await book(m, later)).success, true);
+  const mem = await membershipOf(m);
+  assert.equal((await api.fn('setMembershipEndDate', { membership_id: mem.id, end_date: addDays(mem.start_date, -1) }, coach.token)).success, false);
+  const e = await api.fn('setMembershipEndDate', { membership_id: mem.id, end_date: addDays(today, 1), reason: 'Moving away' }, coach.token);
+  assert.equal(e.success, true, e.error);
+  assert.equal(e.cancelled_bookings, 1, 'only the class after the end date');
+  const r = await book(m, await makeClass(24 * 5));
+  assert.equal(r.code, 'membership_ended');
+  assert.match(r.error, /^Your membership ends [A-Z][a-z]{2} \d{1,2}, so you can't book classes after that\.$/);
+  // Past the end date: still signed in, still sees their records.
+  await api.fn('setMembershipEndDate', { membership_id: mem.id, end_date: addDays(today, -1) }, coach.token);
+  const mine = await api.fn('myClasses', {}, m.token);
+  assert.equal(mine.success, true);
+  assert.equal(mine.memberships.length, 0);
+  assert.equal(mine.past_memberships[0].end_date, addDays(today, -1));
+  assert.ok((await api.list('Reservation', m.token)).length >= 2, 'bookings kept');
+  assert.match((await book(m, await makeClass(30))).error, /^Your membership ended/);
+  // Clearing the end date brings it back.
+  assert.equal((await api.fn('setMembershipEndDate', { membership_id: mem.id, end_date: null }, coach.token)).success, true);
+  assert.equal((await book(m, await makeClass(30))).success, true);
+});
+
 /* ---------------- check-in ---------------- */
 test('self check-in opens 30 minutes before class', async () => {
   assert.equal((await api.fn('checkIn', { session_id: (await makeClass(2)).id }, members.alice.token)).code, 'checkin_not_open');
