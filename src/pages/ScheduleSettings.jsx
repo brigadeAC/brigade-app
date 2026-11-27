@@ -62,7 +62,7 @@ function Reminders() {
         <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
       ) : (
         <ul className="divide-y divide-border">
-          {KINDS.map((k) => {
+          {KINDS.filter((k) => k.key !== "shifts" || data?.shifts_enabled).map((k) => {
             const on = prefs[k.key] !== null && prefs[k.key] !== undefined;
             return (
               <li key={k.key} className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
@@ -120,7 +120,7 @@ function CalendarFeed() {
   };
 
   return (
-    <Section icon={CalendarPlus} title="Add to my calendar" note="Your shifts, classes, PT and time off show up in your phone's calendar and update on their own.">
+    <Section icon={CalendarPlus} title="Add to my calendar" note="Your classes, PT and time off show up in your phone's calendar and update on their own.">
       {!link ? (
         <Button onClick={show} disabled={busy} className="gap-1.5">
           {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <CalendarPlus className="w-4 h-4" />} Get my calendar link

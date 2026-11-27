@@ -79,7 +79,7 @@ export default function MySchedule() {
     <div className="space-y-4 pb-8 max-w-2xl">
       <div>
         <h1 className="text-2xl font-bold text-foreground">My schedule</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">Your shifts, classes and client sessions.</p>
+        <p className="text-sm text-muted-foreground mt-0.5">{data?.shifts_enabled ? "Your shifts, classes and client sessions." : "The classes you coach and your client sessions."}</p>
       </div>
 
       <div className="flex flex-wrap gap-2">

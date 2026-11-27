@@ -3741,6 +3741,11 @@ async function runSalesFunction(name, payload, ctx) {
 // entity-API writes need coach_schedule.manage. Reads are scoped below.
 const SCHED_TYPES = new Set(['StaffShift', 'Availability', 'TimeOffRequest', 'ScheduleWeek']);
 for (const t of SCHED_TYPES) STAFF_WRITE_TYPES.add(t);
+// Shifts are switched off for now (the gym schedules classes, not hours).
+// Set SCHEDULE_SHIFTS=on to bring them back; the code and data stay.
+const shiftsOn = (env) => env.SCHEDULE_SHIFTS === 'on';
+const shiftRows = (env, where, binds) => (shiftsOn(env) ? selectEntities(env, 'StaffShift', where, binds) : Promise.resolve([]));
+const SHIFTS_OFF = { success: false, error: 'Shifts are turned off.' };
 const AVAILABILITY_BLOCKS = {
   early: { label: 'Early', start: '05:00', end: '11:00' },
   midday: { label: 'Midday', start: '11:00', end: '16:00' },
@@ -3803,7 +3808,7 @@ function schedRange(p, defFrom, defTo) {
 // Everything one coach works in a date range (published shifts, coached
 // classes, PT sessions), as schedule items.
 async function schedWorkItems(env, userId, from, to) {
-  const shifts = await selectEntities(env, 'StaffShift',
+  const shifts = await shiftRows(env,
     `json_extract(data,'$.user_id') = ? AND json_extract(data,'$.date') BETWEEN ? AND ? AND json_extract(data,'$.status') = 'published'`, [userId, from, to]);
   const classes = await selectEntities(env, 'ClassSession',
     `json_extract(data,'$.coach_user_id') = ? AND json_extract(data,'$.date') BETWEEN ? AND ? AND COALESCE(json_extract(data,'$.status'),'scheduled') = 'scheduled'`, [userId, from, to]);
@@ -3939,7 +3944,7 @@ async function runSchedCoreFunction(name, p, { env, user }) {
         }
       }
       items.sort((a, b) => (a.date + (a.start || '')).localeCompare(b.date + (b.start || '')));
-      return { success: true, user_id: target.id, from: r.from, to: r.to, items, hours_total: schedHours(items), time_off: offs.map(timeOffPublic) };
+      return { success: true, user_id: target.id, from: r.from, to: r.to, items, hours_total: schedHours(items), shifts_enabled: shiftsOn(env), time_off: offs.map(timeOffPublic) };
     }
 
     case 'myAvailability': {
@@ -4078,7 +4083,7 @@ function boardAvailable(avail, start, end) {
 async function boardRange(env, from, to) {
   const inRange = `json_extract(data,'$.date') BETWEEN ? AND ?`;
   const [shifts, sessions, pt, avail, off] = await Promise.all([
-    selectEntities(env, 'StaffShift', inRange, [from, to]),
+    shiftRows(env, inRange, [from, to]),
     selectEntities(env, 'ClassSession', `${inRange} AND json_extract(data,'$.status') = 'scheduled' AND COALESCE(json_extract(data,'$.auto_cancelled'),0) = 0`, [from, to]),
     selectEntities(env, 'Session', `${inRange} AND json_extract(data,'$.trainer_id') IS NOT NULL AND COALESCE(json_extract(data,'$.status'),'') NOT IN ('cancelled','canceled')`, [from, to]),
     selectEntities(env, 'Availability', inRange, [from, to]),
@@ -4143,7 +4148,7 @@ async function runScheduleBoardFunction(name, payload, ctx) {
         selectEntities(env, 'TimeOffRequest', `json_extract(data,'$.status') = 'pending'`),
       ]);
       return {
-        success: true, week_start: week, days, coaches,
+        success: true, week_start: week, days, coaches, shifts_enabled: shiftsOn(env),
         status: state?.status || 'draft', published_at: state?.published_at || null,
         ...r,
         counts: {
@@ -4155,6 +4160,7 @@ async function runScheduleBoardFunction(name, payload, ctx) {
     }
 
     case 'saveShift': {
+      if (!shiftsOn(env)) return SHIFTS_OFF;
       const existing = p.id ? await getEntityById(env, 'StaffShift', p.id) : null;
       if (p.id && !existing) return { success: false, error: 'Shift not found.' };
       const who = await staffLogin(env, p.user_id || existing?.user_id);
@@ -4216,6 +4222,7 @@ async function runScheduleBoardFunction(name, payload, ctx) {
     }
 
     case 'copyScheduleWeek': {
+      if (!shiftsOn(env)) return SHIFTS_OFF;
       const fromWeek = boardWeek(p.from_week);
       const toWeek = isDateKey(p.to_week) ? boardWeek(p.to_week) : pAddDays(fromWeek, 7);
       if (fromWeek === toWeek) return { success: false, error: 'Pick a different week to copy to.' };
@@ -4241,8 +4248,9 @@ async function runScheduleBoardFunction(name, payload, ctx) {
     }
 
     case 'publishSchedule': {
+      if (!shiftsOn(env)) return SHIFTS_OFF;
       const week = boardWeek(p.week_start);
-      const shifts = await selectEntities(env, 'StaffShift', `json_extract(data,'$.date') BETWEEN ? AND ?`, [week, pAddDays(week, 6)]);
+      const shifts = await shiftRows(env, `json_extract(data,'$.date') BETWEEN ? AND ?`, [week, pAddDays(week, 6)]);
       const drafts = shifts.filter((s) => s.status !== 'published');
       for (const s of drafts) await patchEntity(env, s, { status: 'published' });
       const state = await boardWeekState(env, week);
@@ -4438,7 +4446,7 @@ async function runScheduleReminders(env, nowMs = Date.now()) {
   const lastDay = pAddDays(today, 2);
   const horizonMs = nowMs + Math.max(...SCHED_REMINDER_CHOICES) * 60000;
   const items = [];
-  for (const s of await selectEntities(env, 'StaffShift',
+  for (const s of await shiftRows(env,
     `json_extract(data,'$.status') = 'published' AND json_extract(data,'$.date') BETWEEN ? AND ?`, [today, lastDay])) {
     if (!s.user_id || hmToMin(s.start) === null) continue;
     items.push({ kind: 'shifts', id: s.id, userId: s.user_id, start: easternToUTC(s.date, s.start), date: s.date, hm: s.start,
@@ -4578,7 +4586,7 @@ async function schedFeedEvents(env, userId, nowMs = Date.now()) {
   const to = pAddDays(today, SCHED_FEED_FUTURE_DAYS);
   const stamp = (row) => icsUtc(Date.parse(row.updated_date || '') || nowMs);
   const events = [];
-  for (const s of await selectEntities(env, 'StaffShift',
+  for (const s of await shiftRows(env,
     `json_extract(data,'$.user_id') = ? AND json_extract(data,'$.status') = 'published' AND json_extract(data,'$.date') BETWEEN ? AND ?`, [userId, from, to])) {
     if (!isDateKey(s.date) || hmToMin(s.start) === null) continue;
     const [a, b] = schedSpan(s.date, s.start, s.end);
@@ -4664,7 +4672,7 @@ async function runScheduleRemindFunction(name, payload, { env, user, url, reques
   if (!isStaff(user)) return NO_PERMISSION;
   switch (name) {
     case 'getReminderPrefs':
-      return { success: true, prefs: schedReminderPrefs(await schedUserData(env, user.id)), choices: SCHED_REMINDER_CHOICES, defaults: SCHED_REMINDER_DEFAULTS };
+      return { success: true, prefs: schedReminderPrefs(await schedUserData(env, user.id)), choices: SCHED_REMINDER_CHOICES, defaults: SCHED_REMINDER_DEFAULTS, shifts_enabled: shiftsOn(env) };
 
     case 'saveReminderPrefs': {
       const data = (await schedUserData(env, user.id)) || {};

@@ -17,7 +17,7 @@ async function staff(email, name) {
 }
 
 before(async () => {
-  srv = await startServer();
+  srv = await startServer(undefined, { vars: { SCHEDULE_SHIFTS: 'on' } });
   api = client(srv.base);
   const first = await api.call('POST', 'auth/register', { email: ADMIN.email, password: ADMIN.password, full_name: 'Ada Admin' });
   admin = { token: first.data.token, id: first.data.user.id };

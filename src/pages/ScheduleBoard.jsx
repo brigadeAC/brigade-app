@@ -23,6 +23,17 @@ const fmtTime = (hm) => {
 };
 const ROLE_LABELS = ["Coach", "Front desk", "Open gym", "Admin", "Cleaning"];
 const BLOCKS = [["early", "Early"], ["midday", "Midday"], ["evening", "Evening"]];
+const BLOCK_SPANS = { early: [300, 660], midday: [660, 960], evening: [960, 1260] }; // minutes: 5a–11a, 11a–4p, 4p–9p
+const toMin = (hm) => { const [h, m] = String(hm || "").split(":").map(Number); return h * 60 + (m || 0); };
+// false = the coach said they're not available for (part of) this time; null = they didn't say.
+const fitsAvailability = (avail, start, end) => {
+  if (!avail || !start) return null;
+  let t = toMin(start);
+  const stop = toMin(end || start);
+  const spans = Object.entries(BLOCK_SPANS).filter(([k]) => avail.blocks?.[k]).map(([, v]) => v).sort((a, b) => a[0] - b[0]);
+  for (const [a, b] of spans) if (a <= t && b > t) t = b;
+  return t >= stop;
+};
 // Colors: shifts teal, classes purple, PT coral, time off gray hatched.
 const CHIP = {
   shift: "bg-teal-500/15 text-teal-800 dark:text-teal-200 border border-teal-500/30",
@@ -193,13 +204,14 @@ export default function ScheduleBoard() {
   const days = data?.days || Array.from({ length: 7 }, (_, i) => addDays(week, i));
   const drafts = data?.counts?.drafts || 0;
   const published = data?.status === "published";
+  const shiftsOn = !!data?.shifts_enabled;
 
   return (
     <div className="space-y-4 pb-8">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Schedule board</h1>
-          <p className="text-sm text-muted-foreground">Build the week, then publish it so coaches see it.</p>
+          <p className="text-sm text-muted-foreground">{shiftsOn ? "Build the week, then publish it so coaches see it." : "Who coaches each class and PT session, next to everyone\u2019s availability."}</p>
         </div>
         <Link to={createPageUrl("TimeOffInbox")} className="inline-flex items-center gap-1.5 text-sm rounded-md border border-border px-3 py-1.5 hover:bg-accent">
           <Inbox className="w-4 h-4" /> Time off requests
@@ -211,13 +223,15 @@ export default function ScheduleBoard() {
         <Button variant="outline" size="icon" onClick={() => setWeek(addDays(week, -7))} aria-label="Previous week"><ChevronLeft className="w-4 h-4" /></Button>
         <span className="text-sm font-medium min-w-[9rem] text-center">Week of {fmtDay(week, { month: "short", day: "numeric" })}</span>
         <Button variant="outline" size="icon" onClick={() => setWeek(addDays(week, 7))} aria-label="Next week"><ChevronRight className="w-4 h-4" /></Button>
-        <Badge variant="outline" className={published ? "border-emerald-500/40 text-emerald-700 dark:text-emerald-300" : ""}>{published ? "Published" : "Draft"}</Badge>
+        {shiftsOn && <Badge variant="outline" className={published ? "border-emerald-500/40 text-emerald-700 dark:text-emerald-300" : ""}>{published ? "Published" : "Draft"}</Badge>}
         <div className="flex-1" />
-        <Button variant="outline" size="sm" className="gap-1.5" disabled={busy === "copy"} onClick={copyLast}><Copy className="w-4 h-4" /> Copy last week</Button>
+        {shiftsOn && <Button variant="outline" size="sm" className="gap-1.5" disabled={busy === "copy"} onClick={copyLast}><Copy className="w-4 h-4" /> Copy last week</Button>}
+        {shiftsOn && (
         <Button size="sm" className="gap-1.5" disabled={busy === "publish" || (published && !drafts)} onClick={publish}>
           {busy === "publish" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
           Publish schedule{drafts ? ` (${drafts})` : ""}
         </Button>
+        )}
       </div>
 
       {isLoading && <div className="py-10 flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>}
@@ -260,11 +274,17 @@ export default function ScheduleBoard() {
                     const off = offFor(coach.id, d);
                     const avail = data.availability?.[coach.id]?.[d];
                     const availText = avail ? BLOCKS.filter(([k]) => avail.blocks?.[k]).map(([, l]) => l).join(", ") || "Not available" : null;
+                    const unavailable = availText === "Not available";
                     return (
-                      <td key={d} className={`p-1.5 align-top cursor-pointer hover:bg-accent/50 ${avail && !off && availText !== "Not available" ? "bg-teal-500/[0.04]" : ""}`}
+                      <td key={d} className={`p-1.5 align-top ${shiftsOn ? "cursor-pointer hover:bg-accent/50" : ""} ${!off && unavailable ? "bg-red-500/[0.06]" : ""}`}
                         style={off ? hatched : undefined}
-                        onClick={() => setDialog({ user_id: coach.id, date: d, start: "06:00", end: "10:00", role_label: "Coach", note: "" })}>
+                        onClick={() => shiftsOn && setDialog({ user_id: coach.id, date: d, start: "06:00", end: "10:00", role_label: "Coach", note: "" })}>
                         <div className="space-y-1 min-h-[2.5rem]">
+                          {availText && !off && (
+                            <div className={`text-[10px] ${unavailable ? "text-red-700 dark:text-red-300 font-medium" : "text-muted-foreground"}`}>
+                              {unavailable ? "Not available" : `Avail: ${availText}`}
+                            </div>
+                          )}
                           {off && (
                             <div className="rounded px-1.5 py-0.5 bg-muted text-muted-foreground">
                               Time off{off.status === "pending" ? " (asked)" : ""}{off.part_day ? ` ${fmtTime(off.part_day.start)}–${fmtTime(off.part_day.end)}` : ""}
@@ -281,11 +301,13 @@ export default function ScheduleBoard() {
                               <span className="font-medium">{fmtTime(it.start)}–{fmtTime(it.end)}</span>{" "}
                               {it.kind === "shift" ? it.role_label : it.title}
                               {it.kind === "pt" && it.client_name ? ` · ${it.client_name}` : ""}
+                              {fitsAvailability(avail, it.start, it.end) === false && (
+                                <span className="ml-1 text-red-700 dark:text-red-300" title="Outside their availability">⚠</span>
+                              )}
                               {it.kind === "shift" && it.status !== "published" && <span className="opacity-70"> · draft</span>}
                             </button>
                           ))}
-                          {availText && !items.length && !off && <div className="text-[10px] text-muted-foreground">{availText}</div>}
-                          {!items.length && !off && !availText && <Plus className="w-3.5 h-3.5 text-muted-foreground/40" />}
+                          {shiftsOn && !items.length && !off && !availText && <Plus className="w-3.5 h-3.5 text-muted-foreground/40" />}
                         </div>
                       </td>
                     );
@@ -298,11 +320,12 @@ export default function ScheduleBoard() {
       )}
 
       <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
-        <span className="inline-flex items-center gap-1"><span className={`w-3 h-3 rounded ${CHIP.shift}`} /> Shift</span>
-        <span className="inline-flex items-center gap-1"><span className={`w-3 h-3 rounded ${CHIP.draft}`} /> Draft shift</span>
+        {shiftsOn && <span className="inline-flex items-center gap-1"><span className={`w-3 h-3 rounded ${CHIP.shift}`} /> Shift</span>}
+        {shiftsOn && <span className="inline-flex items-center gap-1"><span className={`w-3 h-3 rounded ${CHIP.draft}`} /> Draft shift</span>}
         <span className="inline-flex items-center gap-1"><span className={`w-3 h-3 rounded ${CHIP.class}`} /> Class</span>
         <span className="inline-flex items-center gap-1"><span className={`w-3 h-3 rounded ${CHIP.pt}`} /> PT</span>
         <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded border border-border" style={hatched} /> Time off</span>
+        <span className="inline-flex items-center gap-1"><span className="text-red-700 dark:text-red-300">⚠</span> Outside their availability</span>
       </div>
 
       <ShiftDialog open={!!dialog} onOpenChange={(o) => !o && setDialog(null)} initial={dialog} coaches={data?.coaches || []}
