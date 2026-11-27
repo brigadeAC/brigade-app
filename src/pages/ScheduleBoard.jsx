@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertTriangle, ChevronLeft, ChevronRight, Copy, Inbox, Loader2, Plus, Send, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { todayKey, addDays, fromKey } from "@/lib/programs";
 import { invoke, errorMessage } from "@/components/classes/coach/api";
 
@@ -101,12 +102,42 @@ function ShiftDialog({ open, onOpenChange, initial, coaches, onSaved }) {
   );
 }
 
+// How a coach fits a class/PT time: green = said they're available, red = time off,
+// marked not available, or already coaching then; gray = hasn't entered availability.
+const overlaps = (s1, e1, s2, e2) => toMin(s1) < toMin(e2 || s2) && toMin(s2) < toMin(e1 || s1);
+function coachFit(data, coach, item) {
+  const first = (coach.name || "This coach").split(" ")[0];
+  const dayName = fmtDay(item.date, { weekday: "long" });
+  const off = (data?.time_off || []).find((t) => t.user_id === coach.id && t.start_date <= item.date && t.end_date >= item.date
+    && (!t.part_day || overlaps(t.part_day.start, t.part_day.end, item.start, item.end)));
+  if (off) return { tone: "red", why: off.status === "approved" ? `${first} has time off on ${dayName}.` : `${first} asked for ${dayName} off (not decided yet).` };
+  const busy = [...(data?.classes || []).filter((c) => c.coach_user_id === coach.id).map((c) => ({ ...c, kind: "class" })),
+    ...(data?.pt || []).filter((p) => p.trainer_id === coach.id).map((p) => ({ ...p, kind: "pt" }))]
+    .find((x) => x.id !== item.id && x.date === item.date && overlaps(x.start, x.end, item.start, item.end));
+  if (busy) return { tone: "red", why: `${first} is already coaching ${busy.title} at ${fmtTime(busy.start)}.` };
+  const avail = data?.availability?.[coach.id]?.[item.date];
+  const fits = fitsAvailability(avail, item.start, item.end);
+  if (fits === true) return { tone: "green", why: `${first} is available.` };
+  if (fits === false) {
+    const missing = BLOCKS.filter(([k]) => !avail.blocks?.[k] && BLOCK_SPANS[k][0] < toMin(item.end || item.start) && toMin(item.start) < BLOCK_SPANS[k][1])
+      .map(([, l]) => l.toLowerCase());
+    return { tone: "red", why: `${first} marked ${dayName} ${missing.join(" and ") || "this time"} as not available.` };
+  }
+  return { tone: "gray", why: `${first} hasn't entered availability for ${dayName}.` };
+}
+const TONE = {
+  green: "text-emerald-700 dark:text-emerald-300",
+  red: "text-red-700 dark:text-red-300",
+  gray: "text-muted-foreground",
+};
+
 // Click a class or PT item on the board: change who coaches it.
-function ItemDialog({ item, coaches, onClose, onDone }) {
+function ItemDialog({ item, data, onClose, onDone }) {
   const [pick, setPick] = useState("");
   const [busy, setBusy] = useState(false);
   React.useEffect(() => { setPick(item ? (item.kind === "class" ? item.coach_user_id : item.trainer_id) || "" : ""); }, [item]);
   if (!item) return null;
+  const coaches = data?.coaches || [];
   const isClass = item.kind === "class";
   const current = isClass ? item.coach_user_id : item.trainer_id;
   const save = async (to) => {
@@ -114,10 +145,25 @@ function ItemDialog({ item, coaches, onClose, onDone }) {
     try {
       if (isClass) await invoke("assignClassCoach", { session_id: item.id, coach_user_id: to || null });
       else await invoke("reassignPtSession", { session_id: item.id, trainer_id: to });
-      toast.success(to ? "Coach changed. They've been told." : "Coach removed. It's in the Needs coach row now.");
+      toast.success(to ? "Coach assigned. They've been told." : "Coach removed. It's in the Needs coach row now.");
       onDone();
     } catch (e) { toast.error(errorMessage(e)); } finally { setBusy(false); }
   };
+  const row = (id, label, fit) => (
+    <label key={id || "none"} className={`flex items-center gap-2 rounded-md border px-3 py-2 cursor-pointer ${pick === id ? "border-primary bg-primary/5" : "border-border hover:bg-accent/50"}`}>
+      <input type="radio" name="coach" className="accent-primary" checked={pick === id} onChange={() => setPick(id)} />
+      <span className={`flex-1 text-sm font-medium ${fit ? TONE[fit.tone] : "text-muted-foreground"}`}>{label}</span>
+      {fit?.tone === "red" && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className={TONE.red} aria-label={fit.why} tabIndex={0}><AlertTriangle className="w-4 h-4" /></span>
+          </TooltipTrigger>
+          <TooltipContent>{fit.why}</TooltipContent>
+        </Tooltip>
+      )}
+      {fit?.tone === "gray" && <span className="text-[11px] text-muted-foreground">no availability</span>}
+    </label>
+  );
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-md">
@@ -129,17 +175,22 @@ function ItemDialog({ item, coaches, onClose, onDone }) {
             {isClass && item.reserved_count ? ` · ${item.reserved_count} booked` : ""}
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-1.5">
-          <Label>{isClass ? "Coach" : "Trainer"}</Label>
-          <select className={selectCls} value={pick} onChange={(e) => setPick(e.target.value)}>
-            {isClass && <option value="">No coach</option>}
-            {coaches.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
-          <p className="text-xs text-muted-foreground">This changes right away. It doesn&apos;t wait for Publish.</p>
-          {!isClass && (
-            <Link to={createPageUrl("Schedule")} className="inline-block text-xs text-primary underline underline-offset-2">Open the PT schedule</Link>
-          )}
-        </div>
+        <TooltipProvider delayDuration={100}>
+          <div className="space-y-1.5">
+            <Label>{isClass ? "Coach" : "Trainer"}</Label>
+            <div className="space-y-1.5 max-h-72 overflow-y-auto">
+              {coaches.map((c) => row(c.id, c.name, coachFit(data, c, item)))}
+              {isClass && row("", "No coach", null)}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              <span className={TONE.green}>Green</span> = available. <span className={TONE.red}>Red</span> = not available. Hover the <AlertTriangle className="inline w-3 h-3" /> to see why.
+              You can still pick anyone.
+            </p>
+            {!isClass && (
+              <Link to={createPageUrl("Schedule")} className="inline-block text-xs text-primary underline underline-offset-2">Open the PT schedule</Link>
+            )}
+          </div>
+        </TooltipProvider>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button disabled={busy || pick === (current || "")} onClick={() => save(pick)}>
@@ -148,16 +199,6 @@ function ItemDialog({ item, coaches, onClose, onDone }) {
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  );
-}
-
-function CoachPicker({ coaches, value, onPick, disabled }) {
-  return (
-    <select className="h-7 w-full rounded border border-input bg-background px-1 text-xs" disabled={disabled}
-      value={value || ""} onChange={(e) => onPick(e.target.value || null)} aria-label="Assign a coach">
-      <option value="">Assign coach…</option>
-      {coaches.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-    </select>
   );
 }
 
@@ -193,7 +234,6 @@ export default function ScheduleBoard() {
     try { const r = await fn(); toast.success(typeof ok === "function" ? ok(r) : ok); refresh(); }
     catch (e) { toast.error(errorMessage(e)); } finally { setBusy(null); }
   };
-  const assign = (sessionId, coachId) => act(`assign-${sessionId}`, () => invoke("assignClassCoach", { session_id: sessionId, coach_user_id: coachId }), "Coach assigned.");
   const copyLast = () => act("copy", () => invoke("copyScheduleWeek", { from_week: addDays(week, -7), to_week: week }),
     (r) => `Copied ${r.created} shift${r.created === 1 ? "" : "s"}${r.skipped?.length ? `, skipped ${r.skipped.length}` : ""}.`);
   const publish = () => act("publish", () => invoke("publishSchedule", { week_start: week }),
@@ -259,7 +299,8 @@ export default function ScheduleBoard() {
                       {needsCoach.filter((c) => c.date === d).map((c) => (
                         <div key={c.id} className="rounded-md border border-red-500/40 bg-red-500/10 p-1.5 space-y-1">
                           <div className="font-medium text-red-800 dark:text-red-200">{fmtTime(c.start)} {c.title}</div>
-                          <CoachPicker coaches={data.coaches} disabled={busy === `assign-${c.id}`} onPick={(id) => id && assign(c.id, id)} />
+                          <button type="button" className="h-7 w-full rounded border border-input bg-background px-2 text-left text-xs hover:bg-accent"
+                            onClick={() => setItemDialog({ ...c, kind: "class" })}>Assign coach…</button>
                         </div>
                       ))}
                     </td>
@@ -330,7 +371,7 @@ export default function ScheduleBoard() {
 
       <ShiftDialog open={!!dialog} onOpenChange={(o) => !o && setDialog(null)} initial={dialog} coaches={data?.coaches || []}
         onSaved={() => { setDialog(null); refresh(); }} />
-      <ItemDialog item={itemDialog} coaches={data?.coaches || []} onClose={() => setItemDialog(null)}
+      <ItemDialog item={itemDialog} data={data} onClose={() => setItemDialog(null)}
         onDone={() => { setItemDialog(null); refresh(); }} />
     </div>
   );
