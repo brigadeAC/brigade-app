@@ -130,6 +130,12 @@ const TONE = {
   red: "text-red-700 dark:text-red-300",
   gray: "text-muted-foreground",
 };
+const ROW_TONE = {
+  green: "bg-emerald-500/15 border-emerald-500/60",
+  red: "bg-red-500/15 border-red-500/60",
+  gray: "bg-background border-border",
+};
+const DOT = { green: "bg-emerald-500", red: "bg-red-500", gray: "bg-muted-foreground/40" };
 
 // Click a class or PT item on the board: change who coaches it.
 function ItemDialog({ item, data, onClose, onDone }) {
@@ -150,13 +156,15 @@ function ItemDialog({ item, data, onClose, onDone }) {
     } catch (e) { toast.error(errorMessage(e)); } finally { setBusy(false); }
   };
   const row = (id, label, fit) => (
-    <label key={id || "none"} className={`flex items-center gap-2 rounded-md border px-3 py-2 cursor-pointer ${pick === id ? "border-primary bg-primary/5" : "border-border hover:bg-accent/50"}`}>
+    <label key={id || "none"} className={`flex items-center gap-2 rounded-md border-2 px-3 py-2 cursor-pointer ${fit ? ROW_TONE[fit.tone] : ROW_TONE.gray} ${pick === id ? "ring-2 ring-primary ring-offset-1" : ""}`}>
       <input type="radio" name="coach" className="accent-primary" checked={pick === id} onChange={() => setPick(id)} />
-      <span className={`flex-1 text-sm font-medium ${fit ? TONE[fit.tone] : "text-muted-foreground"}`}>{label}</span>
+      {fit && <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${DOT[fit.tone]}`} aria-hidden />}
+      <span className={`flex-1 text-sm font-semibold ${fit ? TONE[fit.tone] : "text-muted-foreground"}`}>{label}</span>
+      {fit?.tone === "green" && <span className={`text-[11px] font-medium ${TONE.green}`}>available</span>}
       {fit?.tone === "red" && (
         <Tooltip>
           <TooltipTrigger asChild>
-            <span className={TONE.red} aria-label={fit.why} tabIndex={0}><AlertTriangle className="w-4 h-4" /></span>
+            <span className={`inline-flex items-center gap-1 text-[11px] font-medium ${TONE.red}`} aria-label={fit.why} tabIndex={0}>not available <AlertTriangle className="w-4 h-4" /></span>
           </TooltipTrigger>
           <TooltipContent>{fit.why}</TooltipContent>
         </Tooltip>
