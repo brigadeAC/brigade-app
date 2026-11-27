@@ -4092,7 +4092,7 @@ async function boardRange(env, from, to) {
   })).sort((a, b) => (a.date + a.start).localeCompare(b.date + b.start));
   const ptOut = pt.filter((p) => BOARD_HM.test(String(p.start_time || ''))).map((p) => ({
     id: p.id, date: p.date, start: p.start_time, end: boardEnd(p.start_time, p.duration || p.duration_min),
-    trainer_id: p.trainer_id, title: String(p.type || 'PT session').replace(/_/g, ' '), status: p.status || 'scheduled',
+    trainer_id: p.trainer_id, title: String(p.type || 'PT session').replace(/_/g, ' '), status: p.status || 'scheduled', client_name: p.client_name || '',
   }));
   const availability = {};
   for (const a of avail) (availability[a.user_id] ||= {})[a.date] = { blocks: a.blocks || {}, note: a.note || '' };
@@ -4195,6 +4195,24 @@ async function runScheduleBoardFunction(name, payload, ctx) {
     case 'assignClassCoach': {
       // The one coach-change path: editClassSession patches, audits and notifies.
       return editClassSession(env, user, { session_id: p.session_id, coach_user_id: p.coach_user_id || null });
+    }
+
+    case 'reassignPtSession': {
+      // Move a PT / client appointment to another trainer. Both trainers are told.
+      const sess = await getEntityById(env, 'Session', p.session_id);
+      if (!sess || !sess.trainer_id) return { success: false, error: 'Session not found.' };
+      const who = await staffLogin(env, p.trainer_id);
+      if (!who) return { success: false, error: 'Pick someone from the team.' };
+      if (who.id === sess.trainer_id) return { success: true, session: sess, unchanged: true };
+      const prevId = sess.trainer_id;
+      const updated = await patchEntity(env, sess, { trainer_id: who.id, trainer_name: who.full_name || who.email, updated_by: user.id });
+      const what = `${String(sess.type || 'PT session').replace(/_/g, ' ')}${sess.client_name ? ` with ${sess.client_name}` : ''} on ${boardWeekLabel(sess.date)} at ${sess.start_time}`;
+      await audit(env, { actor: user.email, action: 'reassign_pt', target: 'Session', targetId: sess.id, detail: `${prevId} -> ${who.id}`, request: null });
+      if (sess.date >= programToday()) {
+        await boardNotify(env, [who.id], { title: 'New session for you', message: `You now have the ${what}.` });
+        await boardNotify(env, [prevId], { title: 'Session moved', message: `The ${what} was moved to ${who.full_name || 'another coach'}.` });
+      }
+      return { success: true, session: updated };
     }
 
     case 'copyScheduleWeek': {
@@ -6174,7 +6192,7 @@ async function runFunction(name, payload, ctx) {
       return runSalesFunction(name, payload, ctx);
     // ===== end Phase 4: SALES (cases) =====
     // ===== Scheduling: BOARD (cases) =====
-    case 'scheduleBoard': case 'saveShift': case 'deleteShift': case 'assignClassCoach': case 'copyScheduleWeek':
+    case 'scheduleBoard': case 'saveShift': case 'deleteShift': case 'assignClassCoach': case 'copyScheduleWeek': case 'reassignPtSession':
     case 'publishSchedule': case 'timeOffInbox': case 'decideTimeOff':
       return runScheduleBoardFunction(name, payload, ctx);
     // ===== end Scheduling: BOARD (cases) =====

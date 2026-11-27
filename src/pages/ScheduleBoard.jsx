@@ -90,6 +90,56 @@ function ShiftDialog({ open, onOpenChange, initial, coaches, onSaved }) {
   );
 }
 
+// Click a class or PT item on the board: change who coaches it.
+function ItemDialog({ item, coaches, onClose, onDone }) {
+  const [pick, setPick] = useState("");
+  const [busy, setBusy] = useState(false);
+  React.useEffect(() => { setPick(item ? (item.kind === "class" ? item.coach_user_id : item.trainer_id) || "" : ""); }, [item]);
+  if (!item) return null;
+  const isClass = item.kind === "class";
+  const current = isClass ? item.coach_user_id : item.trainer_id;
+  const save = async (to) => {
+    setBusy(true);
+    try {
+      if (isClass) await invoke("assignClassCoach", { session_id: item.id, coach_user_id: to || null });
+      else await invoke("reassignPtSession", { session_id: item.id, trainer_id: to });
+      toast.success(to ? "Coach changed. They've been told." : "Coach removed. It's in the Needs coach row now.");
+      onDone();
+    } catch (e) { toast.error(errorMessage(e)); } finally { setBusy(false); }
+  };
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="capitalize">{item.title}</DialogTitle>
+          <DialogDescription>
+            {fmtDay(item.date, { weekday: "long", month: "short", day: "numeric" })} · {fmtTime(item.start)}–{fmtTime(item.end)}
+            {!isClass && item.client_name ? ` · ${item.client_name}` : ""}
+            {isClass && item.reserved_count ? ` · ${item.reserved_count} booked` : ""}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-1.5">
+          <Label>{isClass ? "Coach" : "Trainer"}</Label>
+          <select className={selectCls} value={pick} onChange={(e) => setPick(e.target.value)}>
+            {isClass && <option value="">No coach</option>}
+            {coaches.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+          <p className="text-xs text-muted-foreground">This changes right away. It doesn&apos;t wait for Publish.</p>
+          {!isClass && (
+            <Link to={createPageUrl("Schedule")} className="inline-block text-xs text-primary underline underline-offset-2">Open the PT schedule</Link>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button disabled={busy || pick === (current || "")} onClick={() => save(pick)}>
+            {busy && <Loader2 className="w-4 h-4 animate-spin mr-1.5" />}Save
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function CoachPicker({ coaches, value, onPick, disabled }) {
   return (
     <select className="h-7 w-full rounded border border-input bg-background px-1 text-xs" disabled={disabled}
@@ -106,6 +156,7 @@ export default function ScheduleBoard() {
   const qc = useQueryClient();
   const [week, setWeek] = useState(() => mondayOf(todayKey()));
   const [dialog, setDialog] = useState(null);
+  const [itemDialog, setItemDialog] = useState(null);
   const [busy, setBusy] = useState(null);
   const { data, isLoading, error } = useQuery({
     queryKey: ["scheduleBoard", week],
@@ -225,9 +276,11 @@ export default function ScheduleBoard() {
                               onClick={(e) => {
                                 e.stopPropagation();
                                 if (it.kind === "shift") setDialog({ id: it.id, user_id: it.user_id, date: it.date, start: it.start, end: it.end, role_label: it.role_label, note: it.note });
+                                else setItemDialog(it);
                               }}>
                               <span className="font-medium">{fmtTime(it.start)}–{fmtTime(it.end)}</span>{" "}
                               {it.kind === "shift" ? it.role_label : it.title}
+                              {it.kind === "pt" && it.client_name ? ` · ${it.client_name}` : ""}
                               {it.kind === "shift" && it.status !== "published" && <span className="opacity-70"> · draft</span>}
                             </button>
                           ))}
@@ -254,6 +307,8 @@ export default function ScheduleBoard() {
 
       <ShiftDialog open={!!dialog} onOpenChange={(o) => !o && setDialog(null)} initial={dialog} coaches={data?.coaches || []}
         onSaved={() => { setDialog(null); refresh(); }} />
+      <ItemDialog item={itemDialog} coaches={data?.coaches || []} onClose={() => setItemDialog(null)}
+        onDone={() => { setItemDialog(null); refresh(); }} />
     </div>
   );
 }

@@ -42,7 +42,7 @@ test('managers get coach_schedule.manage; coaches and members are refused', asyn
   const c = (await api.call('GET', 'auth/me', undefined, coach.token)).data;
   assert.ok(!c.permissions.includes('coach_schedule.manage'));
   for (const [fn, body] of [['scheduleBoard', {}], ['saveShift', { user_id: coach.id, date: nextWeek, start: '06:00', end: '10:00' }],
-    ['deleteShift', { id: 'x' }], ['assignClassCoach', { session_id: 'x', coach_user_id: coach.id }], ['copyScheduleWeek', { from_week: nextWeek }],
+    ['deleteShift', { id: 'x' }], ['assignClassCoach', { session_id: 'x', coach_user_id: coach.id }], ['reassignPtSession', { session_id: 'x', trainer_id: coach.id }], ['copyScheduleWeek', { from_week: nextWeek }],
     ['publishSchedule', { week_start: nextWeek }], ['timeOffInbox', {}], ['decideTimeOff', { id: 'x', approve: true }]]) {
     assert.equal((await api.fn(fn, body, coach.token)).code, 'forbidden', `coach ${fn}`);
     assert.equal((await api.fn(fn, body, member.token)).code, 'forbidden', `member ${fn}`);
@@ -122,6 +122,22 @@ test('assignClassCoach goes through editClassSession', async () => {
   assert.ok(log.includes('edited one class: coach'));
   b = await api.fn('scheduleBoard', { week_start: nextWeek }, manager.token);
   assert.ok(!b.classes.find((c) => c.id === s.id).needs_coach);
+});
+
+test('reassignPtSession moves a PT session to another trainer (managers only)', async () => {
+  const day = addDays(nextWeek, 3);
+  const pt = await api.create('Session', { client_id: 'c1', client_name: 'Pat Client', trainer_id: coach.id, date: day, start_time: '10:00', end_time: '11:00', type: 'personal_training', status: 'scheduled' }, coach.token);
+  let b = await api.fn('scheduleBoard', { week_start: nextWeek }, manager.token);
+  assert.equal(b.pt.find((x) => x.id === pt.id).client_name, 'Pat Client');
+  assert.equal((await api.fn('reassignPtSession', { session_id: pt.id, trainer_id: coach2.id }, coach.token)).success, false, 'coaches cannot');
+  assert.equal((await api.fn('reassignPtSession', { session_id: pt.id, trainer_id: member.id }, manager.token)).success, false, 'members cannot train');
+  const r = await api.fn('reassignPtSession', { session_id: pt.id, trainer_id: coach2.id }, manager.token);
+  assert.equal(r.success, true, JSON.stringify(r));
+  assert.equal(r.session.trainer_id, coach2.id);
+  b = await api.fn('scheduleBoard', { week_start: nextWeek }, manager.token);
+  assert.equal(b.pt.find((x) => x.id === pt.id).trainer_id, coach2.id);
+  const log = JSON.stringify((await api.call('GET', 'audit?limit=200', undefined, admin.token)).data);
+  assert.ok(log.includes('reassign_pt'));
 });
 
 test('time off inbox suggests cover only from people who are free and not on time off', async () => {
